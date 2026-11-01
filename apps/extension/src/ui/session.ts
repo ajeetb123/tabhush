@@ -54,7 +54,9 @@ function tasksCard(s: ActiveSession): HTMLElement {
   input.addEventListener("keydown", (e) => e.key === "Enter" && add());
   const row = h("div", { className: "row" }, input);
   if (voice) {
-    const mic = h("button", { className: "btn mic", textContent: "🎙", attrs: { "aria-label": "Say a task", "aria-pressed": "false" } });
+    const mic = h("button", { className: "btn mic", attrs: { "aria-label": "Say a task", "aria-pressed": "false" } });
+    mic.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
     mic.addEventListener("click", () => {
       mic.setAttribute("aria-pressed", "true");
       void listenOnce().then((said) => {
@@ -121,7 +123,7 @@ function groupByDomain(items: PreviewItem[]): [string, PreviewItem[]][] {
 function blockList(s: ActiveSession): Node[] {
   const out: Node[] = [];
   if (!s.preview.length) {
-    out.push(h("div", { className: "card empty", textContent: s.taskIds.length ? "Nothing to block. Every open tab fits. ✨" : "Add a task to see what gets blocked." }));
+    out.push(h("div", { className: "card empty", textContent: s.taskIds.length ? "Nothing to block. Every open tab fits." : "Add a task to see what gets blocked." }));
     return out;
   }
   for (const [domain, items] of groupByDomain(s.preview)) {
@@ -193,13 +195,13 @@ function endedView(s: ActiveSession): Node[] {
   again.addEventListener("click", () => void call({ type: "ui:start" }));
   const done = h("button", { className: "btn", textContent: "Done" });
   done.addEventListener("click", () => void call({ type: "ui:dismiss" }).then(() => window.close()));
-  const report = h("button", { className: "btn", textContent: "📊 See your day" });
+  const report = h("button", { className: "btn", textContent: "See your day" });
   report.addEventListener("click", () => void call({ type: "ui:dismiss" }).then(() => location.replace(chrome.runtime.getURL("ui/report.html"))));
   setFooter(h("div", { className: "row" }, report, done), again);
   const duration = (s.endedAt ?? Date.now()) - (s.committedAt ?? s.startedAt);
   const won = s.endKind === "normal";
   const out: Node[] = [
-    hero({ text: won ? "Goal reached" : "Ended early" }, won ? "Nice work 🎯" : "Session over", s.taskLabel ?? undefined),
+    hero({ text: won ? "Goal reached" : "Ended early" }, won ? "Session complete" : "Session over", s.taskLabel ?? undefined),
     h("div", { className: "stats" }, stat(formatDuration(duration), "locked in"), stat(s.goalMin ? `${s.goalMin} min` : "–", "goal"), stat(String(blockedCount(s)), "blocked")),
   ];
   const byDomain = new Map<string, number>();

@@ -84,8 +84,7 @@ export function goalRing(): { el: HTMLElement; update: (elapsedMs: number, goalM
   svg.setAttribute("viewBox", "0 0 120 120");
   svg.setAttribute("aria-hidden", "true");
   svg.innerHTML =
-    '<defs><linearGradient id="ringgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6d5dfc"/><stop offset="1" stop-color="#ff5fa2"/></linearGradient></defs>' +
-    '<circle class="track" cx="60" cy="60" r="52" fill="none" stroke-width="10"/>' +
+        '<circle class="track" cx="60" cy="60" r="52" fill="none" stroke-width="10"/>' +
     '<circle class="bar" cx="60" cy="60" r="52" fill="none" stroke-width="10"/>';
   const bar = svg.querySelector<SVGCircleElement>(".bar")!;
   const length = 2 * Math.PI * 52;

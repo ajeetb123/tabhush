@@ -9,7 +9,8 @@
 import { ACTIVE_TIME, MS, REPORT } from "@lockin/core";
 import type { ActiveSession } from "../background/session";
 
-export const TASK_COLORS = ["#6d5dfc", "#ff5fa2", "#22b8a3", "#f59e0b", "#3b82f6", "#a855f7"] as const;
+// Muted task colors: sage, clay, slate blue, ochre, plum, teal.
+export const TASK_COLORS = ["#6f9a8b", "#c48a64", "#7487ad", "#bfa35a", "#9a7aa6", "#5f97a3"] as const;
 
 export interface SessionLike {
   id: string;

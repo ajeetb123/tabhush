@@ -51,6 +51,7 @@ Current task and timer, Switch task, Break, End, AI checks left today, Limited m
 
 ## UI-06 Style
 One color per task · lots of whitespace · system font · dark mode · **no badges or confetti** (badges, pets and leaderboards are Out).
+**Owner change 2026-11-01 (Q-66):** a calm, non-vibrant look: warm neutral background, one muted pine-green accent, ink buttons, muted task colors, no gradients or emoji. Font: **Plus Jakarta Sans** (OFL-1.1), bundled with the extension (no web fonts), system fonts as fallback.
 
 ## UI-07 Limited mode indicator
 Toolbar badge shows "Limited mode" while failing open (`04` LOCK-08).

@@ -12,6 +12,7 @@
     "icons": "node ../../scripts/make-icons.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
     "@huggingface/transformers": "4.3.2",
     "@lockin/core": "*",
     "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0"

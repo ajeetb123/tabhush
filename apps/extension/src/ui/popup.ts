@@ -13,7 +13,7 @@ const openSessionPage = () => void chrome.tabs.create({ url: chrome.runtime.getU
 const openReport = () => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/report.html") });
 
 function reportLink(): HTMLElement {
-  const b = h("button", { className: "btn block", textContent: "📊  Your focus report" });
+  const b = h("button", { className: "btn block", textContent: "Your focus report" });
   b.addEventListener("click", openReport);
   return b;
 }
@@ -93,7 +93,7 @@ async function render(): Promise<void> {
     open.addEventListener("click", openSessionPage);
     const won = s.endKind === "normal";
     main.replaceChildren(
-      hero({ text: won ? "Goal reached" : "Ended" }, won ? "Nice work 🎯" : "Session over", s.taskLabel ?? ""),
+      hero({ text: won ? "Goal reached" : "Ended" }, won ? "Session complete" : "Session over", s.taskLabel ?? ""),
       start,
       h("div", { className: "stack", attrs: { style: "margin-top:10px" } }, open, reportLink()),
     );

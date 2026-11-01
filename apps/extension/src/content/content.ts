@@ -70,43 +70,43 @@ const STYLE = `
 .backdrop {
   position: fixed; inset: 0; z-index: 2147483647;
   display: flex; align-items: center; justify-content: center; padding: 24px;
-  background: radial-gradient(900px 500px at 15% -10%, rgba(109,93,252,.55) 0%, transparent 60%),
-    radial-gradient(900px 500px at 95% 110%, rgba(255,95,162,.35) 0%, transparent 60%), #0e0f14;
-  color: #eef0f6;
-  font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: #15181b;
+  color: #eceeef;
+  font: 15px/1.55 "Tabhush Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: -.005em; -webkit-font-smoothing: antialiased;
 }
 .card {
-  width: min(440px, 100%); padding: 32px 30px 26px; border-radius: 22px;
-  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
-  box-shadow: 0 30px 80px rgba(0,0,0,.45); text-align: center;
+  width: min(420px, 100%); padding: 34px 30px 26px; border-radius: 18px;
+  background: #1c2023; border: 1px solid #2a2f33;
+  box-shadow: 0 20px 60px rgba(0,0,0,.35); text-align: center;
 }
-.mark { width: 56px; height: 56px; margin: 0 auto 18px; border-radius: 16px; display: block; box-shadow: 0 8px 24px rgba(181,92,240,.45); }
-h1 { font-size: 22px; line-height: 1.25; margin: 0 0 8px; font-weight: 700; letter-spacing: -.01em; }
-p { margin: 6px 0; color: #b9bdcc; }
+.mark { width: 48px; height: 48px; margin: 0 auto 18px; border-radius: 13px; display: block; }
+h1 { font-size: 22px; line-height: 1.25; margin: 0 0 8px; font-weight: 700; letter-spacing: -.02em; }
+p { margin: 6px 0; color: #a3a8ad; }
 .task {
   display: inline-block; margin: 12px 0 4px; padding: 6px 14px; border-radius: 999px;
-  background: rgba(255,95,162,.14); border: 1px solid rgba(255,95,162,.45); color: #ffd9ea; font-weight: 600;
+  background: #23302c; border: 1px solid #3c5a50; color: #b9d6cc; font-weight: 600;
 }
-.note { margin-top: 14px; font-size: 13px; color: #9aa0b4; }
+.note { margin-top: 14px; font-size: 13px; color: #a3a8ad; }
 .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 22px; }
 button, textarea { font: inherit; }
 button {
-  padding: 10px 18px; border-radius: 12px; cursor: pointer; font-weight: 600;
-  border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: #eef0f6;
+  padding: 10px 18px; border-radius: 11px; cursor: pointer; font-weight: 600;
+  border: 1px solid #3a4045; background: transparent; color: #eceeef;
 }
-button.primary { background: linear-gradient(135deg, #6d5dfc, #ff5fa2); border-color: transparent; color: #fff; }
-button:focus-visible, textarea:focus-visible { outline: 3px solid #a5a9ff; outline-offset: 2px; }
+button.primary { background: #eceeef; border-color: #eceeef; color: #15181b; }
+button:focus-visible, textarea:focus-visible { outline: 2px solid #86b5a6; outline-offset: 2px; }
 textarea {
   width: 100%; margin-top: 12px; padding: 10px 12px; border-radius: 12px; resize: vertical;
-  border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.25); color: inherit;
+  border: 1px solid #3a4045; background: #15181b; color: inherit;
 }
-.check { margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.1); }
-.check p { margin-bottom: 8px; color: #dfe1ff; }
+.check { margin-top: 18px; padding-top: 16px; border-top: 1px solid #2a2f33; }
+.check p { margin-bottom: 8px; color: #eceeef; }
 .ask {
   position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 2147483647;
   display: flex; gap: 10px; align-items: center; padding: 10px 12px 10px 16px; border-radius: 14px;
-  background: #15161d; color: #eef0f6; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 12px 40px rgba(0,0,0,.35);
-  font: 14px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: #1c2023; color: #eceeef; border: 1px solid #2a2f33; box-shadow: 0 12px 40px rgba(0,0,0,.3);
+  font: 14px/1.4 "Tabhush Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 .ask button { padding: 6px 12px; border-radius: 10px; }
 `;
@@ -115,7 +115,23 @@ let host: HTMLElement | null = null;
 let shadow: ShadowRoot | null = null;
 let parked = false;
 
+let fontLoaded = false;
+
+/** The overlay uses the bundled font; @font-face can't live in a shadow root, so register it here. */
+function loadFont(): void {
+  if (fontLoaded) return;
+  fontLoaded = true;
+  try {
+    const face = new FontFace("Tabhush Sans", `url(${chrome.runtime.getURL("fonts/jakarta-latin.woff2")})`, { weight: "200 800" });
+    document.fonts.add(face);
+    void face.load().catch(() => undefined); // a page's CSP may refuse it: system fonts then
+  } catch {
+    // orphaned or unsupported: system fonts
+  }
+}
+
 function ensureHost(): ShadowRoot {
+  loadFont();
   if (host && shadow && host.isConnected) return shadow;
   host = document.createElement("div");
   host.id = HOST_ID;
@@ -208,7 +224,7 @@ export function showOverlay(taskLabel: string, canOverride: boolean, overrideNot
   const h1 = el("h1", { id: "lockin-title", textContent: "Blocked for this session" });
   const desc = el("p", {
     id: "lockin-desc",
-    textContent: "This doesn’t look like part of what you’re locked in on. It’s paused and kept as it was, and it opens again when the session ends.",
+    textContent: "This isn’t part of what you’re working on. It’s paused and kept as it was until you finish.",
   });
   const task = el("div", { className: "task", textContent: taskLabel });
   card.append(mark, h1, desc, task);

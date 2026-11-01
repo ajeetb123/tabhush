@@ -246,6 +246,9 @@ The owner found piracy and movie sites unblocked (yarrlist.net, a movie page pla
 3. **Incognito:** Chrome only lets an extension into incognito windows when the user switches on "Allow in Incognito"; the extension cannot turn that on. The popup and settings flag it.
 4. **Report (UI-02/UI-04, built early by owner request):** Today, Week and Sessions views like the scope's mockup: focused time, focus %, items blocked, a day strip colored by task (Q-46: 9am to 9pm, widened to cover any session outside it), time per task, and one insight sentence (Q-21: most-blocked site and when, plus the longest session's time of day). Focus % uses the time the front tab was on task versus off task; time with the browser out of focus is excluded (TIME-01).
 
+**Q-66 Look and feel** · **Resolved 2026-11-01 (owner)**
+The owner found the UI "looks like AI" and asked for clean and smooth, a nice non-vibrant background and a slick font. Done: warm neutral palette with one muted accent, ink primary buttons, muted task colors, no gradients or emoji; Plus Jakarta Sans (OFL-1.1, license shipped in `fonts/OFL.txt`) bundled in the package; logo redrawn as a white T with a sage dot on ink. Recorded in `09` UI-06.
+
 **Q-58 Tier 3 cap day boundary** · P1
 `AI_CAPS` are "per install per day" but the backend cannot see local time. The backend counts per UTC day [DERIVED]. Confirm, or decide how the client's day (4am local) should apply.
 

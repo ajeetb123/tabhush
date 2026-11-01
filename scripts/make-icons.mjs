@@ -1,4 +1,4 @@
-// Draws the Tabhush logo (rounded square, violet→pink gradient, white "T" with a hush dot) and
+// Draws the Tabhush logo (rounded ink square, white "T", sage hush dot) and
 // writes toolbar icons as PNG plus an SVG for pages. Pure Node: shapes are rasterized with 4x4
 // supersampling and encoded with zlib, so no image tools are needed.
 import { writeFileSync, mkdirSync } from "node:fs";
@@ -6,8 +6,8 @@ import { deflateSync } from "node:zlib";
 
 const out = new URL("../apps/extension/public/icons/", import.meta.url).pathname;
 mkdirSync(out, { recursive: true });
-const A = [109, 93, 252]; // #6D5DFC
-const B = [255, 95, 162]; // #FF5FA2
+const INK = [29, 33, 37]; // #1D2125
+const SAGE = [134, 181, 166]; // #86B5A6
 
 // Shapes in a 0..1 box.
 const roundRect = (x, y, x0, y0, x1, y1, r) => {
@@ -18,12 +18,12 @@ const circle = (x, y, cx, cy, r) => (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
 
 function sample(x, y) {
   if (!roundRect(x, y, 0, 0, 1, 1, 0.24)) return null;
-  const t = Math.min(1, Math.max(0, (x + y) / 2));
-  let c = A.map((a, i) => a + (B[i] - a) * t);
+  let c = INK;
   const stem = roundRect(x, y, 0.425, 0.24, 0.575, 0.78, 0.07);
   const foot = roundRect(x, y, 0.22, 0.24, 0.78, 0.39, 0.07); // the T's top bar
   const dot = circle(x, y, 0.74, 0.72, 0.075);
-  if (stem || foot || dot) c = [255, 255, 255];
+  if (stem || foot) c = [255, 255, 255];
+  if (dot) c = SAGE;
   return c;
 }
 
@@ -55,5 +55,5 @@ function png(size) {
 }
 
 for (const size of [16, 32, 48, 128]) writeFileSync(`${out}icon-${size}.png`, png(size));
-writeFileSync(`${out}logo.svg`, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6D5DFC"/><stop offset="1" stop-color="#FF5FA2"/></linearGradient></defs><rect width="100" height="100" rx="24" fill="url(#g)"/><rect x="42.5" y="24" width="15" height="54" rx="7" fill="#fff"/><rect x="22" y="24" width="56" height="15" rx="7" fill="#fff"/><circle cx="74" cy="72" r="7.5" fill="#fff"/></svg>\n`);
+writeFileSync(`${out}logo.svg`, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="24" fill="#1D2125"/><rect x="42.5" y="24" width="15" height="54" rx="7" fill="#fff"/><rect x="22" y="24" width="56" height="15" rx="7" fill="#fff"/><circle cx="74" cy="72" r="7.5" fill="#86B5A6"/></svg>\n`);
 console.log("icons written to", out);
