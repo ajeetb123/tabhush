@@ -118,6 +118,17 @@ async function itemVector(url: string, title: string): Promise<number[]> {
   return v;
 }
 
+/** Embeds every not-yet-seen item text in batches of 16 (CLS-20 "batches of 16 at Start"). */
+async function prefetchVectors(items: { url: string; title: string }[]): Promise<void> {
+  const texts = [...new Set(items.map((i) => itemText(i.title, itemDomain(i.url) ?? "")))].filter((t) => !vectorCache.has(t));
+  try {
+    const vectors = await embed(texts);
+    texts.forEach((t, i) => vectors[i] && vectorCache.set(t, vectors[i]!));
+  } catch {
+    // tier 2 unavailable: judging fails open item by item
+  }
+}
+
 async function ensureLabelVector(task: Task): Promise<Task> {
   if (task.labelVector) return task;
   try {
@@ -358,6 +369,9 @@ async function buildPreview(s: ActiveSession, opts: { clarifyAnswer?: boolean } 
     return null;
   };
 
+  const items = all.filter((t) => t.url).map((t) => ({ url: t.url!, title: t.title ?? "" }));
+  const budget = PERF_EXTENSION.START_JUDGE_RECENT_TABS;
+  await prefetchVectors(items.slice(0, budget)); // the 30 most recent first (2 s budget)
   const related = new Map<string, boolean>();
   const members = new Map<string, chrome.tabs.Tab[]>();
   let judged = 0;
@@ -374,7 +388,10 @@ async function buildPreview(s: ActiveSession, opts: { clarifyAnswer?: boolean } 
       s.preview.push({ tabId: tab.id, url: tab.url, title: tab.title ?? "", domain: itemDomain(tab.url) ?? "", itemKey: cacheKey(task.id, key), park: true, ...(ctx ? { contextId: ctx } : {}) });
     }
     // The 30 most recent tabs land in the preview first (PERF budget); the rest follow.
-    if (++judged === PERF_EXTENSION.START_JUDGE_RECENT_TABS) await saveSession(s);
+    if (++judged === budget) {
+      await saveSession(s);
+      await prefetchVectors(items.slice(budget));
+    }
   }
 
   // A separate window or group that does not match the task is asked about as a whole (LOOP-02).

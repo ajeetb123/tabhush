@@ -48,7 +48,7 @@ async function render(): Promise<void> {
 
   const log = await tier3Log();
   const logList = h("ul", { className: "plain" });
-  for (const entry of log.slice(-50).reverse()) {
+  for (const entry of [...log].reverse()) {
     logList.append(h("li", {}, h("div", { className: "muted", textContent: new Date(entry.at).toLocaleString() }), h("code", { textContent: JSON.stringify(entry.request) })));
   }
 
