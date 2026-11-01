@@ -53,6 +53,8 @@ ENDED → IDLE  (session card shown)
 
 Undecided: whether the idle timers run during ON_BREAK [OPEN Q-39]; what SUSPENDED resumes to [OPEN Q-20].
 
+[DERIVED] End is "always available" (`04` LOCK-04 step 3), so `End → END_COUNTDOWN` is also accepted from INFERRING, CLARIFY, SWEEP_PREVIEW and SUSPENDED. Without it a session abandoned at the clarify prompt could never be left, and Start would stay blocked.
+
 ## Requirements
 
 ### LOOP-01 Start [beta1]
@@ -79,6 +81,8 @@ Undecided: whether the idle timers run during ON_BREAK [OPEN Q-39]; what SUSPEND
 - After that the sweep commits on its own **only when confidence is high** [OPEN Q-16]; otherwise it waits for Confirm [DERIVED].
 - **Every sweep has a 30-second undo.** Undo restores all items parked by that sweep.
 - Items the user un-checks in the preview are **keeps** (strong related labels). A sweep undo is a strong label.
+- [DERIVED] The preview is the sweep's question, so items that would be asked about one by one during the sweep are allowed and flagged instead of each raising an ask.
+- [DERIVED] A separate window or tab group (LOOP-02) is shown as one question, "Park all" or "Keep open". Confirm waits until each is answered. "Park all" still never parks never-locked items or essentials. "Keep open" allows its tabs for the session's task (cached allow, no label).
 
 ### LOOP-05 Judge every new item [beta1; apps v1.5]
 - **Related:** allowed; its time counts toward the task.

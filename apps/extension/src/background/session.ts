@@ -54,6 +54,8 @@ export interface ActiveSession {
   id: string;
   state: SessionState;
   startedAt: number;
+  /** Front window, tab and group at the moment Start was pressed (glossary: start snapshot). */
+  startFront: { tabId: number | null; windowId: number | null; groupId: number };
   taskId: string | null;
   taskLabel: string | null;
   /** Proposed label (from the registry or the LLM) before Confirm; a rename is recorded (LOOP-02). */
@@ -86,6 +88,7 @@ export function newSession(now: number): ActiveSession {
     id: crypto.randomUUID(),
     state: "IDLE",
     startedAt: now,
+    startFront: { tabId: null, windowId: null, groupId: chrome.tabGroups.TAB_GROUP_ID_NONE },
     taskId: null,
     taskLabel: null,
     chip: null,

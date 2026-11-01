@@ -35,6 +35,8 @@ Over-redacting is fine.
 Test set: 500 realistic titles with labeled names; target ≥ 95% of names caught.
 ```
 - PRIV-12 No NER model (too heavy for an extension).
+- [DERIVED] The pattern pass replaces matches with `[EMAIL]`, `[URL]`, `[PHONE]` and `[NUMBER]`; the name pass with `[NAME]`. Redaction runs first, then control characters are stripped and titles cut to 120 characters.
+- [DERIVED] Until the dictionary sources (Q-14) and pattern values (Q-15) are decided, the production redactor is unavailable and **no tier 3 request can be built** (INV-08 fails closed).
 
 ## PRIV-20 Retention
 - **Billed API access only**, never a free tier.
@@ -53,6 +55,7 @@ counts of: sessions · parks · corrections · refused overrides · bails · pas
 availability of Chrome's built-in model (for CLS-16)
 ```
 - **No titles, URLs or domains** (INV-19).
+- [DERIVED] Wire format: one payload per day with fields `install_id`, `browser`, `platform`, `daily_active`, `counts` {`sessions`, `parks`, `corrections`, `refused_overrides`, `bails`, `passes`, `sweep_undos`, `chip_renames`, `gaps`, `limited_mode_seconds`} and `chrome_builtin_ai_available`. The backend stamps the UTC day on receipt; the payload carries no date.
 - Under GDPR the install ID is personal data. A **delete-my-data** button erases it on the server (`08` BE-08).
 - Any field not on this list requires updating this doc and the privacy policy first.
 - Storage and retention period: [OPEN Q-25].

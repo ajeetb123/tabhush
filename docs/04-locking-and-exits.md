@@ -45,6 +45,8 @@ User essentials list
 
 Browser settings stay reachable, which is exactly why disabling the extension is possible. That is accepted.
 
+[DERIVED] "System and safety" is implemented as every browser-internal scheme (`chrome:`, `edge:`, `brave:`, `about:`, `chrome-extension:`, `devtools:`): settings pages, the built-in password manager, other extensions' pages (password-manager extensions included) and the app itself. Content scripts cannot reach these pages anyway. School sign-in pages have no list yet [OPEN Q-56].
+
 ## LOCK-03 Proctored exams [beta1 extension; v1.5 desktop]
 - The extension **suspends itself** when it sees a proctoring tool like **Honorlock**. Detection method: [OPEN Q-20].
 - From v1.5 the desktop app does the same when **Respondus LockDown Browser** starts, and **offers to quit** (LockDown Browser may refuse to run next to monitoring software).

@@ -172,7 +172,7 @@ s < 0.25          → "looks unrelated" (still needs a second signal to park)
 ```
 
 ### CLS-04 Reference decision procedure [DERIVED]
-This is the order implied by the scope. The routing of `s < 0.25` to tier 3 and the order "tier 3 before ask" in the middle band are interpretations awaiting confirmation [OPEN Q-52]. Implement behind config so the order can flip.
+This is the order implied by the scope. [DERIVED] The implementation checks the never-locked list, essentials and accepted overrides **before** the cache lookup, so a stale cached park can never touch a learning platform (INV-01), and a tier 3 transport failure (backend down, cap reached) returns allow-and-flag rather than ask (INV-06: "unknown items are allowed and flagged"). The routing of `s < 0.25` to tier 3 and the order "tier 3 before ask" in the middle band are interpretations awaiting confirmation [OPEN Q-52]. Implement behind config so the order can flip.
 
 ```text
 judge(item, task):

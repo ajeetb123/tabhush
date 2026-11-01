@@ -202,10 +202,12 @@ export async function start(): Promise<void> {
     if (existing && existing.state !== "IDLE") return;
     const s = newSession(Date.now());
     apply(s, { type: "START" });
+    // Snapshot first: opening the session page would otherwise become the front tab.
+    const { all, frontTab } = await snapshot();
+    s.startFront = { tabId: frontTab?.id ?? null, windowId: frontTab?.windowId ?? null, groupId: frontTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE };
     await saveSession(s);
     await chrome.tabs.create({ url: chrome.runtime.getURL(SESSION_PAGE) });
 
-    const { all, frontTab } = await snapshot();
     const recentTabs = all.filter(usableTitle).slice(0, PERF_EXTENSION.START_JUDGE_RECENT_TABS);
     let vectors: (number[] | null)[] = recentTabs.map(() => null);
     try {
@@ -337,7 +339,9 @@ async function buildPreview(s: ActiveSession, opts: { clarifyAnswer?: boolean } 
   s.taskLabel = task.label;
   s.preview = [];
   s.separate = [];
-  const { all, frontWindowId, frontTab } = await snapshot();
+  const { all } = await snapshot();
+  const frontWindowId = s.startFront.windowId ?? undefined;
+  const frontTab = all.find((t) => t.id === s.startFront.tabId);
 
   if (opts.clarifyAnswer && frontTab?.url && usableTitle(frontTab)) {
     // LOOP-03: the clarify answer is a strong label.
@@ -345,9 +349,11 @@ async function buildPreview(s: ActiveSession, opts: { clarifyAnswer?: boolean } 
     if (k) await addLabel(task, cacheKey(task.id, k), true, "clarify");
   }
 
-  const frontGroup = frontTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE;
+  const frontGroup = s.startFront.groupId;
+  const ownPage = chrome.runtime.getURL("");
   const contextOf = (t: chrome.tabs.Tab): string | null => {
-    if (t.windowId !== frontWindowId) return `window:${t.windowId}`;
+    if (t.url?.startsWith(ownPage)) return null; // the app's own pages are never part of a context
+    if (frontWindowId !== undefined && t.windowId !== frontWindowId) return `window:${t.windowId}`;
     if (t.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE && t.groupId !== frontGroup) return `group:${t.groupId}`;
     return null;
   };
@@ -524,7 +530,8 @@ export async function onTabChanged(tab: chrome.tabs.Tab): Promise<void> {
         await sendToTab(tab.id!, { type: "ask:show", taskLabel: task.label });
       }
       if (decision.action === "allow_and_flag") s.flagged.push(k);
-      if (decision.action === "allow" && (decision.source === "similarity" || decision.source === "essential" || decision.source === "profile")) {
+      // CLS-32: accepted items join; seeded only from s ≥ 0.45 and tier 1 allows.
+      if (decision.action === "allow" && (decision.source === "similarity" || decision.source === "never_locked" || decision.source === "essential" || decision.source === "profile")) {
         await seedPrototype(task, tab.url!, tab.title ?? "", decision.source === "similarity" ? { kind: "similarity", s: decision.s ?? 0 } : { kind: "tier1_allow" });
       }
     }
