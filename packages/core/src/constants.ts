@@ -333,6 +333,32 @@ export const PROVIDER = {
   ZDR_APPROVED: false,
 } as const;
 
+// ───────────────────────── Gates (docs/14) ─────────────────────────
+export const GATES = {
+  GATE_0: { WAITLIST_STRANGERS_MIN: 200, BY: "mid-December" },
+  GATE_A: {
+    PARKS_MIN: 200,
+    WRONG_PARKS_MAX: 0,
+    PEOPLE: 3,
+    DISTINCT_SITES_MIN: 50,
+    TAB_SWITCH_SAMPLE_PER_PERSON: 100,
+    CATCH_RATE_MIN: 0.85,
+    BY: "mid-December",
+  },
+  GATE_B: {
+    PARKS_MIN: 500,
+    WRONG_PARK_RATE_MAX: 0.02,
+    CRITICAL_WRONG_PARKS_MAX: 0,
+    CATCH_RATE_MIN: 0.85,
+    LOST_WORK_REPORTS_MAX: 0,
+    ON_DEVICE_ONLY_CATCH_START_TARGET: 0.7,
+    TESTERS_PER_BETA: [60, 90],
+  },
+  GATE_P: { FOUNDING_PLANS_MIN: 50, BY: "Mac app launch" },
+  GATE_C: { DAY7_RETENTION_MIN: 0.15, NON_FRIEND_INSTALLS_MIN: 200 },
+  WATCH_SESSIONS_PER_ACTIVE_USER_PER_WEEK: 5,
+} as const;
+
 // ───────────────────────── Time units (not product values) ─────────────────────────
 export const MS = {
   SECOND: 1000,

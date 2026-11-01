@@ -21,3 +21,4 @@ export * from "./pow";
 export * from "./review";
 export * from "./availability";
 export * from "./privacy/redactionEval";
+export * from "./metrics";
