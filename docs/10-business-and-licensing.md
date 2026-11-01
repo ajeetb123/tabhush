@@ -54,7 +54,7 @@ Note: the Mac app has a **real free mode** (classifier helper + bundled Safari e
 Several US states require clear renewal terms, easy (one-click) cancellation, and a reminder before an annual plan renews. Check which the MoR handles; send the rest yourself.
 
 ## BIZ-09 Unit economics
-- Every free user costs AI calls; free caps keep the cost per free user to cents a month (≤ ~2.5¢ at 40 calls/day).
+- Every free user costs AI calls; free caps keep the cost per free user to cents a month (≤ ~2.5¢ at 40 calls/day at the scope's GPT-5 nano prices; **~9¢ with `gpt-5.4-nano`**, Q-60).
 - Compare revenue per user with AI cost per user **every month**.
 
 ## BIZ-10 Revenue math (planning only)

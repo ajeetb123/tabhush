@@ -59,11 +59,13 @@ Tool lists for Homework, Internship, Projects, Writing, and how a profile is inf
 **Q-13 Leisure keywords and named-site aliases** · P1
 Full leisure keyword list (beyond the leisure set) and full alias list (beyond yt, ig).
 
-**Q-14 Redaction dictionaries** · P0
+**Q-14 Redaction dictionaries** · P0 · **Resolved 2026-10-31**
 Source and license of the 50,000-word English dictionary and the first-name list.
+Answer: dictionary = SCOWL v1 2020.12.07, `english-words` + `american-words` at sizes 10 to 35 (49,811 words per the SCOWL README), MIT-like license, copyright notice bundled. First names = US Social Security Administration national baby-name data (`names.zip`), the **2,000** most common names by total births across all years and both sexes. ssa.gov refuses automated downloads, so the owner downloads `names.zip` by hand; its public-domain status could not be fetched and is for the owner to confirm. Recorded in `06` PRIV-10 and `CONSTANTS.md` REDACTION.
 
-**Q-15 Redaction patterns** · P0
+**Q-15 Redaction patterns** · P0 · **Resolved 2026-10-31**
 Minimum digits for "long number"; phone formats/locales to cover.
+Answer: a long number is **5 or more digits** (contiguous, or grouped in threes by commas, dots or spaces). Phones: US/Canada formats such as (540) 555-0100, 540-555-0100, 540.555.0100 and 540 555 0100 with an optional +1, plus any number starting with `+` and 7 to 15 digits. Recorded in `06` PRIV-10 and `CONSTANTS.md` REDACTION.
 
 **Q-48 Banking and health domains** · P0
 The domain list (or category source) for domain-only sending.
@@ -164,8 +166,9 @@ Country table for age of digital consent (13 to 16) and how age is stored.
 
 ## Business and web
 
-**Q-26 Landing page and waitlist** · P0
+**Q-26 Landing page and waitlist** · P0 · backend host **decided 2026-10-31**, rest open
 Framer vs hand-built on Cloudflare Pages; waitlist/email provider.
+Backend host for beta 1: `https://lockin-backend.<subdomain>.workers.dev`, moving to `api.<domain>` once Q-01 is settled. The owner's workers.dev subdomain is still to come, so `API.BASE_URL` stays `TODO_Q26`. Landing page and waitlist provider still open.
 
 **Q-31 Uninstall survey** · P1
 Questions and where responses are stored.
@@ -198,8 +201,12 @@ The scope names learning platforms, meetings, webmail, web chat and distraction 
 **Q-59 "Same as X?" word overlap measure** · P0
 `05` CLS-31 fires when labels "overlap by ≥ 60% of their words", but not 60% of what (the shorter label, the longer, or the union). The rule is not applied until decided; the similarity and course-code rules work.
 
-**Q-60 GPT-5 nano shutdown and reasoning setting** · P0
+**Q-60 GPT-5 nano shutdown and reasoning setting** · P0 · **Resolved 2026-10-31**
 Verified 2026-10-31: OpenAI's deprecations page lists `gpt-5-nano` for removal on **Dec 11, 2026** (recommended replacement `gpt-5.6-luna`), inside beta 1. Its model page does not list which `reasoning.effort` values it accepts, so "lowest reasoning setting" (`minimal` or `none`) is unconfirmed. Owner decides the model for beta 1 and later (check its terms allow minors, as with Q-37), and the effort value after measuring in setup week.
+Answer: **`gpt-5.4-nano`** (default snapshot `gpt-5.4-nano-2026-03-17`), reasoning effort **`none`** (its lowest and default value per the model page, checked 2026-10-31). Consequences, recorded in `05` CLS-13, `08` BE-01, `10` BIZ-09 and `CONSTANTS.md` LLM:
+- Price is $0.20 per 1M input and $1.25 per 1M output tokens, so a call costs about **$0.000075** (spec assumed $0.00002). A free user at the 40-call cap costs about **9¢ a month**, not 2.5¢. Caps are unchanged; the gap is for the owner to weigh at the gates.
+- `gpt-5.4-nano` is itself deprecated: removal **April 1, 2027** (replacement `gpt-6-luna`), during the Mac beta. Pick its successor before then.
+- Whether OpenAI's terms allow apps used by minors could not be fetched (pages refuse automated access). Owner to confirm, as Q-37 requires.
 
 **Q-58 Tier 3 cap day boundary** · P1
 `AI_CAPS` are "per install per day" but the backend cannot see local time. The backend counts per UTC day [DERIVED]. Confirm, or decide how the client's day (4am local) should apply.

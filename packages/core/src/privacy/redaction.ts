@@ -4,9 +4,9 @@
 // Pattern pass: emails · phone numbers · long numbers · URLs.
 // Name pass: a capitalized word NOT in the English dictionary, OR in the first-name list → [NAME].
 //
-// The production redactor needs the dictionary and first-name sources (TODO_Q14), the
-// long-number length and phone formats (TODO_Q15). Until then productionRedactor() returns null
-// and nothing can be sent to tier 3.
+// Production lists (Q-14) are built into the package by scripts/build-lexicons.mjs; values for
+// long numbers and phone formats are Q-15. If the lists are missing, productionRedactor()
+// returns null and nothing can be sent to tier 3 (INV-08 fails closed).
 
 import { isTodo, REDACTION } from "../constants";
 
@@ -26,7 +26,8 @@ const URL_PATTERN = /\b(?:[a-z][a-z0-9+.-]*:\/\/|www\.)[^\s<>"']+|\b(?:[a-z0-9-]
 export type Redactor = (text: string) => string;
 
 export function createRedactor(cfg: RedactorConfig): Redactor {
-  const longNumber = new RegExp(`\\d(?:[\\d\\s.,-]*\\d)?`, "g");
+  // A long number is contiguous digits, or digits grouped in threes by "," "." or a space (Q-15).
+  const longNumber = /\d{1,3}(?:[,.\s]\d{3})+(?!\d)|\d+/g;
   return (text: string) => {
     let out = text.replace(EMAIL, TOKENS.email).replace(URL_PATTERN, TOKENS.url);
     for (const p of cfg.phonePatterns) out = out.replace(new RegExp(p.source, p.flags.includes("g") ? p.flags : p.flags + "g"), TOKENS.phone);
@@ -42,7 +43,7 @@ export function createRedactor(cfg: RedactorConfig): Redactor {
   };
 }
 
-/** Sources for the production dictionaries are undecided (Q-14); the loader is injected. */
+/** The loader returns the bundled lists (lowercase), or null when the build has none. */
 export function productionRedactor(load: () => { dictionary: ReadonlySet<string>; firstNames: ReadonlySet<string> } | null): Redactor | null {
   if (isTodo(REDACTION.LONG_NUMBER_MIN_DIGITS) || isTodo(REDACTION.PHONE_FORMATS)) return null;
   if (isTodo(REDACTION.DICTIONARY_SOURCE) || isTodo(REDACTION.FIRST_NAME_LIST_SOURCE)) return null;

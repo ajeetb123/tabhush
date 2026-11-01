@@ -48,6 +48,12 @@ The model is bundled in the package, never fetched at runtime (INV-05). Before l
 npm run fetch-model -w @lockin/extension
 ```
 
+The redaction lists (Q-14) are built into the package too. Download the SSA national baby-names file `names.zip` by hand from ssa.gov (it refuses scripted downloads); the script fetches SCOWL from SourceForge:
+
+```bash
+npm run build-lexicons -w @lockin/extension -- --names ~/Downloads/names.zip
+```
+
 Then `npm run build` and load `apps/extension/dist` as an unpacked extension in Chrome, Edge or Brave (120+). Without the model, tier 2 is unavailable and every undecided page is allowed and flagged (INV-06).
 
 ## Backend
@@ -58,4 +64,4 @@ npx wrangler d1 create lockin
 
 Put the returned ID in `apps/backend/wrangler.toml`, then apply `apps/backend/migrations/` and set the key with `wrangler secret put OPENAI_API_KEY`. Logs stay off (INV-18): do not enable Workers Logs or attach Logpush.
 
-Tier 3 cannot run end to end yet: the backend host (Q-26), the redaction dictionaries and patterns (Q-14, Q-15) and the model's reasoning setting (Q-60) are undecided, so the extension keeps tier 3 off.
+Tier 3 cannot run end to end yet: `API.BASE_URL` stays `TODO_Q26` until the workers.dev subdomain is known (`https://lockin-backend.<subdomain>.workers.dev`). Without the redaction lists in the package, tier 3 also stays off.

@@ -286,3 +286,27 @@ describe("label decay", () => {
     expect(effectiveWeight({ source: "uncontested_park", createdAt: 0 }, 14 * 86_400_000)).toBeCloseTo(0.15);
   });
 });
+
+describe("production redaction values (Q-15)", async () => {
+  const { REDACTION, productionRedactor } = await import("../src");
+  const r = productionRedactor(() => ({ dictionary: new Set(["call", "id", "order", "chapter", "room", "lab"]), firstNames: new Set() }))!;
+  it("is available once the lists load, and not before", () => {
+    expect(r).not.toBeNull();
+    expect(productionRedactor(() => null)).toBeNull();
+  });
+  it.each([
+    ["call (540) 555-0100", "call [PHONE]"],
+    ["call 540-555-0100", "call [PHONE]"],
+    ["call 540.555.0100", "call [PHONE]"],
+    ["call +1 540 555 0100", "call [PHONE]"],
+    ["call +44 20 7946 0958", "call [PHONE]"],
+    ["id 12345", "id [NUMBER]"],
+    ["id 906 123 456", "id [NUMBER]"],
+    ["order 1,234,567", "order [NUMBER]"],
+  ])("%s → %s", (input, out) => expect(r(input)).toBe(out));
+  it.each(["lab 2114", "chapter 2020-2026", "room 1234 5678"])("keeps short numbers in %s", (t) => expect(r(t)).toBe(t));
+  it("5 digits is the line", () => {
+    expect(REDACTION.LONG_NUMBER_MIN_DIGITS).toBe(5);
+    expect(r("id 1234")).toBe("id 1234");
+  });
+});

@@ -6,3 +6,5 @@ dist/
 .DS_Store
 # The bundled model is fetched at build time (scripts/fetch-model.mjs), not committed.
 apps/extension/public/models/
+# Redaction lists (Q-14) are built by scripts/build-lexicons.mjs, not committed.
+apps/extension/public/lexicon/

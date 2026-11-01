@@ -175,21 +175,21 @@ export const CACHE = {
 // ───────────────────────── Tier 3 / LLM (docs/05, docs/08) ─────────────────────────
 export const LLM = {
   PROVIDER: "OpenAI API",
-  MODEL: "GPT-5 nano",                  // verify exact API model string before use
+  MODEL: "GPT-5.4 nano",                // Q-60 (owner 2026-10-31); scope's GPT-5 nano is removed 2026-12-11
   REASONING: "lowest available setting",
-  PRICE_INPUT_PER_MTOK_USD: 0.05,
-  PRICE_OUTPUT_PER_MTOK_USD: 0.40,
+  PRICE_INPUT_PER_MTOK_USD: 0.20,       // gpt-5.4-nano standard tier, checked 2026-10-31
+  PRICE_OUTPUT_PER_MTOK_USD: 1.25,
   EST_INPUT_TOKENS: 250,
   EST_VISIBLE_OUTPUT_TOKENS: 20,        // reasoning tokens billed as output: treat cost as a floor; measure in setup week
-  EST_COST_PER_CALL_USD: 0.00002,
+  EST_COST_PER_CALL_USD: 0.000075,
   TITLE_MAX_CHARS: 120,                 // titles cut to 120 characters before sending
   STRIP_CONTROL_CHARS: true,
   CATEGORIES: ["work tool", "reference", "entertainment", "social", "games", "shopping", "other"],
   VERDICTS: ["related", "unrelated", "unsure"],
   BILLED_ACCESS_ONLY: true,             // never a free tier
   FALLBACK_IF_TOO_SLOW: "TODO_Q37",
-  API_MODEL_ID: "gpt-5-nano",           // verified in the OpenAI SDK 2026-10-31; deprecated, shutdown 2026-12-11 (Q-60)
-  API_REASONING_EFFORT: "TODO_Q60",     // lowest value gpt-5-nano accepts is undocumented
+  API_MODEL_ID: "gpt-5.4-nano",         // Q-60; snapshot gpt-5.4-nano-2026-03-17; removed from the API 2027-04-01
+  API_REASONING_EFFORT: "none",         // lowest (and default) value per the model page
   STORE_RESPONSES: false,               // Responses API stores for 30+ days unless store: false (PRIV-20)
 };
 
@@ -203,7 +203,7 @@ export const API = {                    // Q-03: /v1/ prefix, JSON errors {"erro
   TELEMETRY: "/v1/telemetry",
   CONTRIBUTE: "/v1/contribute",
   DELETE: "/v1/delete",
-  BASE_URL: "TODO_Q26",                 // backend host not decided (domain depends on Q-01 / Q-26)
+  BASE_URL: "TODO_Q26",                 // https://lockin-backend.<subdomain>.workers.dev once the owner gives the subdomain
 };
 
 export const POW = {                    // Q-06: SHA-256 hashcash; same cost for install tokens and contribution IDs
@@ -216,18 +216,20 @@ export const POW = {                    // Q-06: SHA-256 hashcash; same cost for
 export const AI_CAPS = {                // tier 3 calls per install per day [START][RC]
   FREE_PER_DAY: 40,
   PRO_PER_DAY: 300,
-  // => at most about 2.5 cents per free user per month
+  // => at most about 9 cents per free user per month at gpt-5.4-nano prices (2.5 cents at the scope's GPT-5 nano prices)
 };
 
 // ───────────────────────── Redaction (docs/06) ─────────────────────────
 export const REDACTION = {
   PATTERNS: ["email", "phone", "long_number", "url"],
-  LONG_NUMBER_MIN_DIGITS: "TODO_Q15",
-  PHONE_FORMATS: "TODO_Q15",
+  LONG_NUMBER_MIN_DIGITS: 5,            // Q-15: contiguous, or grouped in threes by , . or space
+  PHONE_FORMATS: ["US/Canada with optional +1", "+ then 7 to 15 digits"], // Q-15; regexes in the constants module
   NAME_RULE: "capitalized word NOT in 50,000-word English dictionary, OR in first-name list -> [NAME]",
   DICTIONARY_SIZE: 50000,               // source TODO_Q14
-  DICTIONARY_SOURCE: "TODO_Q14",
-  FIRST_NAME_LIST_SOURCE: "TODO_Q14",
+  DICTIONARY_SOURCE: "SCOWL 2020.12.07 english-words + american-words, sizes 10-35", // Q-14, 49,811 words
+  DICTIONARY_MAX_SCOWL_SIZE: 35,
+  FIRST_NAME_LIST_SOURCE: "SSA national baby names (names.zip), top names by total births", // Q-14
+  FIRST_NAME_COUNT: 2000,
   NAME_TOKEN: "[NAME]",
   TEST_SET_TITLES: 500,
   TARGET_NAME_RECALL: 0.95,             // over-redacting is fine

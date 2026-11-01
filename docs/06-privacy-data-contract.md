@@ -28,15 +28,19 @@ Redaction runs **on device before anything is sent**, on titles and typed senten
 
 ## PRIV-10 Redaction (decision 15)
 ```
-Pattern pass:  emails · phone numbers · long numbers · URLs            [long-number length OPEN Q-15]
+Pattern pass:  emails · phone numbers · long numbers · URLs
+               long number = 5+ digits (contiguous or grouped in threes)            (Q-15)
+               phones = US/Canada formats (optional +1) and +<7 to 15 digits>       (Q-15)
 Name pass:     a capitalized word that is NOT in a 50,000-word English dictionary,
-               OR that appears in a first-name list  →  [NAME]        [sources OPEN Q-14]
+               OR that appears in a first-name list  →  [NAME]
+               dictionary = SCOWL 2020.12.07 english + american words, sizes 10-35 (49,811)
+               first names = SSA national data, top 2,000 by total births          (Q-14)
 Over-redacting is fine.
 Test set: 500 realistic titles with labeled names; target ≥ 95% of names caught.
 ```
 - PRIV-12 No NER model (too heavy for an extension).
 - [DERIVED] The pattern pass replaces matches with `[EMAIL]`, `[URL]`, `[PHONE]` and `[NUMBER]`; the name pass with `[NAME]`. Redaction runs first, then control characters are stripped and titles cut to 120 characters.
-- [DERIVED] Until the dictionary sources (Q-14) and pattern values (Q-15) are decided, the production redactor is unavailable and **no tier 3 request can be built** (INV-08 fails closed).
+- [DERIVED] Both lists are built into the package at build time (`scripts/build-lexicons.mjs`) with SCOWL's copyright notice. If they are missing from a build, the production redactor is unavailable and **no tier 3 request can be built** (INV-08 fails closed).
 
 ## PRIV-20 Retention
 - **Billed API access only**, never a free tier.

@@ -6,7 +6,8 @@
   "scripts": {
     "build": "vite build && vite build -c vite.content.config.ts",
     "fetch-model": "node ../../scripts/fetch-model.mjs",
-    "check:bundle": "node ../../scripts/check-bundle.mjs"
+    "check:bundle": "node ../../scripts/check-bundle.mjs",
+    "build-lexicons": "node ../../scripts/build-lexicons.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "4.3.2",

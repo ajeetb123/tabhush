@@ -28,7 +28,6 @@ import {
   parseUrl,
   PERF_EXTENSION,
   PROVIDER,
-  productionRedactor,
   pruneAskTimes,
   pureDistractionDomain,
   recentTasks,
@@ -52,6 +51,7 @@ import {
 } from "@lockin/core";
 import { db, idbCacheStore, labels, review, tasks } from "./db";
 import { embed } from "./embedder";
+import { getRedactor } from "./lexicon";
 import { installPreBlocks, parkTab, removePreBlocks, sendToTab, unparkTab } from "./enforce";
 import { apply, newSession, saveSession, withSession, type ActiveSession } from "./session";
 import { bump, getInternal, getSettings, setInternal } from "./settings";
@@ -61,8 +61,6 @@ export const END_ALARM = "end-countdown";
 const SESSION_PAGE = "ui/session.html";
 const CONSENT_PAGE = "ui/consent.html";
 
-// Dictionaries are TODO_Q14 and patterns TODO_Q15, so this is null and tier 3 stays off (INV-08).
-const redactor: Redactor | null = productionRedactor(() => null);
 
 // ───────────────────────── classifier wiring ─────────────────────────
 
@@ -87,6 +85,7 @@ interface Tier3Ready {
 
 /** Returns what is needed to call tier 3, or null when any gate is closed (INV-08/10/11, CLS-12). */
 async function tier3Ready(): Promise<Tier3Ready | null> {
+  const redactor = await getRedactor();
   const settings = await getSettings();
   const internal = await getInternal();
   const gate = {
@@ -621,6 +620,7 @@ export async function override(tab: chrome.tabs.Tab, sentence: string): Promise<
       await bump("corrections");
     } else if (verdict === "unrelated") {
       // Refused: logged for review, never a label (INV-13).
+      const redactor = await getRedactor();
       if (redactor) {
         const rec = buildReviewRecord(redactor, { kind: "refused_override", taskLabel: task.label, url: tab.url, title: tab.title ?? "", verdict, sentence, domainOnlySetting: (await getSettings()).domainOnly });
         if (rec) await review.add(rec);
@@ -704,6 +704,7 @@ export async function overrideBlocked(url: string, sentence: string): Promise<"a
  */
 export async function answerParkCheck(tab: chrome.tabs.Tab, right: boolean): Promise<void> {
   await withSession(async (s) => {
+    const redactor = await getRedactor();
     if (!s?.taskLabel || !tab.id || !tab.url || !s.parked[String(tab.id)] || !redactor) return;
     const rec = buildReviewRecord(redactor, {
       kind: "sampled_check",

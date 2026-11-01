@@ -188,23 +188,23 @@ export const CACHE = {
 // ───────────────────────── Tier 3 / LLM (docs/05, docs/08) ─────────────────────────
 export const LLM = {
   PROVIDER: "OpenAI API",
-  MODEL: "GPT-5 nano",
+  MODEL: "GPT-5.4 nano", // Q-60
   REASONING: "lowest available setting",
-  PRICE_INPUT_PER_MTOK_USD: 0.05,
-  PRICE_OUTPUT_PER_MTOK_USD: 0.4,
+  PRICE_INPUT_PER_MTOK_USD: 0.2, // gpt-5.4-nano standard tier, checked 2026-10-31
+  PRICE_OUTPUT_PER_MTOK_USD: 1.25,
   EST_INPUT_TOKENS: 250,
   EST_VISIBLE_OUTPUT_TOKENS: 20,
-  EST_COST_PER_CALL_USD: 0.00002,
+  EST_COST_PER_CALL_USD: 0.000075,
   TITLE_MAX_CHARS: 120,
   STRIP_CONTROL_CHARS: true,
   CATEGORIES: ["work tool", "reference", "entertainment", "social", "games", "shopping", "other"],
   VERDICTS: ["related", "unrelated", "unsure"],
   BILLED_ACCESS_ONLY: true,
   FALLBACK_IF_TOO_SLOW: "TODO_Q37" as Todo | string,
-  // Verified 2026-10-31 in openai@7.47.0 types and OpenAI's model page: "gpt-5-nano" exists but is
-  // deprecated with shutdown 2026-12-11 (OPEN Q-60). Its lowest effort value is not documented.
-  API_MODEL_ID: "gpt-5-nano",
-  API_REASONING_EFFORT: "TODO_Q60" as Todo | "none" | "minimal",
+  // Q-60 (owner 2026-10-31). Checked on OpenAI's model page: effort values none (default), low,
+  // medium, high, xhigh. Default snapshot gpt-5.4-nano-2026-03-17; removed from the API 2027-04-01.
+  API_MODEL_ID: "gpt-5.4-nano",
+  API_REASONING_EFFORT: "none" as Todo | "none" | "minimal",
   STORE_RESPONSES: false, // Responses API stores by default; "processed, not stored by us" (PRIV-20)
 } as const;
 
@@ -221,7 +221,7 @@ export const API = {
   TELEMETRY: "/v1/telemetry",
   CONTRIBUTE: "/v1/contribute",
   DELETE: "/v1/delete",
-  BASE_URL: "TODO_Q26" as Todo | string,
+  BASE_URL: "TODO_Q26" as Todo | string, // https://lockin-backend.<subdomain>.workers.dev (Q-26)
 } as const;
 
 export const POW = {
@@ -239,12 +239,18 @@ export const AI_CAPS = {
 // ───────────────────────── Redaction (docs/06) ─────────────────────────
 export const REDACTION = {
   PATTERNS: ["email", "phone", "long_number", "url"],
-  LONG_NUMBER_MIN_DIGITS: "TODO_Q15" as Todo | number,
-  PHONE_FORMATS: "TODO_Q15" as Todo | readonly string[],
+  LONG_NUMBER_MIN_DIGITS: 5 as Todo | number, // Q-15
+  // Q-15: US/Canada with optional +1, e.g. (540) 555-0100, 540-555-0100, 540.555.0100; and "+" then 7-15 digits.
+  PHONE_FORMATS: [
+    String.raw`(?:\+?1[\s.-]?)?(?:\(\d{3}\)\s?|\b\d{3}[\s.-])\d{3}[\s.-]\d{4}\b`,
+    String.raw`\+(?:\d[\s.-]?){6,14}\d\b`,
+  ] as Todo | readonly string[],
   NAME_RULE: "capitalized word NOT in 50,000-word English dictionary, OR in first-name list -> [NAME]",
   DICTIONARY_SIZE: 50000,
-  DICTIONARY_SOURCE: "TODO_Q14" as Todo | string,
-  FIRST_NAME_LIST_SOURCE: "TODO_Q14" as Todo | string,
+  DICTIONARY_SOURCE: "SCOWL 2020.12.07 english-words + american-words, sizes 10-35" as Todo | string, // Q-14
+  DICTIONARY_MAX_SCOWL_SIZE: 35, // 49,811 words per the SCOWL README
+  FIRST_NAME_LIST_SOURCE: "SSA national baby names (names.zip), top names by total births" as Todo | string, // Q-14
+  FIRST_NAME_COUNT: 2000,
   NAME_TOKEN: "[NAME]",
   TEST_SET_TITLES: 500,
   TARGET_NAME_RECALL: 0.95,

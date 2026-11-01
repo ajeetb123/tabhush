@@ -67,7 +67,7 @@ Decided in the scope. Do not substitute.
 - **On-device model:** `all-MiniLM-L6-v2`, 8-bit quantized ONNX (about 23 MB), 384 dimensions, run with **Transformers.js on ONNX Runtime Web**, bundled in the extension, executed in an **offscreen document**. `bge-small-en-v1.5` gets one benchmark only.
 - **Local storage:** IndexedDB for embeddings, labels, task registry and logs. Extension storage only for small settings.
 - **Backend:** serverless on **Cloudflare Workers**. No user accounts.
-- **LLM:** **OpenAI API, GPT-5 nano**, lowest reasoning setting, JSON output, billed access only. **Gemini is banned** (terms bar apps likely used by under-18s).
+- **LLM:** **OpenAI API, `gpt-5.4-nano`** (owner decision 2026-10-31, Q-60; the scope's GPT-5 nano is removed from the API 2026-12-11), lowest reasoning setting (`none`), JSON output, billed access only. **Gemini is banned** (terms bar apps likely used by under-18s).
 - **Payments:** a merchant of record, default **Paddle**, fallback **Lemon Squeezy**. License keys, no accounts.
 - **Desktop (v1.5 / v2):** **Tauri** with a **Rust** shared core. Tier 2 runs as the **same WASM classifier** in Tauri's webview (reuse, do not rewrite in Rust).
 - **VS Code companion (v1.1):** VS Code extension, also published on Open VSX.

@@ -12,7 +12,7 @@ Current phase: **beta 1** (`docs/13-release-scope.md`). Nothing from beta 2 or l
 | Overlay with mute and pause | Built | INV-17, EXT-07, QA-30. |
 | Blocking for distraction domains | Built | DNR redirect to a local page with the override form (LOOP-09, CLS-55). |
 | Show-then-judge | Built | Pages load, then get overlaid. |
-| Tier 1, zero-label similarity, tier 3 via backend, verdict cache | Built, tier 3 gated | Tier 3 is off until Q-14/Q-15 (redaction), Q-26 (backend host) and Q-60 (model setting) are answered. |
+| Tier 1, zero-label similarity, tier 3 via backend, verdict cache | Built, tier 3 gated | Model `gpt-5.4-nano` at effort `none` (Q-60) and redaction (Q-14, Q-15) are decided. Tier 3 waits only on the workers.dev subdomain (Q-26), plus building the lists and model into the package. |
 | Full never-locked list | Partial | Courseware, meetings, GitHub, localhost, browser pages done. School-hosted courseware (Q-10), package registries (Q-11), school sign-in pages (Q-56) open. Domains need owner check (Q-57). |
 | Consent before the first tier 3 call | Built | PRIV-60, INV-10. |
 | Privacy policy | Draft | `docs/privacy-policy-draft.md`, OpenAI retention terms checked 2026-10-31. Legal name, contact, lawful basis and telemetry retention (Q-25) are for the owner. |
@@ -27,7 +27,8 @@ Install tokens with PoW (Q-06), tier 3 proxy with fixed prompts and strict schem
 
 ## Verified external APIs (2026-10-31)
 
-- `openai@7.47.0`: `gpt-5-nano` exists but is **deprecated, shutdown 2026-12-11** (Q-60). Responses API `store` defaults to true, so the proxy sends `store: false`.
+- `openai@7.47.0`: `gpt-5-nano` is **deprecated, shutdown 2026-12-11**, so the owner chose `gpt-5.4-nano` (Q-60): effort values none/low/medium/high/xhigh, $0.20 / $1.25 per 1M tokens, itself removed **2027-04-01**. Responses API `store` defaults to true, so the proxy sends `store: false`. OpenAI's terms on minors could not be fetched (owner to check).
+- SCOWL v1 2020.12.07: MIT-like license with a notice requirement; sizes 10-35 give 49,811 English + American words. SSA `names.zip` refuses automated download (HTTP 403).
 - `@huggingface/transformers@4.3.2`: local-only model loading; the jsdelivr default for ONNX Runtime files is overridden and stripped from the bundle.
 - Hugging Face `Xenova/all-MiniLM-L6-v2`: `onnx/model_int8.onnx`, 22,972,370 bytes, Apache-2.0, revision pinned.
 - `@types/chrome@0.3.7`: `runtime.onUpdateAvailable` installs "the next time the background page gets unloaded", so INV-14 deferral must be checked in a real browser (Q-47).

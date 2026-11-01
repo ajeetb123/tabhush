@@ -25,7 +25,7 @@ Privacy rules for every payload: `06`. Numbers: `CONSTANTS.md`.
 - Holds the LLM API key (never shipped to clients).
 - Accepts requests only with a valid **install token**.
 - Builds the prompt with titles and typed sentences **wrapped as quoted data** (INV-12), never concatenated as instructions.
-- Calls OpenAI GPT-5 nano (lowest reasoning, JSON mode), billed access.
+- Calls OpenAI `gpt-5.4-nano` (reasoning effort `none`, JSON schema output, `store: false`), billed access (Q-60).
 - **Validates the response against the fixed schema**; on failure returns `unsure` [DERIVED].
 - Enforces per-install daily caps: **Free 40, Pro 300** (Pro determined by a validated license, BE-04).
 - Must not log request bodies.

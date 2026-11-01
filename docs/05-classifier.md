@@ -121,8 +121,9 @@ A model trained on 10 friends would learn those 10 friends. A shared base model 
 - Never before consent (INV-10). Never in on-device-only mode. Subject to daily caps (free 40, Pro 300).
 
 ### CLS-13 Provider and call [verify model string before use]
-- **OpenAI API, GPT-5 nano**, lowest reasoning setting, JSON output, **billed access only**.
-- ~250 input tokens and ~20 visible output tokens per call (~$0.00002, a floor because reasoning tokens bill as output). Measure real token counts and latency in setup week.
+- **OpenAI API, `gpt-5.4-nano`** (Q-60, owner 2026-10-31; GPT-5 nano is removed from the API 2026-12-11), reasoning effort `none` (its lowest), JSON output, **billed access only**.
+- ~250 input tokens and ~20 visible output tokens per call (~$0.000075 at $0.20 / $1.25 per 1M tokens; a floor if reasoning tokens bill as output). Measure real token counts and latency in setup week.
+- `gpt-5.4-nano` is removed from the API on April 1, 2027 (replacement `gpt-6-luna`).
 - If latency is too slow on the lowest reasoning setting: switch to the cheapest **non-reasoning** model whose terms allow minors [OPEN Q-37].
 - **Gemini is banned** (terms bar apps likely accessed by under-18s).
 
