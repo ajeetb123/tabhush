@@ -371,6 +371,44 @@ describe("Active session", () => {
   });
 });
 
+describe("refreshing a blocked page", () => {
+  it("is covered again before it shows (document_start answer)", async () => {
+    await engine.start();
+    await engine.confirm(45);
+    // Tab 2 (Netflix) was blocked by the sweep; a refresh reloads its content script.
+    const r = await engine.onContentReady(asTab({ ...TABS[1]!, groupId: -1 }));
+    expect(r).toMatchObject({ blocked: true, canOverride: false });
+  });
+
+  it("a page blocked by its topic stays blocked after a refresh, and in a new tab", async () => {
+    await engine.start();
+    await engine.confirm(45);
+    const tab = { id: 160, windowId: W1, groupId: -1, url: "https://yarrlist.net/", title: "YARRLIST", active: true };
+    fake.tabs.set(160, { ...tab, lastAccessed: Date.now() });
+    await fake.chrome.scripting.executeScript({ target: { tabId: 160 } });
+    await engine.onPageSnippet(asTab(tab), tab.url, "Watch free movies and tv shows online. Torrents and pirated downloads");
+    expect(fake.overlaysShownOn()).toContain(160);
+    expect(await engine.onContentReady(asTab(tab))).toMatchObject({ blocked: true });
+    expect(await engine.onContentReady(asTab({ ...tab, id: 161 }))).toMatchObject({ blocked: true });
+  });
+
+  it("the same item judged again re-sends the cover instead of skipping it", async () => {
+    await engine.start();
+    await engine.confirm(45);
+    const before = fake.overlaysShownOn().filter((id) => id === 2).length;
+    await engine.onContentReady(asTab({ ...TABS[1]!, groupId: -1 })); // clears the dedupe, re-judges
+    await new Promise((r) => setTimeout(r, 0));
+    await engine.sessionInProgress(); // waits for the queued judgment
+    expect(fake.overlaysShownOn().filter((id) => id === 2).length).toBeGreaterThan(before);
+  });
+
+  it("allowed pages are not reported as blocked", async () => {
+    await engine.start();
+    await engine.confirm(45);
+    expect(await engine.onContentReady(asTab({ ...TABS[0]!, groupId: -1 }))).toEqual({ blocked: false });
+  });
+});
+
 describe("after a session ends", () => {
   it("Start works right away, without clicking Done first", async () => {
     await engine.start();

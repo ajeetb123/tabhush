@@ -21,6 +21,7 @@ import {
   clampGoal,
   courseCodesIn,
   goalReached,
+  isEnforcing,
   isDistractingSearch,
   isDistractingPage,
   isDomainOnly,
@@ -67,7 +68,7 @@ import { embed } from "./embedder";
 import { getBankingDomains, getCategoryTable, getUndergroundDomains } from "./categories";
 import { getRedactor } from "./lexicon";
 import { installPreBlocks, parkTab, removePreBlocks, sendToTab, unparkTab } from "./enforce";
-import { apply, newSession, saveSession, withSession, type ActiveSession } from "./session";
+import { apply, loadSession, newSession, saveSession, withSession, type ActiveSession } from "./session";
 import { bump, getInternal, getSettings, setInternal } from "./settings";
 import { backendConfigured, BackendUnavailable, CapReached, inferLabelRemote, judgeRemote, utcDay } from "./tier3Client";
 
@@ -680,7 +681,11 @@ export async function onTabChanged(tab: chrome.tabs.Tab): Promise<void> {
     if (tab.active) logFocus(s, decision.action === "allow" ? "on" : "off");
 
     if (decision.action === "park") {
-      if (parked?.itemKey === k) return;
+      if (parked?.itemKey === k) {
+        // Still blocked (e.g. the cover was lost to a reload): put it back, nothing else changes.
+        await sendToTab(tab.id!, { type: "overlay:show", taskLabel: s.taskLabel ?? "", canOverride: OWNER_RULES.OVERRIDE_ENABLED });
+        return;
+      }
       if (parked) delete s.parked[String(tab.id)];
       await recordPark(s, tab, k, decision.source, false, OWNER_RULES.OVERRIDE_ENABLED);
     } else {
@@ -720,6 +725,32 @@ export async function onFocusChange(activeTabId: number | null): Promise<void> {
     else logFocus(s, s.tabOnTask[String(activeTabId)] === false ? "off" : "on");
     await saveSession(s);
   });
+}
+
+/**
+ * A page started loading in a tab (the content script runs at document_start). If the item is
+ * already blocked, or cached as blocked for this task, answer at once so the cover goes up before
+ * the page is visible; a refresh can no longer get around a block. Otherwise judge it as usual.
+ */
+export async function onContentReady(tab: chrome.tabs.Tab): Promise<{ blocked: boolean; taskLabel?: string; canOverride?: boolean }> {
+  if (!tab.id || !tab.url) return { blocked: false };
+  lastJudged.delete(tab.id); // this load gets a fresh judgment
+  const s = await loadSession();
+  const key = itemKeyFor(tab.url);
+  if (s && isEnforcing(s.state) && key) {
+    const task = await sessionTask(s);
+    const k = task ? cacheKey(task.id, key) : null;
+    const internal = await getInternal();
+    const cached = task ? await cacheFor(s, internal.configVersion).lookup(task.id, key) : undefined;
+    const t1 = tier1(tab.url, await tier1Context(tab.id, tab.url));
+    const exempt = ["never_locked", "essential", "tool_allow", "music", "browse_allow"].includes(t1.kind);
+    if (!exempt && (s.parked[String(tab.id)]?.itemKey === k || cached?.decision === "park")) {
+      void onTabChanged(tab); // records the park (and the block event) if it is a new tab
+      return { blocked: true, taskLabel: s.taskLabel ?? "", canOverride: OWNER_RULES.OVERRIDE_ENABLED };
+    }
+  }
+  void onTabChanged(tab);
+  return { blocked: false };
 }
 
 export function forgetTab(tabId: number): void {

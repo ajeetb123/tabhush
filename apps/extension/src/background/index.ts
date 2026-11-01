@@ -16,6 +16,7 @@ import {
   onInputCounts,
   onTabChanged,
   onYoutubeMeta,
+  onContentReady,
   onPageSnippet,
   onFocusChange,
   override,
@@ -118,8 +119,7 @@ chrome.runtime.onMessage.addListener((msg: FromUi | FromContent | { target?: str
   switch (m.type) {
     // content script
     case "content:ready":
-      if (tab) void onTabChanged(tab);
-      return false;
+      return tab ? done(onContentReady(tab)) : false;
     case "input:counts":
       return tab ? done(onInputCounts(tab, m.minuteStart, m.count)) : false;
     case "ask:answer":

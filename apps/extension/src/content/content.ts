@@ -47,6 +47,18 @@ function send(msg: FromContent): void {
   }
 }
 
+/** Like send, but waits for the service worker's answer (wrapped as {ok, value}). */
+async function ask<T>(msg: FromContent): Promise<T | null> {
+  if (!alive || !contextAlive()) return (shutdown(), null);
+  try {
+    const res = (await chrome.runtime.sendMessage(msg)) as { ok?: boolean; value?: T } | undefined;
+    return res?.ok ? (res.value ?? null) : null;
+  } catch {
+    if (!contextAlive()) shutdown();
+    return null;
+  }
+}
+
 /** For tests: whether this copy is still connected to the extension. */
 export function isAliveForTests(): boolean {
   return alive;
@@ -391,17 +403,26 @@ if (!window.__tabhushAlive?.()) {
     return false;
   });
   if (isTop) {
-    send({ type: "content:ready" });
-    reportYoutube();
-    reportSnippet();
-    // Single-page sites (YouTube and others) change without reloading; re-read when the head changes.
-    if (document.head) {
-      const observer = new MutationObserver(() => {
-        reportYoutube();
-        reportSnippet();
-      });
-      observer.observe(document.head, { childList: true, subtree: true, attributes: true });
-      teardown.push(() => observer.disconnect());
-    }
+    // Runs at document_start: if this page is blocked, cover it before anything is visible.
+    void ask<{ blocked: boolean; taskLabel?: string; canOverride?: boolean }>({ type: "content:ready" }).then((r) => {
+      if (r?.blocked) showOverlay(r.taskLabel ?? "", r.canOverride ?? false);
+    });
+    const whenReady = (fn: () => void) =>
+      document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", fn, { once: true }) : fn();
+    whenReady(startReading);
+  }
+}
+
+function startReading(): void {
+  reportYoutube();
+  reportSnippet();
+  // Single-page sites (YouTube and others) change without reloading; re-read when the head changes.
+  if (document.head) {
+    const observer = new MutationObserver(() => {
+      reportYoutube();
+      reportSnippet();
+    });
+    observer.observe(document.head, { childList: true, subtree: true, attributes: true });
+    teardown.push(() => observer.disconnect());
   }
 }

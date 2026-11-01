@@ -26,7 +26,8 @@ export const manifest = {
   permissions: ["tabs", "tabGroups", "webNavigation", "declarativeNetRequest", "offscreen", "storage", "scripting", "alarms"],
   host_permissions: ["<all_urls>"],
   // all_frames: embedded players on a blocked page are paused too (Q-65).
-  content_scripts: [{ matches: ["<all_urls>"], js: ["content.js"], run_at: "document_idle", all_frames: true }],
+  // document_start: a blocked page is covered before it shows, so a refresh can't get around it.
+  content_scripts: [{ matches: ["<all_urls>"], js: ["content.js"], run_at: "document_start", all_frames: true }],
   web_accessible_resources: [{ resources: ["ui/blocked.html", "icons/logo.svg"], matches: ["<all_urls>"] }],
   // INV-05: no remote code. WASM needs 'wasm-unsafe-eval'; nothing else is loosened.
   content_security_policy: { extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'" },
