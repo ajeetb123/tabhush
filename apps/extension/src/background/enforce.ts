@@ -46,6 +46,22 @@ export async function parkTab(tab: chrome.tabs.Tab, taskLabel: string, canOverri
   return "overlaid";
 }
 
+/**
+ * Q-67: closes a blocked tab. The last tab of a window is turned into the blocked page instead,
+ * so closing never shuts the window (or the browser).
+ */
+export async function closeBlockedTab(tab: chrome.tabs.Tab): Promise<ParkOutcome> {
+  const id = tab.id!;
+  const siblings = await chrome.tabs.query({ windowId: tab.windowId });
+  if (siblings.length > 1) {
+    await chrome.tabs.remove(id).catch(() => undefined);
+  } else {
+    const blocked = chrome.runtime.getURL(BLOCKED_PAGE);
+    await chrome.tabs.update(id, { url: `${blocked}#${encodeURIComponent(tab.url ?? "")}` }).catch(() => undefined);
+  }
+  return "closed";
+}
+
 export async function unparkTab(tabId: number, unmute: boolean): Promise<void> {
   await send(tabId, { type: "overlay:hide" });
   if (unmute) await chrome.tabs.update(tabId, { muted: false }).catch(() => undefined);

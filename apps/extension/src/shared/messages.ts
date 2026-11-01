@@ -15,7 +15,7 @@ export type FromContent =
   | { type: "ask:answer"; related: boolean }
   | { type: "override:submit"; sentence: string }
   | { type: "check:answer"; right: boolean }
-  | { type: "youtube:meta"; videoId: string; genre: string | null }
+  | { type: "youtube:meta"; videoId: string; genre: string | null; title: string; channel: string }
   | { type: "page:snippet"; url: string; text: string }
   | { type: "open:session" };
 

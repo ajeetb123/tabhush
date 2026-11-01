@@ -261,6 +261,10 @@ export const OWNER_RULES = {
   MUSIC_SITES: ["spotify.com", "music.youtube.com"],
   MUSIC_YOUTUBE_GENRE: "Music",         // YouTube's own genre metadata for the playing video
   MUSIC_VOLUME: 0.3,
+  MUSIC_TITLE_MARKERS: ["official video", "official audio", "official music video", "lyric video", "lyrics", "visualizer",
+    "(feat", "feat.", " ft.", "remix", "lofi", "lo-fi", "ncs", "music video", "dnb", "edm", "playlist", "mix)"], // Q-67
+  MUSIC_CHANNEL_MARKERS: [" - topic", "vevo", "ncs"],                                                       // Q-67
+  CLOSE_BLOCKED_TABS: true,             // Q-67: blocked tabs are closed (to the reopen list), not covered
   UNDERGROUND_LIST: "warez",            // UT1 category, blocked for the session
   UNDERGROUND_HOST_KEYWORDS: ["streameast"],
   MULTI_TASK_MIN_SCORE: 0.60,           // = INFERENCE.AUTOFILL_MIN_SCORE: two recent tasks this strong → both pre-selected

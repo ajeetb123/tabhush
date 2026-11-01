@@ -249,6 +249,10 @@ The owner found piracy and movie sites unblocked (yarrlist.net, a movie page pla
 **Q-66 Look and feel** · **Resolved 2026-11-01 (owner)**
 The owner found the UI "looks like AI" and asked for clean and smooth, a nice non-vibrant background and a slick font. Done: warm neutral palette with one muted accent, ink primary buttons, muted task colors, no gradients or emoji; Plus Jakarta Sans (OFL-1.1, license shipped in `fonts/OFL.txt`) bundled in the package; logo redrawn as a white T with a sage dot on ink. Recorded in `09` UI-06.
 
+**Q-67 Close blocked tabs; music on YouTube** · **Resolved 2026-11-01 (owner; details by the agent)**
+1. The owner could still watch a blocked piracy site after a refresh (muted). Blocked tabs are now **closed** and put on the reopen list instead of covered (amends INV-17 and LOCK-05). The last tab in a window becomes the blocked page, so the window never closes.
+2. Music on YouTube: YouTube only writes its genre label on a full page load, so a song reached by clicking from another video was judged as an ordinary video. Videos are now also allowed as music when the title or channel shows clear markers (`OWNER_RULES.MUSIC_TITLE_MARKERS`, `MUSIC_CHANNEL_MARKERS`: "official audio", "lyrics", "feat.", "- Topic", VEVO, NCS…), which errs toward allowing. A YouTube video is judged only after the content script reports its genre, title and channel, so a song is never closed in the moment before its label arrives.
+
 **Q-58 Tier 3 cap day boundary** · P1
 `AI_CAPS` are "per install per day" but the backend cannot see local time. The backend counts per UTC day [DERIVED]. Confirm, or decide how the client's day (4am local) should apply.
 

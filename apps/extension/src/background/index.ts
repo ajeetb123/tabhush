@@ -127,7 +127,7 @@ chrome.runtime.onMessage.addListener((msg: FromUi | FromContent | { target?: str
     case "page:snippet":
       return tab ? done(onPageSnippet(tab, m.url, m.text)) : false;
     case "youtube:meta":
-      return tab ? done(onYoutubeMeta(tab, m.videoId, m.genre)) : false;
+      return tab ? done(onYoutubeMeta(tab, m.videoId, m.genre, m.title, m.channel)) : false;
     case "check:answer":
       return tab ? done(answerParkCheck(tab, m.right)) : false;
     case "override:submit":

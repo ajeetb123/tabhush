@@ -51,6 +51,8 @@ export interface Tier1Context {
   undergroundDomains?: ReadonlySet<string>;
   /** YouTube genre of the video playing in this tab, verified against its video ID by the content script. */
   youtubeGenre?: string | null;
+  /** The video looks like music by its title or channel (Q-67). */
+  youtubeLooksLikeMusic?: boolean;
 }
 
 export function isLearningPlatform(url: ParsedUrl, ctx: Pick<Tier1Context, "schoolCoursewareDomains" | "coursewareFingerprint">): boolean {
@@ -128,7 +130,7 @@ export function tier1(urlString: string, ctx: Tier1Context): Tier1Result {
   if (hostMatchesAny(url.host, OWNER_RULES.ALWAYS_ALLOWED_TOOLS)) return { kind: "tool_allow" };
   if (hostMatchesAny(url.host, OWNER_RULES.MUSIC_SITES)) return { kind: "music" };
   if (hostMatches(url.host, "youtube.com")) {
-    if (ctx.youtubeGenre === OWNER_RULES.MUSIC_YOUTUBE_GENRE) return { kind: "music" };
+    if (ctx.youtubeGenre === OWNER_RULES.MUSIC_YOUTUBE_GENRE || ctx.youtubeLooksLikeMusic) return { kind: "music" };
     // Browsing YouTube is allowed; individual videos and Shorts are judged (Q-63).
     if (itemKeyFor(urlString)?.kind !== "path" || /\|channel:/.test(itemKeyFor(urlString)!.value)) return { kind: "browse_allow" };
   }

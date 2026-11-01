@@ -22,6 +22,7 @@ import {
   courseCodesIn,
   goalReached,
   isEnforcing,
+  looksLikeMusic,
   isDistractingSearch,
   isDistractingPage,
   isDomainOnly,
@@ -67,7 +68,7 @@ import { db, idbCacheStore, labels, review, tasks } from "./db";
 import { embed } from "./embedder";
 import { getBankingDomains, getCategoryTable, getUndergroundDomains } from "./categories";
 import { getRedactor } from "./lexicon";
-import { installPreBlocks, parkTab, removePreBlocks, sendToTab, unparkTab } from "./enforce";
+import { closeBlockedTab, installPreBlocks, parkTab, removePreBlocks, sendToTab, unparkTab } from "./enforce";
 import { apply, loadSession, newSession, saveSession, withSession, type ActiveSession } from "./session";
 import { bump, getInternal, getSettings, setInternal } from "./settings";
 import { backendConfigured, BackendUnavailable, CapReached, inferLabelRemote, judgeRemote, utcDay } from "./tier3Client";
@@ -85,26 +86,31 @@ function cacheFor(s: ActiveSession | null, configVersion: number): VerdictCache 
 
 // YouTube genre of the video playing in each tab, as reported (and checked against the video ID)
 // by the content script. Used for the always-allowed music rule (Q-63).
-const youtubeMeta = new Map<number, { videoId: string; genre: string | null }>();
+const youtubeMeta = new Map<number, { videoId: string; genre: string | null; title: string; channel: string }>();
 
-function youtubeGenre(tabId: number | undefined, url: string): string | null {
-  if (tabId === undefined) return null;
-  const meta = youtubeMeta.get(tabId);
-  const v = (() => {
-    try {
-      return new URL(url).searchParams.get("v");
-    } catch {
-      return null;
-    }
-  })();
-  return meta && v && meta.videoId === v ? meta.genre : null;
+function youtubeVideoId(url: string): string | null {
+  const p = parseUrl(url);
+  return p && p.host === "youtube.com" && p.path === "/watch" ? new URLSearchParams(p.search).get("v") : null;
 }
 
-async function tier1Context(tabId?: number, url = ""): Promise<Tier1Context> {
+/** The content script's report for the video now in this tab, or null if it hasn't come yet. */
+function youtubeInfo(tabId: number | undefined, url: string): { genre: string | null; title: string; channel: string } | null {
+  const v = youtubeVideoId(url);
+  const meta = tabId === undefined ? undefined : youtubeMeta.get(tabId);
+  return meta && v && meta.videoId === v ? meta : null;
+}
+
+function youtubeGenre(tabId: number | undefined, url: string): string | null {
+  return youtubeInfo(tabId, url)?.genre ?? null;
+}
+
+async function tier1Context(tabId?: number, url = "", title = ""): Promise<Tier1Context> {
+  const yt = youtubeInfo(tabId, url);
   const settings = await getSettings();
   return {
     undergroundDomains: await getUndergroundDomains(),
-    youtubeGenre: youtubeGenre(tabId, url),
+    youtubeGenre: yt?.genre ?? null,
+    youtubeLooksLikeMusic: youtubeVideoId(url) !== null && looksLikeMusic(yt?.title || title, yt?.channel ?? ""),
     essentials: settings.essentials,
     schoolCoursewareDomains: [], // onboarding school domains: beta 2, mapping TODO_Q10
     coursewareFingerprint: false, // page fingerprint method TODO_Q10
@@ -227,7 +233,7 @@ export async function judgeItem(s: ActiveSession, task: SessionTask, url: string
   const key = itemKeyFor(url) ?? { kind: "page", value: url };
   const internal = await getInternal();
   const ready = await tier3Ready();
-  const t1 = tier1(url, await tier1Context(tabId, url));
+  const t1 = tier1(url, await tier1Context(tabId, url, title));
   const searched = await judgeSearch(s, task, url, key, t1.kind, tabId);
   if (searched) return { decision: searched, key };
   // CLS-21 may also use a tier 3 category cached on device from earlier calls (none while Q-61 holds).
@@ -579,8 +585,10 @@ export async function stop(): Promise<boolean> {
 }
 
 async function recordPark(s: ActiveSession, tab: chrome.tabs.Tab, itemKey: string, source: string, bySweep: boolean, canOverride: boolean): Promise<void> {
+  // Q-67 (owner): a blocked tab is closed and goes on the reopen list, so a refresh can't get
+  // around it. INV-17's cover-and-keep remains only where closing is off.
   // The sampled "Was this park right?" check (docs/14). Rate is TODO_Q42, so nothing is sampled yet.
-  const outcome = await parkTab(tab, s.taskLabel ?? "", canOverride, shouldSampleParkCheck());
+  const outcome = OWNER_RULES.CLOSE_BLOCKED_TABS ? await closeBlockedTab(tab) : await parkTab(tab, s.taskLabel ?? "", canOverride, shouldSampleParkCheck());
   const now = Date.now();
   s.blockEvents.push({ at: Date.now(), domain: itemDomain(tab.url ?? "") ?? "" });
   if (outcome === "closed") s.restoreList.push({ url: tab.url ?? "", title: tab.title ?? "", reason: "closed" });
@@ -647,15 +655,19 @@ const lastJudged = new Map<number, string>();
 const musicTabs = new Set<number>();
 
 /** YouTube genre for the playing video, reported by the content script (Q-63 music rule). */
-export async function onYoutubeMeta(tab: chrome.tabs.Tab, videoId: string, genre: string | null): Promise<void> {
+export async function onYoutubeMeta(tab: chrome.tabs.Tab, videoId: string, genre: string | null, title = "", channel = ""): Promise<void> {
   if (!tab.id) return;
-  youtubeMeta.set(tab.id, { videoId, genre });
+  youtubeMeta.set(tab.id, { videoId, genre, title, channel });
   await onTabChanged(tab);
 }
 
 export async function onTabChanged(tab: chrome.tabs.Tab): Promise<void> {
   if (!tab.id || !tab.url) return;
-  const fingerprint = `${tab.url}\n${tab.title ?? ""}\n${youtubeGenre(tab.id, tab.url) ?? ""}\n${snippetFor(tab.id, tab.url)?.length ?? 0}`;
+  // Q-67: a YouTube video waits for the content script's genre/title/channel report, because a
+  // blocked tab is closed and a song must not be closed in the moment before its label arrives.
+  if (youtubeVideoId(tab.url) !== null && youtubeInfo(tab.id, tab.url) === null) return;
+  const yt = youtubeInfo(tab.id, tab.url);
+  const fingerprint = `${tab.url}\n${tab.title ?? ""}\n${yt ? `${yt.genre}|${yt.title}|${yt.channel}` : ""}\n${snippetFor(tab.id, tab.url)?.length ?? 0}`;
   if (lastJudged.get(tab.id) === fingerprint) return;
   lastJudged.set(tab.id, fingerprint);
   await withSession(async (s) => {
@@ -742,7 +754,7 @@ export async function onContentReady(tab: chrome.tabs.Tab): Promise<{ blocked: b
     const k = task ? cacheKey(task.id, key) : null;
     const internal = await getInternal();
     const cached = task ? await cacheFor(s, internal.configVersion).lookup(task.id, key) : undefined;
-    const t1 = tier1(tab.url, await tier1Context(tab.id, tab.url));
+    const t1 = tier1(tab.url, await tier1Context(tab.id, tab.url, tab.title ?? ""));
     const exempt = ["never_locked", "essential", "tool_allow", "music", "browse_allow"].includes(t1.kind);
     if (!exempt && (s.parked[String(tab.id)]?.itemKey === k || cached?.decision === "park")) {
       void onTabChanged(tab); // records the park (and the block event) if it is a new tab

@@ -44,7 +44,10 @@ export function makeChrome(initialTabs: Omit<FakeTab, "groupId" | "lastAccessed"
       },
     },
     tabs: {
-      query: async () => [...tabs.values()].map((t) => ({ ...t })),
+      query: async (q: { windowId?: number; active?: boolean } = {}) =>
+        [...tabs.values()]
+          .filter((t) => (q.windowId === undefined || t.windowId === q.windowId) && (q.active === undefined || t.active === q.active))
+          .map((t) => ({ ...t })),
       get: async (id: number) => {
         const t = tabs.get(id);
         if (!t) throw new Error("no tab");
@@ -56,8 +59,10 @@ export function makeChrome(initialTabs: Omit<FakeTab, "groupId" | "lastAccessed"
         tabs.set(id, { id, windowId: opts.focusedWindow, groupId: -1, url, title: "", active: true, lastAccessed: Date.now() });
         return { id };
       },
-      update: async (id: number, p: { muted?: boolean }) => {
+      update: async (id: number, p: { muted?: boolean; url?: string }) => {
         if (p.muted !== undefined) muted.set(id, p.muted);
+        const t = tabs.get(id);
+        if (t && p.url) t.url = p.url;
       },
       remove: async (id: number) => {
         removed.push(id);

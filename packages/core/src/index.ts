@@ -25,3 +25,4 @@ export * from "./metrics";
 export * from "./search";
 export * from "./autoLabel";
 export * from "./goal";
+export * from "./music";

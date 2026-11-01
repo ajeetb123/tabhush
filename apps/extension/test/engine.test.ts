@@ -30,6 +30,8 @@ const TABS = [
 ];
 
 const asTab = (t: object) => t as chrome.tabs.Tab;
+/** Tabs blocked so far: closed (Q-67) or, where closing is off, covered. */
+const blocked = () => [...fake.removed, ...fake.overlaysShownOn()];
 
 type Engine = typeof import("../src/background/engine");
 type Session = typeof import("../src/background/session");
@@ -67,7 +69,7 @@ describe("Start (Q-64: no prompts)", () => {
 
   it("parks nothing before Lock in (LOOP-04)", async () => {
     await startToPreview();
-    expect(fake.overlaysShownOn()).toEqual([]);
+    expect(blocked()).toEqual([]);
     expect(fake.rules()).toEqual([]);
   });
 
@@ -82,7 +84,7 @@ describe("Start (Q-64: no prompts)", () => {
     fake.tabs.set(120, { ...tab, lastAccessed: Date.now() });
     await fake.chrome.scripting.executeScript({ target: { tabId: 120 } });
     await engine.onTabChanged(asTab(tab));
-    expect(fake.overlaysShownOn()).not.toContain(120);
+    expect(blocked()).not.toContain(120);
     s = (await session.loadSession())!;
     expect(s.goalMin).toBe(45);
   });
@@ -110,12 +112,21 @@ describe("Lock in, Stop, End", () => {
     return (await session.loadSession())!;
   }
 
-  it("parks with mute + overlay and installs pre-blocks", async () => {
+  it("Q-67: closes blocked tabs to the reopen list and installs pre-blocks", async () => {
     const s = await confirmWith();
     expect(s.state).toBe("ACTIVE");
-    expect(fake.overlaysShownOn()).toEqual([2]);
-    expect(fake.muted.get(2)).toBe(true);
+    expect(fake.removed).toEqual([2]);
+    expect(s.restoreList.map((r) => r.url)).toContain(TABS[1]!.url);
     expect(fake.rules().length).toBeGreaterThan(0);
+  });
+
+  it("Q-67: the last tab of a window becomes the blocked page instead of closing the window", async () => {
+    await confirmWith();
+    const lone = { id: 170, windowId: 9, groupId: -1, url: "https://www.netflix.com/title/9", title: "Netflix", active: true };
+    fake.tabs.set(170, { ...lone, lastAccessed: Date.now() });
+    await engine.onTabChanged(asTab(lone));
+    expect(fake.removed).not.toContain(170);
+    expect(fake.tabs.get(170)!.url).toMatch(/^chrome-extension:\/\/ownextensionid\/ui\/blocked\.html#/);
   });
 
   it("the goal is clamped to 15-240 minutes", async () => {
@@ -138,7 +149,6 @@ describe("Lock in, Stop, End", () => {
     expect(s.state).toBe("ENDED");
     expect(s.endKind).toBe("normal");
     expect(s.bail).toBe(false);
-    expect(fake.overlaysHiddenOn()).toContain(2);
     expect(fake.rules()).toEqual([]);
   });
 
@@ -155,9 +165,9 @@ describe("Lock in, Stop, End", () => {
 
   it("Q-63: a sweep can't be undone; blocks hold until End", async () => {
     await confirmWith();
+    const created = fake.created.length;
     await engine.undo();
-    expect(Object.keys((await session.loadSession())!.parked)).toEqual(["2"]);
-    expect(fake.overlaysHiddenOn()).not.toContain(2);
+    expect(fake.created.length).toBe(created); // nothing reopened
   });
 
   it("End: needs a reason, counts down 30 seconds (Q-63), marks ended early, lifts everything", async () => {
@@ -172,7 +182,6 @@ describe("Lock in, Stop, End", () => {
     s = (await session.loadSession())!;
     expect(s.state).toBe("ENDED");
     expect(s.endKind).toBe("early");
-    expect(fake.overlaysHiddenOn()).toContain(2);
     expect(fake.rules()).toEqual([]);
   });
 
@@ -199,11 +208,11 @@ describe("Active session", () => {
     fake.tabs.set(50, { ...tab, lastAccessed: Date.now() });
     await fake.chrome.scripting.executeScript({ target: { tabId: 50 } });
     await engine.onTabChanged(asTab(tab));
-    expect(fake.overlaysShownOn()).toContain(50);
+    expect(blocked()).toContain(50);
 
     const ok = { id: 51, windowId: W1, groupId: -1, url: "https://example.org/chemistry-lab-report-guide", title: "Lab report chemistry guide", active: true };
     await engine.onTabChanged(asTab(ok));
-    expect(fake.overlaysShownOn()).not.toContain(51);
+    expect(blocked()).not.toContain(51);
   });
 
   it("CLS-21: a low-similarity page in a shipped park category is parked on device (Q-08)", async () => {
@@ -212,8 +221,8 @@ describe("Active session", () => {
     fake.tabs.set(80, { ...tab, lastAccessed: Date.now() });
     await fake.chrome.scripting.executeScript({ target: { tabId: 80 } });
     await engine.onTabChanged(asTab(tab));
-    expect(fake.overlaysShownOn()).toContain(80);
-    expect((await session.loadSession())!.parked["80"]?.source).toBe("on_device_path");
+    expect(blocked()).toContain(80);
+    expect((await session.loadSession())!.blockEvents.map((e) => e.domain)).toContain("arcade.example.com");
   });
 
   it("INV-01: courseware in a shipped category is still never parked", async () => {
@@ -222,7 +231,7 @@ describe("Active session", () => {
     fake.tabs.set(81, { ...tab, lastAccessed: Date.now() });
     await fake.chrome.scripting.executeScript({ target: { tabId: 81 } });
     await engine.onTabChanged(asTab(tab));
-    expect(fake.overlaysShownOn()).not.toContain(81);
+    expect(blocked()).not.toContain(81);
   });
 
   async function open(id: number, url: string, title: string) {
@@ -236,7 +245,7 @@ describe("Active session", () => {
   it("INV-02 + Q-63: a low-similarity page with no second signal stays open, with no question", async () => {
     await active();
     await open(60, "https://random.example.net/page", "Something else entirely");
-    expect(fake.overlaysShownOn()).not.toContain(60);
+    expect(blocked()).not.toContain(60);
     expect(fake.contentMessages.some((m) => m.tabId === 60 && m.msg.type === "ask:show")).toBe(false);
     expect((await session.loadSession())!.flagged.length).toBeGreaterThan(0);
   });
@@ -255,40 +264,56 @@ describe("Active session", () => {
     expect(await engine.override(asTab({ ...TABS[1]!, groupId: -1 }), "I need this for my film class")).toBe("unavailable");
     expect(await engine.overrideBlocked("https://www.steampowered.com/app/1", "game design class")).toBe("unavailable");
     const s = (await session.loadSession())!;
-    expect(Object.keys(s.parked)).toContain("2");
+    expect(fake.removed).toContain(2);
     expect(s.liftedDomains).not.toContain("steampowered.com");
-  });
-
-  it("Q-63: the overlay offers no override", async () => {
-    await active();
-    const shown = fake.contentMessages.find((m) => m.tabId === 2 && m.msg.type === "overlay:show")!.msg as unknown as { canOverride: boolean };
-    expect(shown.canOverride).toBe(false);
   });
 
   it("Q-63: YouTube home and search stay open; an unrelated video is blocked", async () => {
     await active();
     await open(90, "https://www.youtube.com/", "YouTube");
     await open(91, "https://www.youtube.com/results?search_query=titration", "titration - YouTube");
-    await open(92, "https://www.youtube.com/watch?v=cats1", "Funny cat compilation - YouTube");
-    expect(fake.overlaysShownOn()).not.toContain(90);
-    expect(fake.overlaysShownOn()).not.toContain(91);
-    expect(fake.overlaysShownOn()).toContain(92);
+    const vid = await open(92, "https://www.youtube.com/watch?v=cats1", "Funny cat compilation - YouTube");
+    await engine.onYoutubeMeta(asTab(vid), "cats1", null, "Funny cat compilation", "Cat Clips");
+    expect(blocked()).not.toContain(90);
+    expect(blocked()).not.toContain(91);
+    expect(blocked()).toContain(92);
+  });
+
+  it("Q-67: a YouTube video is not judged before its genre/title report arrives", async () => {
+    await active();
+    await open(93, "https://www.youtube.com/watch?v=song1", "YouTube");
+    expect(blocked()).not.toContain(93);
   });
 
   it("Q-63: a YouTube video labelled Music is allowed and turned down to 30%", async () => {
     await active();
-    const tab = await open(93, "https://www.youtube.com/watch?v=song1", "Some Song (Official Audio) - YouTube");
-    expect(fake.overlaysShownOn()).toContain(93); // judged before the genre arrives
-    await engine.onYoutubeMeta(asTab(tab), "song1", "Music");
-    expect(fake.overlaysHiddenOn()).toContain(93);
+    const tab = await open(93, "https://www.youtube.com/watch?v=song1", "Some Song - YouTube");
+    await engine.onYoutubeMeta(asTab(tab), "song1", "Music", "Some Song", "Some Artist");
+    expect(blocked()).not.toContain(93);
     expect(fake.contentMessages).toContainEqual({ tabId: 93, msg: { type: "music:on", volume: 0.3 } });
+  });
+
+  it("Q-67: a song reached by in-page navigation (no fresh genre) is allowed by its title", async () => {
+    await active();
+    const tab = await open(95, "https://www.youtube.com/watch?v=ncs1", "YouTube");
+    await engine.onYoutubeMeta(asTab(tab), "ncs1", null, "Cartoon, Jéja - Why We Lose (feat. Coleman Trapp) | DnB | NCS", "NoCopyrightSounds");
+    expect(blocked()).not.toContain(95);
+  });
+
+  it("Q-67: an auto-generated '- Topic' channel counts as music", async () => {
+    await active();
+    const tab = await open(96, "https://www.youtube.com/watch?v=t1", "YouTube");
+    await engine.onYoutubeMeta(asTab(tab), "t1", null, "Blinding Lights", "The Weeknd - Topic");
+    expect(blocked()).not.toContain(96);
   });
 
   it("Q-63: a Music label for a different video does not count", async () => {
     await active();
     const tab = await open(94, "https://www.youtube.com/watch?v=cats2", "Funny cats again - YouTube");
-    await engine.onYoutubeMeta(asTab(tab), "someOtherVideo", "Music");
-    expect(Object.keys((await session.loadSession())!.parked)).toContain("94");
+    await engine.onYoutubeMeta(asTab(tab), "someOtherVideo", "Music", "Other song", "");
+    expect(blocked()).not.toContain(94); // still waiting for this video's own report
+    await engine.onYoutubeMeta(asTab(tab), "cats2", null, "Funny cats again", "Cat Clips");
+    expect(blocked()).toContain(94);
   });
 
   it("Q-63: Spotify, Claude, ChatGPT, Blender and Stack Overflow are always allowed", async () => {
@@ -298,7 +323,7 @@ describe("Active session", () => {
     await open(102, "https://chatgpt.com/", "ChatGPT");
     await open(103, "https://www.blender.org/download/", "Blender");
     await open(104, "https://stackoverflow.com/questions/1/x", "Unrelated Java question");
-    for (const id of [100, 101, 102, 103, 104]) expect(fake.overlaysShownOn()).not.toContain(id);
+    for (const id of [100, 101, 102, 103, 104]) expect(blocked()).not.toContain(id);
   });
 
   it("Q-63: underground streaming sites are blocked (UT1 warez and streameast variants)", async () => {
@@ -306,24 +331,24 @@ describe("Active session", () => {
     await open(110, "https://streameast.app/nba/1", "NBA live");
     await open(111, "https://www.streameast-to.live/x", "Live sports");
     await open(112, "https://pirate-example.to/movie", "Watch free");
-    for (const id of [110, 111, 112]) expect(fake.overlaysShownOn()).toContain(id);
+    for (const id of [110, 111, 112]) expect(blocked()).toContain(id);
   });
 
   it("Q-64: a search for a distraction topic is blocked; a work search is not", async () => {
     await active();
     await open(130, "https://www.google.com/search?q=lebron+basketball+stats", "lebron basketball stats - Google Search");
     await open(131, "https://www.google.com/search?q=chemistry+titration+curve", "chemistry titration curve - Google Search");
-    expect(fake.overlaysShownOn()).toContain(130);
-    expect(fake.overlaysShownOn()).not.toContain(131);
-    expect((await session.loadSession())!.parked["130"]?.source).toBe("search_topic");
+    expect(blocked()).toContain(130);
+    expect(blocked()).not.toContain(131);
+    expect((await session.loadSession())!.blockEvents.map((e) => e.domain)).toContain("google.com");
   });
 
   it("Q-64: blocking one search does not block every search", async () => {
     await active();
     await open(132, "https://www.google.com/search?q=basketball+scores", "basketball scores - Google Search");
     await open(133, "https://www.google.com/search?q=lab+report+format", "lab report format - Google Search");
-    expect(fake.overlaysShownOn()).toContain(132);
-    expect(fake.overlaysShownOn()).not.toContain(133);
+    expect(blocked()).toContain(132);
+    expect(blocked()).not.toContain(133);
   });
 
   it("Q-64: course codes are remembered from normal tabs, never from incognito or webmail", async () => {
@@ -340,24 +365,24 @@ describe("Active session", () => {
   it("Q-65: an unlisted piracy/movie page is blocked by what it's about", async () => {
     await active();
     const tab = await open(150, "https://yarrlist.net/", "YARRLIST");
-    expect(fake.overlaysShownOn()).not.toContain(150); // no snippet yet: the title alone says nothing
+    expect(blocked()).not.toContain(150); // no snippet yet: the title alone says nothing
     await engine.onPageSnippet(asTab(tab), tab.url, "YARRLIST. Watch free movies and tv shows online. Anime and manga. Torrents and pirated downloads. Live sports streams");
-    expect(fake.overlaysShownOn()).toContain(150);
-    expect((await session.loadSession())!.parked["150"]?.source).toBe("page_topic");
+    expect(blocked()).toContain(150);
+    expect((await session.loadSession())!.blockEvents.map((e) => e.domain)).toContain("yarrlist.net");
   });
 
   it("Q-65: a work page's snippet does not block it", async () => {
     await active();
     const tab = await open(151, "https://docs.example.org/titration", "Titration");
     await engine.onPageSnippet(asTab(tab), tab.url, "Titration lab report chemistry guide. How to write the lab report draft");
-    expect(fake.overlaysShownOn()).not.toContain(151);
+    expect(blocked()).not.toContain(151);
   });
 
   it("Q-65: a snippet never overrides never-locked or always-allowed pages", async () => {
     await active();
     const tab = await open(152, "https://canvas.instructure.com/courses/1/videos", "Course video");
     await engine.onPageSnippet(asTab(tab), tab.url, "Watch free movies and tv shows online. Movie trailers and film reviews");
-    expect(fake.overlaysShownOn()).not.toContain(152);
+    expect(blocked()).not.toContain(152);
   });
 
   it("Q-65: blocks and on-task time are recorded for the report", async () => {
@@ -387,19 +412,9 @@ describe("refreshing a blocked page", () => {
     fake.tabs.set(160, { ...tab, lastAccessed: Date.now() });
     await fake.chrome.scripting.executeScript({ target: { tabId: 160 } });
     await engine.onPageSnippet(asTab(tab), tab.url, "Watch free movies and tv shows online. Torrents and pirated downloads");
-    expect(fake.overlaysShownOn()).toContain(160);
+    expect(blocked()).toContain(160);
     expect(await engine.onContentReady(asTab(tab))).toMatchObject({ blocked: true });
     expect(await engine.onContentReady(asTab({ ...tab, id: 161 }))).toMatchObject({ blocked: true });
-  });
-
-  it("the same item judged again re-sends the cover instead of skipping it", async () => {
-    await engine.start();
-    await engine.confirm(45);
-    const before = fake.overlaysShownOn().filter((id) => id === 2).length;
-    await engine.onContentReady(asTab({ ...TABS[1]!, groupId: -1 })); // clears the dedupe, re-judges
-    await new Promise((r) => setTimeout(r, 0));
-    await engine.sessionInProgress(); // waits for the queued judgment
-    expect(fake.overlaysShownOn().filter((id) => id === 2).length).toBeGreaterThan(before);
   });
 
   it("allowed pages are not reported as blocked", async () => {

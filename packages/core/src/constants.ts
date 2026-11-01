@@ -268,6 +268,14 @@ export const OWNER_RULES = {
   MUSIC_SITES: ["spotify.com", "music.youtube.com"],
   MUSIC_YOUTUBE_GENRE: "Music", // YouTube's own genre metadata for the playing video
   MUSIC_VOLUME: 0.3,
+  // Q-67: YouTube only sets its genre metadata on a full page load, so videos reached by in-page
+  // navigation are also recognized as music by clear markers in the title or channel name.
+  MUSIC_TITLE_MARKERS: [
+    "official video", "official audio", "official music video", "lyric video", "lyrics", "visualizer",
+    "(feat", "feat.", " ft.", "remix", "lofi", "lo-fi", "ncs", "music video", "dnb", "edm", "playlist", "mix)",
+  ],
+  MUSIC_CHANNEL_MARKERS: [" - topic", "vevo", "ncs"],
+  CLOSE_BLOCKED_TABS: true as boolean, // Q-67: blocked tabs are closed (to the reopen list), not covered
   UNDERGROUND_LIST: "warez", // UT1 category, blocked for the session
   UNDERGROUND_HOST_KEYWORDS: ["streameast"],
   MULTI_TASK_MIN_SCORE: 0.6, // two recent tasks this strong → both pre-selected

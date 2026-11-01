@@ -321,10 +321,15 @@ function reportYoutube(): void {
   if (!v) return;
   const id = document.querySelector('meta[itemprop="identifier"]')?.getAttribute("content");
   const genre = id === v ? (document.querySelector('meta[itemprop="genre"]')?.getAttribute("content") ?? null) : null;
-  const key = `${v}|${genre}`;
+  // The channel name, from the page when it is rendered for this video, else from the head metadata.
+  const channel =
+    document.querySelector("ytd-watch-metadata ytd-channel-name a, #owner #channel-name a")?.textContent?.trim() ||
+    (id === v ? (document.querySelector('span[itemprop="author"] link[itemprop="name"]')?.getAttribute("content") ?? "") : "");
+  const title = document.title.replace(/\s*-\s*YouTube$/, "");
+  const key = `${v}|${genre}|${title}|${channel}`;
   if (key === lastYoutube) return;
   lastYoutube = key;
-  send({ type: "youtube:meta", videoId: v, genre });
+  send({ type: "youtube:meta", videoId: v, genre, title, channel });
 }
 
 // ───────────────────────── page snippet (Q-65), read on device only ─────────────────────────

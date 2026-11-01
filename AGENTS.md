@@ -54,7 +54,7 @@ These are the requirements most likely to be broken by a well-meaning agent. Tre
 - **INV-14** An extension update arriving mid-session **waits until the session ends**.
 - **INV-15** Quitting the desktop app is always possible, is logged as a gap, and is **never followed by a relaunch**.
 - **INV-16** Breaks are **never** counted as bails.
-- **INV-17** Overlays **keep page state**: unrelated tabs are muted, paused and covered, never closed (except pages a content script cannot reach, which are closed and added to the restore list).
+- **INV-17** Overlays **keep page state**: unrelated tabs are muted, paused and covered, never closed (except pages a content script cannot reach, which are closed and added to the restore list). **Owner change 2026-11-01 (Q-67):** blocked tabs are now **closed** and added to the reopen list (`OWNER_RULES.CLOSE_BLOCKED_TABS`), so a refresh can't get around a block; the last tab of a window becomes the blocked page instead. Covering stays as the mechanism when that switch is off.
 - **INV-18** Request-body logging is **off** at the backend and in Cloudflare.
 - **INV-19** Telemetry never contains titles, URLs or domains.
 - **INV-20** Do not dogfood or test on Procedura or school systems, since titles reach an LLM.
