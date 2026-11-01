@@ -22,6 +22,8 @@ Privacy rules for every payload: `06`. Numbers: `CONSTANTS.md`.
 - **Request-body logging is off** in the Worker and in Cloudflare (INV-18). Titles are processed, not stored.
 
 ## BE-01 Tier 3 proxy
+
+**Owner decision 2026-10-31 (Q-61): no LLM.** The proxy answers `not_found` while `LLM.ENABLED` is false and no OpenAI key is needed. Install tokens (BE-05) exist only for tier 3, so they are idle too.
 - Holds the LLM API key (never shipped to clients).
 - Accepts requests only with a valid **install token**.
 - Builds the prompt with titles and typed sentences **wrapped as quoted data** (INV-12), never concatenated as instructions.

@@ -114,7 +114,9 @@ A model trained on 10 friends would learn those 10 friends. A shared base model 
 - At most **4 asks per hour** and **1 every 5 minutes**.
 - Past the budget: **allow and flag** instead of interrupting.
 
-## Tier 3: LLM fallback (via backend) [beta1]
+## Tier 3: LLM fallback (via backend) [beta1; OFF per Q-61]
+
+**Owner decision 2026-10-31 (Q-61): no LLM.** Tier 3 is not used: no install makes LLM calls, so every install is in on-device-only mode and uses the CLS-21 parking path. Middle items are asked about within the ask budget, otherwise allowed and flagged. Inference with no fitting recent task goes to the clarify prompt. The rest of this section describes the switched-off fallback.
 
 ### CLS-12 When it runs
 - Only for **middle-confidence** items, **once per cache key**.

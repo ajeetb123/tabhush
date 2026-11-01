@@ -208,6 +208,9 @@ Answer: **`gpt-5.4-nano`** (default snapshot `gpt-5.4-nano-2026-03-17`), reasoni
 - `gpt-5.4-nano` is itself deprecated: removal **April 1, 2027** (replacement `gpt-6-luna`), during the Mac beta. Pick its successor before then.
 - Whether OpenAI's terms allow apps used by minors could not be fetched (pages refuse automated access). Owner to confirm, as Q-37 requires.
 
+**Q-61 No LLM** · **Resolved 2026-10-31 (owner)**
+The owner will not pay for or call a pre-existing LLM, and only wants to spend on the domain, the Chrome Web Store fee and domain email. Tier 3 is switched off for everyone (`LLM.ENABLED = false`); every install runs on-device only with the CLS-21 parking path, moved up to beta 1. Consequences: on-device parking needs the shipped category list (Q-08); overrides need a non-LLM rule (Q-38); the on-device catch-rate target is 70%, while Gate B asks for 85% (owner to weigh at Gate A). Q-60's model choice stays recorded as the fallback if this is reversed. Payments: processor decided at v1.
+
 **Q-58 Tier 3 cap day boundary** · P1
 `AI_CAPS` are "per install per day" but the backend cannot see local time. The backend counts per UTC day [DERIVED]. Confirm, or decide how the client's day (4am local) should apply.
 

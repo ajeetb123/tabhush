@@ -12,6 +12,7 @@ import {
   parseTelemetry,
   emptyCounts,
   SHARED_PRIOR,
+  needsConsentPrompt,
   tier3Available,
   type Tier3Gate,
 } from "../src";
@@ -124,7 +125,7 @@ describe("INV-09 domain-only sites never send titles", () => {
 });
 
 describe("INV-10 / INV-11 tier 3 gate", () => {
-  const ok: Tier3Gate = { consent: "granted", onDeviceOnlySetting: false, underDigitalConsentAge: false, providerZdrApproved: false, capReached: false, redactorReady: true, backendConfigured: true };
+  const ok: Tier3Gate = { llmEnabled: true, consent: "granted", onDeviceOnlySetting: false, underDigitalConsentAge: false, providerZdrApproved: false, capReached: false, redactorReady: true, backendConfigured: true };
   it("is open only with everything granted", () => expect(tier3Available(ok)).toBe(true));
   it("INV-10: no call before explicit consent", () => expect(tier3Available({ ...ok, consent: "unknown" })).toBe(false));
   it("INV-10: declining consent means on-device only", () => expect(tier3Available({ ...ok, consent: "declined" })).toBe(false));
@@ -133,6 +134,10 @@ describe("INV-10 / INV-11 tier 3 gate", () => {
     expect(tier3Available({ ...ok, underDigitalConsentAge: true, providerZdrApproved: true })).toBe(true);
   });
   it("INV-08: no call when redaction cannot run", () => expect(tier3Available({ ...ok, redactorReady: false })).toBe(false));
+  it("Q-61: with the LLM switched off nothing is ever sent and no consent is asked", () => {
+    expect(tier3Available({ ...ok, llmEnabled: false })).toBe(false);
+    expect(needsConsentPrompt({ ...ok, llmEnabled: false, consent: "unknown" })).toBe(false);
+  });
 });
 
 describe("INV-13 the model never learns from guesses or excuses", () => {

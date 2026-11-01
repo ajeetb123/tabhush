@@ -7,6 +7,7 @@ import {
   AI_CAPS,
   API,
   checkPow,
+  LLM,
   parseTelemetry,
   parseTier3Request,
   POW,
@@ -90,6 +91,8 @@ async function authorize(d: Deps, req: Request): Promise<string | null> {
 }
 
 async function tier3(d: Deps, req: Request): Promise<Response> {
+  // Q-61: the owner switched the LLM off; the proxy does not exist while LLM.ENABLED is false.
+  if (!LLM.ENABLED) return apiError("not_found", "no such endpoint");
   // BE-02 order: 1. install token
   const install = await authorize(d, req);
   if (!install) return apiError("unauthorized", "missing or unknown install token");

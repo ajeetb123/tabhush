@@ -79,6 +79,11 @@ export function isKnownUnreachable(url: ParsedUrl): boolean {
   return UNREACHABLE_HOST_PATHS.some((u) => url.rawHost === u.host && url.path.startsWith(u.pathPrefix));
 }
 
+/** Category from the shipped domain-category list (CLS-10 input 5). The list is TODO_Q08. */
+export function shippedCategory(_url: string): Category | null {
+  return null;
+}
+
 export function tier1(urlString: string, ctx: Tier1Context): Tier1Result {
   const url = parseUrl(urlString);
   if (!url) return { kind: "none", category: null };

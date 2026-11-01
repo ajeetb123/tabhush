@@ -187,6 +187,7 @@ export const CACHE = {
 
 // ───────────────────────── Tier 3 / LLM (docs/05, docs/08) ─────────────────────────
 export const LLM = {
+  ENABLED: false as boolean, // Q-61 (owner 2026-10-31): no LLM; tier 3 is off for every install
   PROVIDER: "OpenAI API",
   MODEL: "GPT-5.4 nano", // Q-60
   REASONING: "lowest available setting",

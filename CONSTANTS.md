@@ -174,6 +174,7 @@ export const CACHE = {
 
 // ───────────────────────── Tier 3 / LLM (docs/05, docs/08) ─────────────────────────
 export const LLM = {
+  ENABLED: false,                       // Q-61 (owner 2026-10-31): no LLM; everything below is the switched-off fallback
   PROVIDER: "OpenAI API",
   MODEL: "GPT-5.4 nano",                // Q-60 (owner 2026-10-31); scope's GPT-5 nano is removed 2026-12-11
   REASONING: "lowest available setting",

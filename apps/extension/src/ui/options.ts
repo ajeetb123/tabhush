@@ -1,7 +1,7 @@
 // Settings (beta 1 subset): consent (PRIV-60), Domain only (PRIV-03), on-device only (PRIV-70),
 // essentials (LOCK-02), and the log of every tier 3 call (PRIV-80). Locked during a session (LOCK-01).
 
-import type { Tier3Request } from "@lockin/core";
+import { LLM, type Tier3Request } from "@lockin/core";
 import { call, getSnapshot, h, onStateChange, setTitle } from "./common";
 
 setTitle("Settings");
@@ -56,16 +56,20 @@ async function render(): Promise<void> {
     h("h1", { textContent: "Settings" }),
     ...(locked ? [h("p", { className: "muted", textContent: "Settings are locked until the session ends." })] : []),
     h("h2", { textContent: "AI checks" }),
-    h("p", { textContent: consentText }),
-    h("div", { className: "row" }, allow, revoke),
-    toggle("On-device only: never send anything", settings.onDeviceOnly, (v) => void save({ type: "ui:settings", patch: { onDeviceOnly: v } })),
-    toggle("Domain only: never send page titles", settings.domainOnly, (v) => void save({ type: "ui:settings", patch: { domainOnly: v } })),
+    // Q-61: with the LLM switched off there is nothing to consent to or limit.
+    ...(LLM.ENABLED
+      ? [
+          h("p", { textContent: consentText }),
+          h("div", { className: "row" }, allow, revoke),
+          toggle("On-device only: never send anything", settings.onDeviceOnly, (v) => void save({ type: "ui:settings", patch: { onDeviceOnly: v } })),
+          toggle("Domain only: never send page titles", settings.domainOnly, (v) => void save({ type: "ui:settings", patch: { domainOnly: v } })),
+        ]
+      : [h("p", { textContent: "Everything is decided on this device. No page titles, addresses or task names are ever sent." })]),
     h("h2", { textContent: "Essentials (never locked)" }),
     essentials,
     h("div", { className: "row" }, saveEssentials),
     err,
-    h("h2", { textContent: "Every AI check this install sent" }),
-    log.length ? logList : h("p", { className: "muted", textContent: "None yet." }),
+    ...(LLM.ENABLED ? [h("h2", { textContent: "Every AI check this install sent" }), log.length ? logList : h("p", { className: "muted", textContent: "None yet." })] : []),
   );
 }
 

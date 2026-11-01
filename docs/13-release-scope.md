@@ -29,14 +29,14 @@ Summer 2027   v2 WINDOWS APP, only if GATE C passes
 - Start from the toolbar; task inference from open tabs with the task registry and prototypes.
 - Sweep with Confirm for the first 5 sessions and a 30-second undo.
 - Overlay with mute and pause; blocking for distraction domains; show-then-judge for everything else.
-- Tier 1, zero-label similarity, and tier 3 through the backend, with the verdict cache.
+- Tier 1, zero-label similarity, and tier 3 through the backend, with the verdict cache. **Changed by owner 2026-10-31 (Q-61): no tier 3. The on-device-only parking path (CLS-21) moves up from beta 2 so pages can be parked without an LLM.**
 - The full never-locked list, including courseware, meetings and developer pages.
-- Consent before the first tier 3 call, a privacy policy, basic telemetry, and the sampled "Was this park right?" check.
+- Consent before the first tier 3 call (not shown while Q-61 keeps tier 3 off: nothing is sent), a privacy policy, basic telemetry, and the sampled "Was this park right?" check.
 - Exit ladder steps 1 and 3 (override, End) [DERIVED: required to run any session safely].
 - Opt-in redacted review export and refused-override logging [placement OPEN Q-29; roadmap puts review export in beta 1].
 
 ## Beta 2: private extension [spring weeks 1-3, 60-90 testers]
-- Personal memory; on-device-only mode with its own parking path.
+- Personal memory; on-device-only mode with its own parking path (the parking path moved to beta 1, Q-61).
 - Switch task, timed breaks, emergency pass, the ask budget, Limited mode, the signed remote config.
 - Session max length, idle pause and end, restart recovery, deferred updates.
 - Overlay escape handling, the background audio setting, the visible AI cap.

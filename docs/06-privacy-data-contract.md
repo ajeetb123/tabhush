@@ -10,6 +10,8 @@ This is a contract: the privacy policy must match it word for word in substance.
 - Full URLs, full titles, labels, the task registry, sessions and time logs.
 
 ## PRIV-02 Sent to the backend, then to the LLM provider (tier 3 only, after consent)
+
+**Owner decision 2026-10-31 (Q-61): no LLM.** Nothing below is sent while tier 3 is off: no titles, labels, domains or sentences leave the device. Only PRIV-30 telemetry counts go to the backend. Redaction (PRIV-10) still runs on review export records (PRIV-50).
 ```
 task label                 (redacted)
 domain

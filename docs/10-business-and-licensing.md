@@ -73,7 +73,8 @@ Before extension launch
   Google Workspace email      $7/mo (annual billing)
   website                     $0 hand-built on Cloudflare Pages (owner decision 2026-10-31, Q-26)
 Backend                       Cloudflare Workers free, then $5/mo for 10M requests
-LLM                           GPT-5 nano ~ $0.00002/call floor; a few cents per active user per month max
+LLM                           none: $0 (owner decision 2026-10-31, Q-61). Owner budget: domain, Chrome Web Store fee, domain email only
+Payments                      decided at v1; every processor takes a cut per sale, none charge up front
 Payments                      ~5% + 50¢ per sale
 Apple Developer Program       $99/yr from the Mac app beta
 LLC (optional)                $100 file + $50/yr (Virginia)

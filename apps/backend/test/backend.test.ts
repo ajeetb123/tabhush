@@ -7,7 +7,13 @@ import { MemoryStore } from "./memoryStore";
 vi.mock("@lockin/core", async (orig) => {
   const real = await orig<typeof import("@lockin/core")>();
   // Tests run the real PoW at a low difficulty so they stay fast.
-  return { ...real, POW: { ...real.POW, DIFFICULTY_BITS: 8 }, checkPow: (c: string, n: number) => real.checkPow(c, n, 8) };
+  // The tier 3 tests exercise the switched-off fallback (Q-61), so they turn it on.
+  return {
+    ...real,
+    LLM: { ...real.LLM, ENABLED: true },
+    POW: { ...real.POW, DIFFICULTY_BITS: 8 },
+    checkPow: (c: string, n: number) => real.checkPow(c, n, 8),
+  };
 });
 
 const SECRET_TITLE = "Zbigniew's secret chem notes";
@@ -155,5 +161,12 @@ describe("routing", () => {
     const res = await post("/v1/config", {});
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: { code: "not_found", message: expect.any(String) } });
+  });
+});
+
+describe("Q-61 LLM switched off", () => {
+  it("the shipped constant keeps tier 3 off", async () => {
+    const real = await vi.importActual<typeof import("@lockin/core")>("@lockin/core");
+    expect(real.LLM.ENABLED).toBe(false);
   });
 });

@@ -21,6 +21,8 @@ import {
   itemText,
   judge,
   liftedPreBlockDomains,
+  LLM,
+  shippedCategory,
   MS,
   namedPureDistraction,
   needsConsentPrompt,
@@ -89,6 +91,7 @@ async function tier3Ready(): Promise<Tier3Ready | null> {
   const settings = await getSettings();
   const internal = await getInternal();
   const gate = {
+    llmEnabled: LLM.ENABLED,
     consent: settings.consent,
     onDeviceOnlySetting: settings.onDeviceOnly,
     underDigitalConsentAge: settings.underDigitalConsentAge,
@@ -148,6 +151,8 @@ export async function judgeItem(s: ActiveSession, task: Task, url: string, title
   const internal = await getInternal();
   const ready = await tier3Ready();
   const t1 = tier1(url, await tier1Context());
+  // CLS-21 may also use a tier 3 category cached on device from earlier calls (none while Q-61 holds).
+  const cachedCategory = (await cacheFor(s, internal.configVersion).lookup(task.id, key))?.tier3?.category ?? null;
   try {
     const decision = await judge({
       taskId: task.id,
@@ -167,8 +172,9 @@ export async function judgeItem(s: ActiveSession, task: Task, url: string, title
             return judgeRemote(req);
           }
         : null,
-      onDeviceParkingPath: false, // CLS-21: beta 2
-      onDeviceCategory: null,
+      // CLS-21 is used whenever tier 3 is unavailable; moved to beta 1 when the LLM was switched off (Q-61).
+      onDeviceParkingPath: ready === null,
+      onDeviceCategory: shippedCategory(url) ?? cachedCategory,
       askBudgetAvailable: () => askBudgetAvailable(s.asks, Date.now()),
     });
     return { decision, key };
