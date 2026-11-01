@@ -48,6 +48,12 @@ The model is bundled in the package, never fetched at runtime (INV-05). Before l
 npm run fetch-model -w @lockin/extension
 ```
 
+To see the model's label scores for your own examples (useful for Gate A):
+
+```bash
+node scripts/model-smoke.mjs "Lab report chemistry" "Titration lab report draft docs.google.com"
+```
+
 The redaction lists (Q-14) are built into the package too. Download the SSA national baby-names file `names.zip` by hand from ssa.gov (it refuses scripted downloads); the script fetches SCOWL from SourceForge:
 
 ```bash
