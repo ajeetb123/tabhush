@@ -189,11 +189,13 @@ function activeView(s: ActiveSession): Node[] {
 
 function endedView(s: ActiveSession): Node[] {
   setTitle("Session summary");
-  const done = h("button", { className: "btn primary", textContent: "Done" });
+  const again = h("button", { className: "btn primary", textContent: "Start a new session" });
+  again.addEventListener("click", () => void call({ type: "ui:start" }));
+  const done = h("button", { className: "btn", textContent: "Done" });
   done.addEventListener("click", () => void call({ type: "ui:dismiss" }).then(() => window.close()));
   const report = h("button", { className: "btn", textContent: "📊 See your day" });
   report.addEventListener("click", () => void call({ type: "ui:dismiss" }).then(() => location.replace(chrome.runtime.getURL("ui/report.html"))));
-  setFooter(report, done);
+  setFooter(h("div", { className: "row" }, report, done), again);
   const duration = (s.endedAt ?? Date.now()) - (s.committedAt ?? s.startedAt);
   const won = s.endKind === "normal";
   const out: Node[] = [

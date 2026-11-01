@@ -370,3 +370,19 @@ describe("Active session", () => {
     expect((await session.loadSession())!.focusLog.at(-1)?.state).toBe("away");
   });
 });
+
+describe("after a session ends", () => {
+  it("Start works right away, without clicking Done first", async () => {
+    await engine.start();
+    await engine.confirm(25);
+    await engine.requestEnd("done");
+    await engine.finishEnd();
+    expect((await session.loadSession())!.state).toBe("ENDED");
+    const ended = (await session.loadSession())!.id;
+    await engine.start();
+    const s = (await session.loadSession())!;
+    expect(s.state).toBe("SWEEP_PREVIEW");
+    expect(s.id).not.toBe(ended);
+    expect(await engine.sessionHistoryMinutes()).toHaveLength(1); // the ended one is kept for the report
+  });
+});

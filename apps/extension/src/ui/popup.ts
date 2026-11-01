@@ -53,10 +53,16 @@ async function render(): Promise<void> {
   }
 
   if (s.state === "ENDED") {
-    const open = h("button", { className: "btn primary block", textContent: "See summary" });
+    const start = h("button", { className: "btn primary block", textContent: "Start a new session" });
+    start.addEventListener("click", () => void call({ type: "ui:start" }).then(() => window.close()));
+    const open = h("button", { className: "btn block", textContent: "See last session’s summary" });
     open.addEventListener("click", openSessionPage);
     const won = s.endKind === "normal";
-    main.replaceChildren(hero({ text: won ? "Goal reached" : "Ended" }, won ? "Nice work 🎯" : "Session over", s.taskLabel ?? ""), open, h("div", { className: "row", attrs: { style: "margin-top:10px" } }, reportLink()));
+    main.replaceChildren(
+      hero({ text: won ? "Goal reached" : "Ended" }, won ? "Nice work 🎯" : "Session over", s.taskLabel ?? ""),
+      start,
+      h("div", { className: "stack", attrs: { style: "margin-top:10px" } }, open, reportLink()),
+    );
     return;
   }
 

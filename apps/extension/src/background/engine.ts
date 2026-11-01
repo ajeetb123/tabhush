@@ -383,7 +383,8 @@ function usableTitle(tab: chrome.tabs.Tab): boolean {
 
 export async function start(): Promise<void> {
   await withSession(async (existing) => {
-    if (existing && existing.state !== "IDLE") return;
+    // An ended session is already saved for the report, so Start simply replaces it.
+    if (existing && existing.state !== "IDLE" && existing.state !== "ENDED") return;
     const s = newSession(Date.now());
     apply(s, { type: "START" });
     // Snapshot first: opening the session page would otherwise become the front tab.
