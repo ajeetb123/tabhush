@@ -168,7 +168,7 @@ Country table for age of digital consent (13 to 16) and how age is stored.
 
 **Q-26 Landing page and waitlist** · P0 · backend host **decided 2026-10-31**, rest open
 Framer vs hand-built on Cloudflare Pages; waitlist/email provider.
-Backend host for beta 1: `https://lockin-backend.<subdomain>.workers.dev`, moving to `api.<domain>` once Q-01 is settled. The owner's workers.dev subdomain is still to come, so `API.BASE_URL` stays `TODO_Q26`. Landing page and waitlist provider still open.
+Backend host for beta 1: `https://lockin-backend.<subdomain>.workers.dev`, moving to `api.<domain>` once Q-01 is settled. The owner's workers.dev subdomain is still to come, so `API.BASE_URL` stays `TODO_Q26`. Landing page (owner, 2026-10-31): **hand-built on Cloudflare Pages** ($0, not Framer). The owner wants no paid services beyond the domain, the Chrome Web Store fee and domain email, so the waitlist is to be built in-house on Cloudflare too. How waitlist emails (confirmation, unsubscribe, invites) get sent is still open.
 
 **Q-31 Uninstall survey** · P1
 Questions and where responses are stored.

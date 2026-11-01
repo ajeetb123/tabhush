@@ -71,7 +71,7 @@ Before extension launch
   domain                      ~$10 to $15/yr (.com)
   Chrome Web Store            $5 one-time
   Google Workspace email      $7/mo (annual billing)
-  website                     Framer Basic $10/mo (annual) OR $0 hand-built on Cloudflare Pages
+  website                     $0 hand-built on Cloudflare Pages (owner decision 2026-10-31, Q-26)
 Backend                       Cloudflare Workers free, then $5/mo for 10M requests
 LLM                           GPT-5 nano ~ $0.00002/call floor; a few cents per active user per month max
 Payments                      ~5% + 50¢ per sale
