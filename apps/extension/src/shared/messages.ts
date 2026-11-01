@@ -29,6 +29,8 @@ export type FromUi =
   | { type: "ui:toggle"; tabId: number; park: boolean }
   | { type: "ui:confirm"; goalMin: number }
   | { type: "ui:stop" }
+  | { type: "ui:break"; min: number }
+  | { type: "ui:breakEnd" }
   | { type: "ui:undo" }
   | { type: "ui:end"; reason: string }
   | { type: "ui:dismiss" }

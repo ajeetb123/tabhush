@@ -136,7 +136,7 @@ File format and contents.
 **Q-32 Extend increment** · P1
 How much time the one-tap extend adds at max length.
 
-**Q-34 Break accrual** · P1
+**Q-34 Break accrual** · P1 · **Decided by the agent 2026-11-01 (owner may change)**: each session has its own bank, floor(on-task minutes ÷ 5) minus minutes already used; a 5/10/15-minute break is offered once earned; break time does not count toward the time goal (Q-64).
 How the "about 1 break minute per 5 focused minutes" cap is computed (per session bank, per day, rounding) and what the UI shows when no break time is available.
 
 **Q-35 "Same as X?" flow** · P2

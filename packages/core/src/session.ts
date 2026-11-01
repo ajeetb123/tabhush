@@ -12,7 +12,8 @@ export type SessionState =
   | "ACTIVE"
   | "END_COUNTDOWN"
   | "ENDED"
-  | "SUSPENDED";
+  | "SUSPENDED"
+  | "ON_BREAK";
 
 export type SessionEvent =
   | { type: "START" }
@@ -24,6 +25,8 @@ export type SessionEvent =
   | { type: "END_REQUESTED" }
   | { type: "END_COUNTDOWN_DONE" }
   | { type: "PROCTORING_DETECTED" }
+  | { type: "BREAK_START" }
+  | { type: "BREAK_END" }
   | { type: "DISMISS" };
 
 const TRANSITIONS: Record<SessionState, Partial<Record<SessionEvent["type"], SessionState>>> = {
@@ -31,7 +34,9 @@ const TRANSITIONS: Record<SessionState, Partial<Record<SessionEvent["type"], Ses
   INFERRING: { INFER_CONFIDENT: "SWEEP_PREVIEW", INFER_UNSURE: "CLARIFY", END_REQUESTED: "END_COUNTDOWN" },
   CLARIFY: { CLARIFY_ANSWERED: "SWEEP_PREVIEW", END_REQUESTED: "END_COUNTDOWN" },
   SWEEP_PREVIEW: { CONFIRM: "ACTIVE", AUTO_COMMIT: "ACTIVE", END_REQUESTED: "END_COUNTDOWN" },
-  ACTIVE: { END_REQUESTED: "END_COUNTDOWN", PROCTORING_DETECTED: "SUSPENDED" },
+  ACTIVE: { END_REQUESTED: "END_COUNTDOWN", PROCTORING_DETECTED: "SUSPENDED", BREAK_START: "ON_BREAK" },
+  // LOOP-08: a break unlocks everything, then re-locks on its own (or early, by choice).
+  ON_BREAK: { BREAK_END: "ACTIVE", END_REQUESTED: "END_COUNTDOWN" },
   // End is always available (LOCK-04 step 3). What SUSPENDED resumes to is OPEN Q-20.
   SUSPENDED: { END_REQUESTED: "END_COUNTDOWN" },
   END_COUNTDOWN: { END_COUNTDOWN_DONE: "ENDED" },

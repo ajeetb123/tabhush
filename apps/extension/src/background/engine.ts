@@ -21,6 +21,8 @@ import {
   clampGoal,
   courseCodesIn,
   goalReached,
+  breakMinutesAvailable,
+  BREAKS,
   isEnforcing,
   looksLikeMusic,
   isDistractingSearch,
@@ -68,12 +70,14 @@ import { db, idbCacheStore, labels, review, tasks } from "./db";
 import { embed } from "./embedder";
 import { getBankingDomains, getCategoryTable, getUndergroundDomains } from "./categories";
 import { getRedactor } from "./lexicon";
+import { asSessionLike, focusSplit } from "../ui/reportData";
 import { closeBlockedTab, installPreBlocks, parkTab, removePreBlocks, sendToTab, unparkTab } from "./enforce";
 import { apply, loadSession, newSession, saveSession, withSession, type ActiveSession } from "./session";
 import { bump, getInternal, getSettings, setInternal } from "./settings";
 import { backendConfigured, BackendUnavailable, CapReached, inferLabelRemote, judgeRemote, utcDay } from "./tier3Client";
 
 export const END_ALARM = "end-countdown";
+export const BREAK_ALARM = "break-end";
 const SESSION_PAGE = "ui/session.html";
 const CONSENT_PAGE = "ui/consent.html";
 
@@ -574,7 +578,7 @@ export async function confirm(goalMin: number): Promise<void> {
 /** Past the goal, Stop ends at once as a normal end: no countdown, no reason (Q-64). */
 export async function stop(): Promise<boolean> {
   return withSession(async (s) => {
-    if (!s || (s.state !== "ACTIVE" && s.state !== "END_COUNTDOWN") || !goalReached(s.committedAt, s.goalMin, Date.now())) return false;
+    if (!s || (s.state !== "ACTIVE" && s.state !== "END_COUNTDOWN" && s.state !== "ON_BREAK") || !goalReached(s.committedAt, s.goalMin, Date.now(), breakMs(s))) return false;
     if (s.state === "ACTIVE") apply(s, { type: "END_REQUESTED" });
     s.endCountdown = { startedAt: Date.now(), reason: "goal reached" };
     await chrome.alarms.clear(END_ALARM);
@@ -719,6 +723,61 @@ export async function onTabChanged(tab: chrome.tabs.Tab): Promise<void> {
     }
     await saveSession(s);
   });
+}
+
+// ───────────────────────── Breaks (LOOP-08, Q-34) ─────────────────────────
+
+/** Total break time so far (a running break counts up to now). */
+export function breakMs(s: ActiveSession, now = Date.now()): number {
+  return (s.breaks ?? []).reduce((sum, b) => sum + ((b.endedAt ?? now) - b.startedAt), 0);
+}
+
+/** Break minutes earned and not yet used: 1 per 5 on-task minutes, per session. */
+export function breakAvailable(s: ActiveSession, now = Date.now()): number {
+  const used = (s.breaks ?? []).reduce((sum, b) => sum + b.plannedMin, 0);
+  return breakMinutesAvailable(focusSplit(asSessionLike(s), now).on, used);
+}
+
+/** A break unlocks everything for 5, 10 or 15 minutes, then re-locks on its own. Never a bail (INV-16). */
+export async function startBreak(min: number): Promise<boolean> {
+  return withSession(async (s) => {
+    if (s?.state !== "ACTIVE" || !(BREAKS.OPTIONS_MIN as readonly number[]).includes(min) || breakAvailable(s) < min) return false;
+    const now = Date.now();
+    s.breaks.push({ startedAt: now, plannedMin: min, endedAt: null });
+    apply(s, { type: "BREAK_START" });
+    s.focusLog.push({ at: now, state: "away" }); // breaks are not focused time (TIME-06)
+    await removePreBlocks();
+    await saveSession(s);
+    await chrome.alarms.create(BREAK_ALARM, { when: now + min * MS.MINUTE });
+    return true;
+  });
+}
+
+/** The break timer ran out, or the user came back early: lock again and judge every open tab. */
+export async function endBreak(): Promise<void> {
+  await withSession(async (s) => {
+    if (s?.state !== "ON_BREAK") return;
+    const current = s.breaks[s.breaks.length - 1];
+    if (current && current.endedAt === null) current.endedAt = Date.now();
+    apply(s, { type: "BREAK_END" });
+    await chrome.alarms.clear(BREAK_ALARM);
+    await installPreBlocks(s.liftedDomains);
+    logFocus(s, "on");
+    await relock(s);
+    await saveSession(s);
+  });
+}
+
+/** Re-judges every open tab after a break; anything unrelated is blocked again. */
+async function relock(s: ActiveSession): Promise<void> {
+  const task = await sessionTask(s);
+  if (!task) return;
+  lastJudged.clear();
+  for (const tab of await chrome.tabs.query({})) {
+    if (!tab.id || !tab.url) continue;
+    const { decision, key } = await judgeItem(s, task, tab.url, tab.title ?? "", tab.id);
+    if (decision.action === "park") await recordPark(s, tab, cacheKey(task.id, key), decision.source, false, OWNER_RULES.OVERRIDE_ENABLED);
+  }
 }
 
 // ───────────────────────── Focus time for the report (Q-65, TIME-01) ─────────────────────────
@@ -964,6 +1023,12 @@ export async function requestEnd(reason: string): Promise<boolean> {
     const now = Date.now();
     s.bail = isBail("end", now, s.lastParkAt);
     s.endCountdown = { startedAt: now, reason: reason.trim() };
+    if (s.state === "ON_BREAK") {
+      // Ending from a break closes the break; the countdown runs unlocked, as the break was.
+      const current = s.breaks[s.breaks.length - 1];
+      if (current && current.endedAt === null) current.endedAt = now;
+      await chrome.alarms.clear(BREAK_ALARM);
+    }
     apply(s, { type: "END_REQUESTED" });
     await saveSession(s);
     await chrome.alarms.create(END_ALARM, { when: now + EXITS.END_COUNTDOWN_SEC * MS.SECOND });
@@ -975,7 +1040,7 @@ export async function finishEnd(): Promise<void> {
   await withSession(async (s) => {
     if (s?.state !== "END_COUNTDOWN") return;
     // Ending after the goal is a normal end (Q-64); before it, "ended early".
-    await finishSession(s, goalReached(s.committedAt, s.goalMin, Date.now()) ? "normal" : "early");
+    await finishSession(s, goalReached(s.committedAt, s.goalMin, Date.now(), breakMs(s)) ? "normal" : "early");
   });
 }
 

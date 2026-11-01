@@ -66,6 +66,8 @@ export interface ActiveSession {
   liftedDomains: string[];
   /** Every override this session; the sentence stays on this device (PRIV-01). */
   overrideLog: { at: number; domain: string; sentence: string; judged: boolean }[];
+  /** Breaks taken this session (LOOP-08): planned length and actual start/end. */
+  breaks: { startedAt: number; plannedMin: number; endedAt: number | null }[];
   /** Every block, for the report (domains stay on this device; telemetry has no domains, INV-19). */
   blockEvents: { at: number; domain: string }[];
   /** Front-tab state over time: on task, off task, or browser not in front (Q-65 report). */
@@ -105,6 +107,7 @@ export function newSession(now: number): ActiveSession {
     pendingAsk: {},
     liftedDomains: [],
     overrideLog: [],
+    breaks: [],
     blockEvents: [],
     focusLog: [],
     tabOnTask: {},

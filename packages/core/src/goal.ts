@@ -1,7 +1,7 @@
 // Time goal (Q-64): the user sets how long they will work. The default is their typical session;
 // a note (never a question) flags over-ambitious or very short goals.
 
-import { MS, OWNER_RULES, SESSION } from "./constants";
+import { BREAKS, MS, OWNER_RULES, SESSION } from "./constants";
 
 export function clampGoal(min: number): number {
   return Math.min(SESSION.MAX_LENGTH_MIN, Math.max(OWNER_RULES.GOAL_MIN_MIN, Math.round(min)));
@@ -30,6 +30,12 @@ export function goalNote(goal: number, typical: number | null): string | null {
   return null;
 }
 
-export function goalReached(committedAt: number | null, goalMin: number | null, now: number): boolean {
-  return committedAt !== null && goalMin !== null && now - committedAt >= goalMin * MS.MINUTE;
+/** Break time does not count toward the goal (Q-34). */
+export function goalReached(committedAt: number | null, goalMin: number | null, now: number, breakMs = 0): boolean {
+  return committedAt !== null && goalMin !== null && now - committedAt - breakMs >= goalMin * MS.MINUTE;
+}
+
+/** Break minutes earned and not yet used this session (LOOP-08, Q-34). */
+export function breakMinutesAvailable(onTaskMs: number, usedMin: number): number {
+  return Math.max(0, Math.floor(onTaskMs / MS.MINUTE / BREAKS.FOCUSED_MIN_PER_BREAK_MIN) - usedMin);
 }

@@ -43,7 +43,8 @@ export const SWITCH = {
 // ───────────────────────── Breaks (docs/03) ─────────────────────────
 export const BREAKS = {
   OPTIONS_MIN: [5, 10, 15],             // free tier choices; Pro gets custom lengths
-  FOCUSED_MIN_PER_BREAK_MIN: 5,         // [START] cap: roughly 1 break minute per 5 focused minutes (accrual details TODO_Q34)
+  FOCUSED_MIN_PER_BREAK_MIN: 5,         // [START] cap: roughly 1 break minute per 5 focused minutes
+                                        // Q-34 (agent 2026-11-01): per-session bank = floor(on-task min / 5) − minutes used
   COUNTS_AS_BAIL: false,                // never
 };
 

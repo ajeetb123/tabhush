@@ -173,16 +173,19 @@ function activeView(s: ActiveSession): Node[] {
   const ring = goalRing();
   const stopBtn = h("button", { className: "btn primary", textContent: "Stop, I’m done" });
   stopBtn.addEventListener("click", () => void call({ type: "ui:stop" }));
+  const breakTotal = () => (s.breaks ?? []).reduce((sum, b) => sum + ((b.endedAt ?? Date.now()) - b.startedAt), 0);
   const update = () => {
-    const elapsed = Date.now() - (s.committedAt ?? s.startedAt);
-    const reached = goalReached(s.committedAt, s.goalMin, Date.now());
+    const elapsed = Date.now() - (s.committedAt ?? s.startedAt) - breakTotal();
+    const reached = goalReached(s.committedAt, s.goalMin, Date.now(), breakTotal());
     ring.update(elapsed, s.goalMin, reached ? "goal reached" : s.goalMin ? `of ${s.goalMin} min` : "");
     setFooter(...(reached ? [h("span", { className: "muted small", textContent: "You hit your goal. Keep going or stop now." }), stopBtn] : []));
   };
   update();
   tick = window.setInterval(update, MS.SECOND);
   return [
-    hero(s.state === "END_COUNTDOWN" ? { text: "Ending", tone: "warn" } : { text: "Locked in", tone: "live" }, "You’re locked in", s.taskLabel ?? undefined),
+    s.state === "ON_BREAK"
+      ? hero({ text: "On a break" }, "Take a breather", "Everything’s unlocked for now. It locks again on its own.")
+      : hero(s.state === "END_COUNTDOWN" ? { text: "Ending", tone: "warn" } : { text: "Locked in", tone: "live" }, "You’re locked in", s.taskLabel ?? undefined),
     h("div", { className: "card" }, ring.el),
     h("div", { className: "stats" }, stat(String(blockedCount(s)), "blocked so far")),
     h("p", { className: "muted small", textContent: `Before your goal, End lives in the ${BRAND.NAME} button in your toolbar.` }),

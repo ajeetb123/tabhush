@@ -10,6 +10,9 @@ import {
   consent,
   dismiss,
   END_ALARM,
+  BREAK_ALARM,
+  startBreak,
+  endBreak,
   finishEnd,
   forgetTab,
   onBlockedVisit,
@@ -63,6 +66,7 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === END_ALARM) void finishEnd();
+  if (alarm.name === BREAK_ALARM) void endBreak();
   if (alarm.name === TELEMETRY_ALARM) void sendTelemetry();
 });
 
@@ -155,6 +159,10 @@ chrome.runtime.onMessage.addListener((msg: FromUi | FromContent | { target?: str
       return done(confirm(m.goalMin));
     case "ui:stop":
       return done(stop());
+    case "ui:break":
+      return done(startBreak(m.min));
+    case "ui:breakEnd":
+      return done(endBreak());
     case "ui:undo":
       return done(undo());
     case "ui:end":

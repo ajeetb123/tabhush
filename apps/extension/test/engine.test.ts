@@ -439,3 +439,54 @@ describe("after a session ends", () => {
     expect(await engine.sessionHistoryMinutes()).toHaveLength(1); // the ended one is kept for the report
   });
 });
+
+describe("breaks (LOOP-08, Q-34)", () => {
+  async function lockedIn() {
+    await engine.start();
+    await engine.confirm(45);
+  }
+  const later = (min: number) => {
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now + min * 60_000);
+  };
+
+  it("are earned at 1 minute per 5 on task; none at the start", async () => {
+    await lockedIn();
+    expect(await engine.startBreak(5)).toBe(false);
+    later(26); // 26 on-task minutes → 5 earned
+    expect(await engine.startBreak(10)).toBe(false);
+    expect(await engine.startBreak(5)).toBe(true);
+    vi.restoreAllMocks();
+    expect((await session.loadSession())!.state).toBe("ON_BREAK");
+  });
+
+  it("unlock everything, then re-lock and close what was opened meanwhile", async () => {
+    await lockedIn();
+    later(30);
+    await engine.startBreak(5);
+    expect(fake.rules()).toEqual([]); // pre-blocks lifted
+    const tab = { id: 180, windowId: W1, groupId: -1, url: "https://www.netflix.com/title/5", title: "Netflix", active: true };
+    fake.tabs.set(180, { ...tab, lastAccessed: Date.now() });
+    await engine.onTabChanged(asTab(tab));
+    expect(fake.removed).not.toContain(180); // allowed during the break
+    later(36);
+    await engine.endBreak();
+    vi.restoreAllMocks();
+    expect((await session.loadSession())!.state).toBe("ACTIVE");
+    expect(fake.rules().length).toBeGreaterThan(0);
+    expect(fake.removed).toContain(180);
+  });
+
+  it("INV-16: ending right after a break is not a bail, and break time doesn't count toward the goal", async () => {
+    await lockedIn();
+    later(30);
+    await engine.startBreak(5);
+    const s = (await session.loadSession())!;
+    expect(engine.breakMs(s, s.breaks[0]!.startedAt + 5 * 60_000)).toBe(5 * 60_000);
+    later(36);
+    await engine.endBreak();
+    vi.restoreAllMocks();
+    // 45-minute goal; 36 minutes elapsed including a 5-minute break → not reached yet
+    expect(await engine.stop()).toBe(false);
+  });
+});

@@ -2,7 +2,8 @@
 // Q-64: past the time goal, Stop ends at once (normal end); before it, End keeps the 30-second
 // countdown and a one-line reason (Q-63).
 
-import { EXITS, goalReached, MS } from "@lockin/core";
+import { BREAKS, breakMinutesAvailable, EXITS, goalReached, MS } from "@lockin/core";
+import { asSessionLike, focusSplit } from "./reportData";
 import { BUILD_ID } from "../shared/build";
 import { blockedCount, call, formatDuration, getSnapshot, goalRing, h, onStateChange, setTitle, stat, topbar } from "./common";
 
@@ -48,6 +49,21 @@ function startButton(text: string): HTMLElement {
       });
   });
   return h("div", {}, start, err);
+}
+
+/** Breaks (LOOP-08): 5, 10 or 15 minutes, earned at 1 minute per 5 on task (Q-34). Never a bail. */
+function breakCard(s: NonNullable<Awaited<ReturnType<typeof getSnapshot>>["session"]>): HTMLElement {
+  const used = (s.breaks ?? []).reduce((sum, b) => sum + b.plannedMin, 0);
+  const available = breakMinutesAvailable(focusSplit(asSessionLike(s), Date.now()).on, used);
+  const buttons = BREAKS.OPTIONS_MIN.map((m) => {
+    const b = h("button", { className: "chip", textContent: `${m} min`, disabled: available < m });
+    b.addEventListener("click", () => void call({ type: "ui:break", min: m }));
+    return b;
+  });
+  const note = available >= BREAKS.OPTIONS_MIN[0]
+    ? `${available} min of break earned`
+    : `Breaks unlock as you work: 1 min for every ${BREAKS.FOCUSED_MIN_PER_BREAK_MIN} focused`;
+  return h("div", { className: "card stack" }, h("div", { className: "spread" }, h("b", { textContent: "Break" }), h("span", { className: "muted small", textContent: note })), h("div", { className: "chips" }, ...buttons));
 }
 
 /** The service worker is still running an older build than this popup (unpacked rebuild, no reload). */
@@ -100,6 +116,28 @@ async function render(): Promise<void> {
     return;
   }
 
+  const breaks = s.breaks ?? [];
+  const breakTotal = (now: number) => breaks.reduce((sum, b) => sum + ((b.endedAt ?? now) - b.startedAt), 0);
+
+  if (s.state === "ON_BREAK") {
+    const current = breaks[breaks.length - 1]!;
+    const back = h("button", { className: "btn primary block", textContent: "Back to work" });
+    back.addEventListener("click", () => void call({ type: "ui:breakEnd" }));
+    const ring = goalRing();
+    const tick = () => {
+      const left = Math.max(0, current.startedAt + current.plannedMin * MS.MINUTE - Date.now());
+      ring.update(left, null, "of break left");
+    };
+    tick();
+    timer = window.setInterval(tick, MS.SECOND);
+    main.replaceChildren(
+      hero({ text: "On a break" }, "Take a breather", "Everything’s unlocked. It locks again on its own."),
+      ring.el,
+      back,
+    );
+    return;
+  }
+
   const ending = s.state === "END_COUNTDOWN" && s.endCountdown;
   const ring = goalRing();
   const actions = h("div", { className: "stack" });
@@ -135,8 +173,8 @@ async function render(): Promise<void> {
       ring.update(left, null, "until it ends");
       return;
     }
-    const reached = goalReached(s.committedAt, s.goalMin, Date.now());
-    ring.update(elapsed, s.goalMin, reached ? "goal reached" : s.goalMin ? `of ${s.goalMin} min` : "focused");
+    const reached = goalReached(s.committedAt, s.goalMin, Date.now(), breakTotal(Date.now()));
+    ring.update(elapsed - breakTotal(Date.now()), s.goalMin, reached ? "goal reached" : s.goalMin ? `of ${s.goalMin} min` : "focused");
     if (reached !== shownReached) {
       shownReached = reached;
       renderActions(reached);
@@ -150,6 +188,7 @@ async function render(): Promise<void> {
     hero(ending ? { text: "Ending", tone: "warn" } : { text: "Locked in", tone: "live" }, s.taskLabel ?? "Locked in"),
     ring.el,
     h("div", { className: "stats" }, stat(String(blockedCount(s)), "blocked"), soFar),
+    ...(ending ? [] : [breakCard(s)]),
     actions,
   );
 }
