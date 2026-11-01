@@ -62,7 +62,10 @@ Browser settings stay reachable, which is exactly why disabling the extension is
    Refused  → logged for review (never a label).
    Accepted override becomes a training label ONLY after 3 active minutes on that item
    (active minute = ≥10 input events: keys, clicks, scrolls). A playing video doesn't count.
-   Behavior when tier 3 is unavailable (on-device only / cap hit / backend down): OPEN Q-38.
+   When tier 3 is unavailable (on-device only / cap hit / backend down; always while Q-61 keeps the
+   LLM off): the override is ACCEPTED AND LOGGED (Q-38, owner 2026-10-31). The sentence is still
+   required; the item is allowed for this session only; the session card shows it as "not checked";
+   a redacted review record is kept. An LLM "unsure" verdict: still OPEN Q-38 (nothing unlocks).
 
 2. Emergency pass             [beta2]
    Lifts the lock on ONE specific item for 10 minutes after a 30-second wait.

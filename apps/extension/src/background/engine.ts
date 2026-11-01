@@ -461,7 +461,7 @@ async function recordPark(s: ActiveSession, tab: chrome.tabs.Tab, itemKey: strin
 async function commit(s: ActiveSession, how: "CONFIRM" | "AUTO_COMMIT"): Promise<void> {
   const task = await chipTask(s);
   const internal = await getInternal();
-  const canOverride = (await tier3Ready()) !== null;
+  const canOverride = true; // Q-38: an override is always available, with or without tier 3
   for (const item of s.preview) {
     const tab = await chrome.tabs.get(item.tabId).catch(() => null);
     if (!tab) continue;
@@ -542,7 +542,7 @@ export async function onTabChanged(tab: chrome.tabs.Tab): Promise<void> {
     if (decision.action === "park") {
       if (parked?.itemKey === k) return;
       if (parked) delete s.parked[String(tab.id)];
-      await recordPark(s, tab, k, decision.source, false, (await tier3Ready()) !== null);
+      await recordPark(s, tab, k, decision.source, false, true);
     } else {
       if (parked) {
         // The tab moved to an item that is allowed (e.g. SPA navigation, LOOP-05).
@@ -588,56 +588,87 @@ export async function answerAsk(tab: chrome.tabs.Tab, isRelated: boolean): Promi
     await cacheFor(s, internal.configVersion).record(task.id, key, { decision: isRelated ? "allow" : "park" });
     await addLabel(task, k, isRelated, "ask_answer");
     if (isRelated) await seedPrototype(task, tab.url, tab.title ?? "", { kind: "accepted_item" });
-    else await recordPark(s, tab, k, "ask", false, (await tier3Ready()) !== null);
+    else await recordPark(s, tab, k, "ask", false, true);
     await saveSession(s);
   });
 }
 
 // ───────────────────────── Exit ladder step 1: override (LOCK-04) ─────────────────────────
 
-export async function override(tab: chrome.tabs.Tab, sentence: string): Promise<void> {
-  await withSession(async (s) => {
-    if (s?.state !== "ACTIVE" || !s.taskId || !tab.id || !tab.url) return;
+type OverrideOutcome = "accepted" | "refused" | "unavailable";
+
+/**
+ * Judges a "This is for my task" sentence. With tier 3 the LLM decides. Without it (the LLM is
+ * off, Q-61, or the cap is hit or the backend is down) the override is accepted and logged
+ * (Q-38, owner 2026-10-31). An "unsure" LLM verdict is still OPEN Q-38: nothing unlocks.
+ */
+async function judgeOverride(taskLabel: string, url: string, title: string, sentence: string): Promise<{ verdict: "related" | "unrelated" | "unsure"; judged: boolean }> {
+  const ready = await tier3Ready();
+  if (!ready) return { verdict: "related", judged: false };
+  const req = buildOverrideRequest({ redact: ready.redact, domainOnlySetting: ready.domainOnly }, taskLabel, url, title, sentence);
+  if (!req) return { verdict: "related", judged: false };
+  try {
+    return { verdict: (await judgeRemote(req)).verdict, judged: true };
+  } catch {
+    return { verdict: "related", judged: false }; // tier 3 unavailable mid-call: Q-38 applies
+  }
+}
+
+/** Accepted: allowed for THIS SESSION ONLY; a label only after 3 active minutes (CLS-62). Logged. */
+async function acceptOverride(s: ActiveSession, task: Task, url: string, title: string, sentence: string, judged: boolean): Promise<void> {
+  const key = itemKeyFor(url);
+  if (!key) return;
+  const k = cacheKey(task.id, key);
+  s.overrides[k] = { url, title, itemKey: k, at: Date.now(), activity: [], labeled: false };
+  const pd = parseUrl(url);
+  const domain = pd ? pureDistractionDomain(pd) : null;
+  if (domain && !s.liftedDomains.includes(domain)) {
+    s.liftedDomains.push(domain);
+    await installPreBlocks(s.liftedDomains);
+  }
+  // Every override is visible: on the session card, and (redacted) in the review records.
+  s.suspensions.push(`${judged ? "Override accepted" : "Override (not checked)"}: ${itemDomain(url) ?? url}`);
+  s.overrideLog.push({ at: Date.now(), domain: itemDomain(url) ?? "", sentence, judged });
+  const redactor = await getRedactor();
+  if (redactor && !judged) {
+    const rec = buildReviewRecord(redactor, { kind: "unjudged_override", taskLabel: task.label, url, title, verdict: "accepted_unjudged", sentence, domainOnlySetting: (await getSettings()).domainOnly });
+    if (rec) await review.add(rec);
+  }
+  await bump("corrections");
+}
+
+async function refuseOverride(task: Task, url: string, title: string, sentence: string): Promise<void> {
+  // Refused: logged for review, never a label (INV-13).
+  const redactor = await getRedactor();
+  if (redactor) {
+    const rec = buildReviewRecord(redactor, { kind: "refused_override", taskLabel: task.label, url, title, verdict: "unrelated", sentence, domainOnlySetting: (await getSettings()).domainOnly });
+    if (rec) await review.add(rec);
+  }
+  await bump("refused_overrides");
+}
+
+export async function override(tab: chrome.tabs.Tab, sentence: string): Promise<OverrideOutcome> {
+  return withSession(async (s) => {
+    if (s?.state !== "ACTIVE" || !s.taskId || !tab.id || !tab.url) return "unavailable";
     const parked = s.parked[String(tab.id)];
     const task = await tasks.get(s.taskId);
-    if (!parked || !task || !sentence.trim()) return;
-    const ready = await tier3Ready();
-    const req = ready ? buildOverrideRequest({ redact: ready.redact, domainOnlySetting: ready.domainOnly }, task.label, tab.url, tab.title ?? "", sentence) : null;
-    let verdict: "related" | "unrelated" | "unsure" = "unsure";
-    if (req) {
-      try {
-        verdict = (await judgeRemote(req)).verdict;
-      } catch {
-        verdict = "unsure";
-      }
-    }
+    if (!parked || !task || !sentence.trim()) return "unavailable";
+    const { verdict, judged } = await judgeOverride(task.label, tab.url, tab.title ?? "", sentence);
+    let outcome: OverrideOutcome = "unavailable";
     if (verdict === "related") {
-      // Accepted: allowed for THIS SESSION ONLY; a label only after 3 active minutes (CLS-62).
-      s.overrides[parked.itemKey] = { url: tab.url, title: tab.title ?? "", itemKey: parked.itemKey, at: Date.now(), activity: [], labeled: false };
       delete s.parked[String(tab.id)];
       await unparkTab(tab.id, true);
-      const pd = parseUrl(tab.url);
-      const domain = pd ? pureDistractionDomain(pd) : null;
-      if (domain && !s.liftedDomains.includes(domain)) {
-        s.liftedDomains.push(domain);
-        await installPreBlocks(s.liftedDomains);
-      }
-      s.suspensions.push(`Override accepted: ${itemDomain(tab.url) ?? tab.url}`);
-      await bump("corrections");
+      await acceptOverride(s, task, tab.url, tab.title ?? "", sentence, judged);
+      outcome = "accepted";
     } else if (verdict === "unrelated") {
-      // Refused: logged for review, never a label (INV-13).
-      const redactor = await getRedactor();
-      if (redactor) {
-        const rec = buildReviewRecord(redactor, { kind: "refused_override", taskLabel: task.label, url: tab.url, title: tab.title ?? "", verdict, sentence, domainOnlySetting: (await getSettings()).domainOnly });
-        if (rec) await review.add(rec);
-      }
-      await bump("refused_overrides");
+      await refuseOverride(task, tab.url, tab.title ?? "", sentence);
       await sendToTab(tab.id, { type: "overlay:show", taskLabel: task.label, canOverride: true, overrideNote: "Not accepted for this task. You can still end the session." });
+      outcome = "refused";
     } else {
-      // What "unsure" or "tier 3 unavailable" does is OPEN Q-38. Nothing parked unlocks (INV-06).
-      await sendToTab(tab.id, { type: "overlay:show", taskLabel: task.label, canOverride: req !== null, overrideNote: "This can’t be checked right now. You can still end the session." });
+      await sendToTab(tab.id, { type: "overlay:show", taskLabel: task.label, canOverride: true, overrideNote: "This can’t be checked right now. You can still end the session." });
     }
     await saveSession(s);
+    return outcome;
   });
 }
 
@@ -665,42 +696,24 @@ export async function onInputCounts(tab: chrome.tabs.Tab, minuteStart: number, c
   });
 }
 
-/**
- * Override from the blocked page of a pure-distraction domain (CLS-55): the only way to lift it.
- * Returns "accepted", "refused" or "unavailable" (OPEN Q-38 for the last two's handling).
- */
-export async function overrideBlocked(url: string, sentence: string): Promise<"accepted" | "refused" | "unavailable"> {
+/** Override from the blocked page of a pure-distraction domain (CLS-55): the only way to lift it. */
+export async function overrideBlocked(url: string, sentence: string): Promise<OverrideOutcome> {
   return withSession(async (s) => {
     if (s?.state !== "ACTIVE" || !s.taskId || !sentence.trim()) return "unavailable";
     const task = await tasks.get(s.taskId);
     const parsed = parseUrl(url);
-    const domain = parsed ? pureDistractionDomain(parsed) : null;
-    const ready = await tier3Ready();
-    if (!task || !domain || !ready) return "unavailable";
-    const req = buildOverrideRequest({ redact: ready.redact, domainOnlySetting: ready.domainOnly }, task.label, url, "", sentence);
-    let verdict: "related" | "unrelated" | "unsure" = "unsure";
-    try {
-      if (req) verdict = (await judgeRemote(req)).verdict;
-    } catch {
-      verdict = "unsure";
+    if (!task || !parsed || !pureDistractionDomain(parsed)) return "unavailable";
+    const { verdict, judged } = await judgeOverride(task.label, url, "", sentence);
+    let outcome: OverrideOutcome = "unavailable";
+    if (verdict === "related") {
+      await acceptOverride(s, task, url, "", sentence, judged);
+      outcome = "accepted";
+    } else if (verdict === "unrelated") {
+      await refuseOverride(task, url, "", sentence);
+      outcome = "refused";
     }
-    const key = itemKeyFor(url);
-    if (verdict === "related" && key) {
-      s.overrides[cacheKey(task.id, key)] = { url, title: "", itemKey: cacheKey(task.id, key), at: Date.now(), activity: [], labeled: false };
-      if (!s.liftedDomains.includes(domain)) s.liftedDomains.push(domain);
-      await installPreBlocks(s.liftedDomains);
-      s.suspensions.push(`Override accepted: ${domain}`);
-      await bump("corrections");
-      await saveSession(s);
-      return "accepted";
-    }
-    if (verdict === "unrelated") {
-      const rec = buildReviewRecord(ready.redact, { kind: "refused_override", taskLabel: task.label, url, title: "", verdict, sentence, domainOnlySetting: ready.domainOnly });
-      if (rec) await review.add(rec);
-      await bump("refused_overrides");
-      return "refused";
-    }
-    return "unavailable";
+    await saveSession(s);
+    return outcome;
   });
 }
 

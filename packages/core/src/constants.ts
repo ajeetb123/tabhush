@@ -58,6 +58,7 @@ export const EXITS = {
   PASSES_PER_DAY: 2, // [START]
   END_COUNTDOWN_SEC: 120, // [START]
   BAIL_WINDOW_SEC: 120,
+  OVERRIDE_WITHOUT_TIER3: "accept_and_log", // Q-38 (owner 2026-10-31)
 } as const;
 
 export const STRICT_MODE = {

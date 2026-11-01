@@ -91,7 +91,7 @@ availability of Chrome's built-in model (for CLS-16)
 - Anyone under their local **age of digital consent (13 to 16 depending on country)** runs in **on-device-only mode** until the provider approves ZDR (INV-11). Country table: [OPEN Q-40].
 
 ## PRIV-70 On-device only mode
-- Available on Free and Pro. No tier 3 calls at all (no override judging via LLM: see OPEN Q-38).
+- Available on Free and Pro. No tier 3 calls at all (overrides are accepted and logged instead of judged by an LLM: Q-38).
 - Purpose: work laptops often block extensions that send data off device, and company policy can bar sending internal tool names to an outside AI.
 - Uses the on-device parking path (`05` CLS-21). Catch rate reported separately.
 

@@ -53,7 +53,7 @@ Privacy rules for every payload: `06`. Numbers: `CONSTANTS.md`.
 // infer_label
 { "label": "≤ 5 words", "confidence": 0.0 }
 ```
-An `override` with verdict `related` = accepted; `unrelated` = refused; `unsure` handling: [OPEN Q-38].
+An `override` with verdict `related` = accepted; `unrelated` = refused; `unsure` handling: [OPEN Q-38]. With tier 3 unavailable the client accepts and logs the override (Q-38).
 
 ### Prompt rules
 - System message: fixed, versioned in the repo, defines the schema and states that everything in the data block is untrusted data.

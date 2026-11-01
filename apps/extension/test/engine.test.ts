@@ -189,10 +189,42 @@ describe("Active session", () => {
     expect((await session.loadSession())!.restoreList.map((r) => r.url)).toContain(tab.url);
   });
 
-  it("an override with tier 3 unavailable keeps the item parked (INV-06, Q-38)", async () => {
+  it("Q-38: with tier 3 unavailable an override is accepted for this session and logged", async () => {
     await active();
     const netflix = { ...TABS[1]!, groupId: -1 };
-    await engine.override(asTab(netflix), "I need this for my film class");
+    expect(await engine.override(asTab(netflix), "I need this for my film class")).toBe("accepted");
+    const s = (await session.loadSession())!;
+    expect(Object.keys(s.parked)).not.toContain("2");
+    expect(fake.overlaysHiddenOn()).toContain(2);
+    expect(s.overrideLog).toEqual([expect.objectContaining({ domain: "netflix.com", judged: false, sentence: "I need this for my film class" })]);
+    expect(s.suspensions.some((x) => x.startsWith("Override (not checked)"))).toBe(true);
+    expect(s.liftedDomains).toContain("netflix.com"); // the pre-block lifts for this session only
+  });
+
+  it("an override still needs a sentence", async () => {
+    await active();
+    expect(await engine.override(asTab({ ...TABS[1]!, groupId: -1 }), "   ")).toBe("unavailable");
     expect(Object.keys((await session.loadSession())!.parked)).toContain("2");
+  });
+
+  it("the override does not outlive the session (LOCK-04)", async () => {
+    await active();
+    await engine.override(asTab({ ...TABS[1]!, groupId: -1 }), "film class");
+    await engine.requestEnd("done");
+    await engine.finishEnd();
+    expect(fake.rules()).toEqual([]);
+    await engine.dismiss();
+    await engine.start();
+    await engine.clarify("Lab report chemistry");
+    const next = (await session.loadSession())!;
+    expect(next.overrides).toEqual({});
+    expect(next.liftedDomains).not.toContain("netflix.com");
+    expect(next.preview.map((p) => p.tabId)).toContain(2); // proposed for parking again
+  });
+
+  it("the blocked page override lifts a pure-distraction domain (CLS-55)", async () => {
+    await active();
+    expect(await engine.overrideBlocked("https://www.steampowered.com/app/1", "game design class assignment")).toBe("accepted");
+    expect((await session.loadSession())!.liftedDomains).toContain("steampowered.com");
   });
 });

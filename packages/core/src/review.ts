@@ -9,7 +9,7 @@ import { isDomainOnly } from "./classifier/tier1";
 import type { Redactor } from "./privacy/redaction";
 import { sanitizeSentence, sanitizeTitle } from "./privacy/sanitize";
 
-export type ReviewKind = "refused_override" | "bail" | "sampled_check";
+export type ReviewKind = "refused_override" | "unjudged_override" | "bail" | "sampled_check";
 
 export interface ReviewRecord {
   kind: ReviewKind;

@@ -12,13 +12,13 @@ Current phase: **beta 1** (`docs/13-release-scope.md`). Nothing from beta 2 or l
 | Overlay with mute and pause | Built | INV-17, EXT-07, QA-30. |
 | Blocking for distraction domains | Built | DNR redirect to a local page with the override form (LOOP-09, CLS-55). |
 | Show-then-judge | Built | Pages load, then get overlaid. |
-| Tier 1, zero-label similarity, tier 3 via backend, verdict cache | Built; tier 3 **off by owner decision** (Q-61) | Every install is on-device only. The CLS-21 on-device parking path moved into beta 1, but it can only park once the shipped category list (Q-08) exists. Overrides without an LLM wait on Q-38. |
+| Tier 1, zero-label similarity, tier 3 via backend, verdict cache | Built; tier 3 **off by owner decision** (Q-61) | Every install is on-device only. The CLS-21 on-device parking path moved into beta 1, but it can only park once the shipped category list (Q-08) exists. Overrides without an LLM are accepted and logged (Q-38). |
 | Full never-locked list | Partial | Courseware, meetings, GitHub, localhost, browser pages done. School-hosted courseware (Q-10), package registries (Q-11), school sign-in pages (Q-56) open. Domains need owner check (Q-57). |
 | Consent before the first tier 3 call | Built, not shown | Nothing is sent while the LLM is off (Q-61). |
 | Privacy policy | Draft | `docs/privacy-policy-draft.md`, OpenAI retention terms checked 2026-10-31. Legal name, contact, lawful basis and telemetry retention (Q-25) are for the owner. |
 | Basic telemetry | Built, not sent | PRIV-30 allowlist on both ends. The client has no backend host (Q-26). Retention Q-25. |
 | Sampled "Was this park right?" check | Built, gated | Overlay question and review record are in place; the sample rate is Q-42, so nothing is sampled yet. |
-| Exit ladder: override, End | Built | Override outcome when tier 3 is unsure/unavailable is Q-38: the item stays parked. |
+| Exit ladder: override, End | Built | Without tier 3 an override is accepted for the session and logged as "not checked" (Q-38). |
 | Review export, refused-override logging | Logging built, export gated | Format Q-28. |
 
 ## Backend (beta 1 subset)

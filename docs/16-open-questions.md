@@ -100,8 +100,9 @@ Compute each tab's s for the task; the front tab is entered twice; the task scor
 **Q-37 LLM fallback model** · P1
 If GPT-5 nano on the lowest reasoning setting is too slow, which non-reasoning model whose terms allow minors.
 
-**Q-38 Overrides without tier 3** · P1
+**Q-38 Overrides without tier 3** · P1 · **Resolved 2026-10-31 (owner)** for "tier 3 unavailable"; the LLM `unsure` case stays open (moot while Q-61 keeps the LLM off)
 How "This is for my task" works in on-device-only mode, past the cap, or with the backend down; and what an `unsure` override verdict does.
+Answer: when tier 3 is unavailable (LLM off per Q-61, cap reached, backend down), "This is for my task" is **accepted and logged**: the one-sentence reason is still required, the item is allowed for this session only, the override shows on the session card as "not checked", is kept as a redacted review record (`unjudged_override`) and counts as a correction. It becomes a label only after 3 active minutes, as before (CLS-62). Recorded in `04` LOCK-04 and `CONSTANTS.md` EXITS. Note for the gates: every accepted override counts toward the estimated wrong-park rate (`14`), so unchecked overrides will push that rate up.
 
 **Q-42 Statistics details** · P1
 Sampled-check rate; bail review sample size; CI method for the per-user drift rule; what "disagreement rises" means for the pooled weekly check.

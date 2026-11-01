@@ -54,6 +54,7 @@ export const EXITS = {
   PASSES_PER_DAY: 2,                    // [START]
   END_COUNTDOWN_SEC: 120,               // [START] plus a one-line reason; session marked "ended early"
   BAIL_WINDOW_SEC: 120,                 // emergency pass or early end within 2 min of a park = bail
+  OVERRIDE_WITHOUT_TIER3: "accept_and_log", // Q-38 (owner 2026-10-31)
 };
 
 export const STRICT_MODE = {            // v1.5, opt-in, Pro

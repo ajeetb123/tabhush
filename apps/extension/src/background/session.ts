@@ -71,6 +71,8 @@ export interface ActiveSession {
   asks: number[];
   pendingAsk: Record<string, string>; // tabId → itemKey
   liftedDomains: string[];
+  /** Every override this session; the sentence stays on this device (PRIV-01). */
+  overrideLog: { at: number; domain: string; sentence: string; judged: boolean }[];
   /** Named-site lifts and overrides, shown on the session card (LOOP-09). */
   suspensions: string[];
   restoreList: RestoreEntry[];
@@ -103,6 +105,7 @@ export function newSession(now: number): ActiveSession {
     asks: [],
     pendingAsk: {},
     liftedDomains: [],
+    overrideLog: [],
     suspensions: [],
     restoreList: [],
     tier3Uncontested: [],
