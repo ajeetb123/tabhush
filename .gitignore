@@ -8,3 +8,5 @@ dist/
 apps/extension/public/models/
 # Redaction lists (Q-14) are built by scripts/build-lexicons.mjs, not committed.
 apps/extension/public/lexicon/
+# Category and banking lists (Q-08, Q-48) are built by scripts/build-categories.mjs.
+apps/extension/public/categories/

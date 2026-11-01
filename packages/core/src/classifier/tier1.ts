@@ -2,7 +2,7 @@
 // never-locked → user essentials → pure-distraction → profile tool list → shipped category list.
 // The shared domain prior is applied in relatedness as a nudge only (INV-04), never here.
 
-import { hostMatches, hostMatchesAny, parseUrl, type ParsedUrl } from "../domains";
+import { hostInSet, hostMatches, hostMatchesAny, lookupHost, parseUrl, type ParsedUrl } from "../domains";
 import {
   BROWSER_INTERNAL_SCHEMES,
   DEVELOPER_HOST_SUFFIXES,
@@ -68,9 +68,13 @@ export function mixedSiteDomain(url: ParsedUrl): string | null {
   return null;
 }
 
-/** INV-09: webmail, web chat, banking and health send the domain only. */
-export function isDomainOnly(url: ParsedUrl): boolean {
-  return hostMatchesAny(url.host, [...domainsOf(WEBMAIL), ...domainsOf(WEB_CHAT), ...domainsOf(BANKING_AND_HEALTH)]);
+/**
+ * INV-09: webmail, web chat, banking and health send the domain only. Banking domains come from
+ * the shipped list (Q-48), loaded at runtime and passed in.
+ */
+export function isDomainOnly(url: ParsedUrl, bankingDomains?: ReadonlySet<string>): boolean {
+  if (hostMatchesAny(url.host, [...domainsOf(WEBMAIL), ...domainsOf(WEB_CHAT), ...domainsOf(BANKING_AND_HEALTH)])) return true;
+  return bankingDomains !== undefined && hostInSet(url.host, bankingDomains);
 }
 
 /** EXT-08 pages known by URL to be unreachable by content scripts. */
@@ -79,9 +83,10 @@ export function isKnownUnreachable(url: ParsedUrl): boolean {
   return UNREACHABLE_HOST_PATHS.some((u) => url.rawHost === u.host && url.path.startsWith(u.pathPrefix));
 }
 
-/** Category from the shipped domain-category list (CLS-10 input 5). The list is TODO_Q08. */
-export function shippedCategory(_url: string): Category | null {
-  return null;
+/** Category from the shipped domain-category list (CLS-10 input 5, Q-08), loaded at runtime. */
+export function shippedCategory(urlString: string, table: ReadonlyMap<string, Category>): Category | null {
+  const url = parseUrl(urlString);
+  return url ? (lookupHost(url.host, table) ?? null) : null;
 }
 
 export function tier1(urlString: string, ctx: Tier1Context): Tier1Result {

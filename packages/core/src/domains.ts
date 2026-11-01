@@ -62,6 +62,31 @@ export function hostMatchesAny(host: string, domains: readonly string[]): boolea
   return domains.some((d) => hostMatches(host, d));
 }
 
+/** The host and each parent domain down to two labels: a.b.example.com → b.example.com → example.com. */
+export function* hostAndParents(host: string): Generator<string> {
+  let h = host;
+  for (;;) {
+    yield h;
+    const dot = h.indexOf(".");
+    if (dot < 0 || h.indexOf(".", dot + 1) < 0) return;
+    h = h.slice(dot + 1);
+  }
+}
+
+/** Looks a host up in a domain table, matching the host itself or any parent domain. */
+export function lookupHost<T>(host: string, table: ReadonlyMap<string, T>): T | undefined {
+  for (const h of hostAndParents(host)) {
+    const hit = table.get(h);
+    if (hit !== undefined) return hit;
+  }
+  return undefined;
+}
+
+export function hostInSet(host: string, set: ReadonlySet<string>): boolean {
+  for (const h of hostAndParents(host)) if (set.has(h)) return true;
+  return false;
+}
+
 /** The domain an item is reported and judged as (mirror-unwrapped, no "www."). */
 export function itemDomain(url: string): string | null {
   return parseUrl(url)?.host ?? null;

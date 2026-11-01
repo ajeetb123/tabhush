@@ -310,3 +310,26 @@ describe("production redaction values (Q-15)", async () => {
     expect(r("id 1234")).toBe("id 1234");
   });
 });
+
+describe("shipped categories and banking (Q-08, Q-48)", async () => {
+  const { lookupHost, hostInSet, shippedCategory, buildJudgeRequest, createRedactor, CATEGORY_LIST } = await import("../src");
+  const table = new Map([["miniclip.com", "games" as const], ["etsy.com", "shopping" as const]]);
+  it("matches the host and its parent domains", () => {
+    expect(lookupHost("www.miniclip.com", table)).toBe("games");
+    expect(lookupHost("a.b.etsy.com", table)).toBe("shopping");
+    expect(lookupHost("notetsy.com", table)).toBeUndefined();
+    expect(hostInSet("online.mybank.com", new Set(["mybank.com"]))).toBe(true);
+  });
+  it("shippedCategory reads the table, mirror-unwrapped", () => {
+    expect(shippedCategory("https://www-miniclip-com.translate.goog/x", table)).toBe("games");
+    expect(shippedCategory("https://example.org/", table)).toBeNull();
+  });
+  it("INV-09: banking domains send the domain only", () => {
+    const ctx = { redact: createRedactor({ dictionary: new Set(), firstNames: new Set(), longNumberMinDigits: 5, phonePatterns: [] }), domainOnlySetting: false, bankingDomains: new Set(["mybank.com"]) };
+    expect(buildJudgeRequest(ctx, "Lab", "https://online.mybank.com/acct", "Checking account")).not.toHaveProperty("title");
+  });
+  it("uses the decided mapping", () => {
+    expect(CATEGORY_LIST.MAPPING).toEqual({ games: "games", social_networks: "social", shopping: "shopping", "audio-video": "entertainment" });
+    expect(CATEGORY_LIST.BANKING).toBe("bank");
+  });
+});

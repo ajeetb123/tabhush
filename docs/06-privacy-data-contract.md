@@ -24,7 +24,7 @@ Redaction runs **on device before anything is sent**, on titles and typed senten
 ## PRIV-03 Domain only, never titles (INV-09)
 - Webmail: Gmail, Outlook on the web.
 - Web chat: Discord, Messenger, WhatsApp Web.
-- Banking and health (domain lists: [OPEN Q-48]).
+- Banking: UT1's `bank` list (Q-48). Health: list still open [OPEN Q-48].
 - Desktop app excluded apps never send titles: Messages, Mail, Slack, Discord.
 - A user setting **"Domain only"** stops titles from leaving at all.
 

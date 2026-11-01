@@ -37,8 +37,9 @@ Chrome may apply a pending update when the browser restarts. Verify behavior and
 
 ## Lists and data sources
 
-**Q-08 Shipped domain-category list** · P0
+**Q-08 Shipped domain-category list** · P0 · **Resolved 2026-11-01 (owner)**
 Which openly licensed or commercial list, license confirmed, and how its categories map to the 7 categories.
+Answer: the **UT1 web blacklists** (Université Toulouse Capitole), **CC BY-SA 4.0** (commercial use allowed; credit required; shipped adaptations stay BY-SA, the extension's code is not affected; license read from the GitHub mirror README because the UT1 site returned 503, recheck on the official site). Built from the mirror `olbat/ut1-blacklists` pinned at commit `03501c64d230df9d84124176558d758351027be1` (2026-10-12). Mapping: `games` → games, `social_networks` → social, `shopping` → shopping, `audio-video` → entertainment. No other UT1 category ships. Recorded in `05` CLS-10 and `CONSTANTS.md` CATEGORY_LIST.
 
 **Q-09 Pure-distraction and mixed-site lists** · P0
 Full members beyond Netflix, Steam, TikTok (pure) and YouTube, Reddit, Stack Overflow, X (mixed), plus their path rules.
@@ -67,8 +68,9 @@ Answer: dictionary = SCOWL v1 2020.12.07, `english-words` + `american-words` at 
 Minimum digits for "long number"; phone formats/locales to cover.
 Answer: a long number is **5 or more digits** (contiguous, or grouped in threes by commas, dots or spaces). Phones: US/Canada formats such as (540) 555-0100, 540-555-0100, 540.555.0100 and 540 555 0100 with an optional +1, plus any number starting with `+` and 7 to 15 digits. Recorded in `06` PRIV-10 and `CONSTANTS.md` REDACTION.
 
-**Q-48 Banking and health domains** · P0
+**Q-48 Banking and health domains** · P0 · banking **resolved 2026-11-01 (owner)**, health open
 The domain list (or category source) for domain-only sending.
+Banking: UT1's `bank` list, same source and license as Q-08. Health: UT1 has no health list; still open.
 
 **Q-19 Known-safe apps (desktop)** · P2
 Which media and social apps may be quit; completeness of the excluded-apps list.

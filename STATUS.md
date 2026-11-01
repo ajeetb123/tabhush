@@ -12,7 +12,8 @@ Current phase: **beta 1** (`docs/13-release-scope.md`). Nothing from beta 2 or l
 | Overlay with mute and pause | Built | INV-17, EXT-07, QA-30. |
 | Blocking for distraction domains | Built | DNR redirect to a local page with the override form (LOOP-09, CLS-55). |
 | Show-then-judge | Built | Pages load, then get overlaid. |
-| Tier 1, zero-label similarity, tier 3 via backend, verdict cache | Built; tier 3 **off by owner decision** (Q-61) | Every install is on-device only. The CLS-21 on-device parking path moved into beta 1, but it can only park once the shipped category list (Q-08) exists. Overrides without an LLM are accepted and logged (Q-38). |
+| Tier 1, zero-label similarity, tier 3 via backend, verdict cache | Built; tier 3 **off by owner decision** (Q-61) | Every install is on-device only. The CLS-21 on-device parking path moved into beta 1 and parks low-similarity pages in the UT1 games, social, shopping and entertainment lists (Q-08). Overrides without an LLM are accepted and logged (Q-38). |
+| Domain-only sites | Partial | Webmail, web chat and UT1 banking domains (Q-48) send nothing but the domain; no health list yet. |
 | Full never-locked list | Partial | Courseware, meetings, GitHub, localhost, browser pages done. School-hosted courseware (Q-10), package registries (Q-11), school sign-in pages (Q-56) open. Domains need owner check (Q-57). |
 | Consent before the first tier 3 call | Built, not shown | Nothing is sent while the LLM is off (Q-61). |
 | Privacy policy | Draft | `docs/privacy-policy-draft.md`, OpenAI retention terms checked 2026-10-31. Legal name, contact, lawful basis and telemetry retention (Q-25) are for the owner. |

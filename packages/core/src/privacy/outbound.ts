@@ -11,6 +11,8 @@ export interface OutboundContext {
   redact: Redactor;
   /** User setting "Domain only": titles never leave at all (PRIV-03). */
   domainOnlySetting: boolean;
+  /** Shipped banking domains (Q-48), domain-only like webmail and chat. */
+  bankingDomains?: ReadonlySet<string>;
 }
 
 function clean(ctx: OutboundContext, title: string): string {
@@ -22,7 +24,7 @@ export function buildJudgeRequest(ctx: OutboundContext, taskLabel: string, url: 
   const parsed = parseUrl(url);
   if (!parsed) return null;
   const req: Tier3Request = { kind: "judge", task_label: clean(ctx, taskLabel), domain: parsed.host };
-  if (!ctx.domainOnlySetting && !isDomainOnly(parsed) && title.trim()) req.title = clean(ctx, title);
+  if (!ctx.domainOnlySetting && !isDomainOnly(parsed, ctx.bankingDomains) && title.trim()) req.title = clean(ctx, title);
   return req;
 }
 
@@ -44,7 +46,7 @@ export function buildInferLabelRequest(ctx: OutboundContext, tabs: readonly { ur
   const titles = tabs
     .filter((t) => {
       const p = parseUrl(t.url);
-      return p !== null && !isDomainOnly(p);
+      return p !== null && !isDomainOnly(p, ctx.bankingDomains);
     })
     .map((t) => clean(ctx, t.title))
     .filter(Boolean);

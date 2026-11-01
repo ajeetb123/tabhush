@@ -237,6 +237,16 @@ export const REDACTION = {
   TARGET_NAME_RECALL: 0.95,             // over-redacting is fine
 };
 
+// ───────────────────────── Shipped domain-category list (docs/05 CLS-10, Q-08, Q-48) ─────────────────────────
+export const CATEGORY_LIST = {
+  SOURCE: "UT1 web blacklists, Université Toulouse Capitole",
+  LICENSE: "CC BY-SA 4.0",
+  MIRROR_REPO: "olbat/ut1-blacklists",
+  MIRROR_COMMIT: "03501c64d230df9d84124176558d758351027be1", // 2026-10-12
+  MAPPING: { games: "games", social_networks: "social", shopping: "shopping", "audio-video": "entertainment" },
+  BANKING: "bank",                      // Q-48: domain-only; health still TODO_Q48
+};
+
 // ───────────────────────── Shared domain prior (docs/05, docs/06) ─────────────────────────
 export const REVIEW = {                 // docs/14, docs/06 PRIV-50
   SAMPLED_CHECK_RATE: "TODO_Q42",       // "Was this park right?" sample rate

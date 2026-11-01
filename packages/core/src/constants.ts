@@ -258,6 +258,16 @@ export const REDACTION = {
   TARGET_NAME_RECALL: 0.95,
 } as const;
 
+// ───────────────────────── Shipped domain-category list (docs/05 CLS-10, Q-08, Q-48) ─────────────────────────
+export const CATEGORY_LIST = {
+  SOURCE: "UT1 web blacklists, Université Toulouse Capitole",
+  LICENSE: "CC BY-SA 4.0",
+  MIRROR_REPO: "olbat/ut1-blacklists",
+  MIRROR_COMMIT: "03501c64d230df9d84124176558d758351027be1", // 2026-10-12
+  MAPPING: { games: "games", social_networks: "social", shopping: "shopping", "audio-video": "entertainment" } as Readonly<Record<string, Category>>,
+  BANKING: "bank", // Q-48: domain-only; health still TODO_Q48
+} as const;
+
 // ───────────────────────── Shared domain prior (docs/05, docs/06) ─────────────────────────
 export const SHARED_PRIOR = {
   MIN_DISTINCT_CONTRIBUTION_IDS: 25,

@@ -1,7 +1,7 @@
 // Settings (beta 1 subset): consent (PRIV-60), Domain only (PRIV-03), on-device only (PRIV-70),
 // essentials (LOCK-02), and the log of every tier 3 call (PRIV-80). Locked during a session (LOCK-01).
 
-import { LLM, type Tier3Request } from "@lockin/core";
+import { CATEGORY_LIST, LLM, type Tier3Request } from "@lockin/core";
 import { call, getSnapshot, h, onStateChange, setTitle } from "./common";
 
 setTitle("Settings");
@@ -69,6 +69,13 @@ async function render(): Promise<void> {
     essentials,
     h("div", { className: "row" }, saveEssentials),
     err,
+    h("h2", { textContent: "Credits" }),
+    h(
+      "p",
+      { className: "muted" },
+      `Site categories are adapted from the ${CATEGORY_LIST.SOURCE}, licensed ${CATEGORY_LIST.LICENSE}. `,
+      h("a", { href: chrome.runtime.getURL("categories/NOTICE.txt"), textContent: "Details" }),
+    ),
     ...(LLM.ENABLED ? [h("h2", { textContent: "Every AI check this install sent" }), log.length ? logList : h("p", { className: "muted", textContent: "None yet." })] : []),
   );
 }

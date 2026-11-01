@@ -22,7 +22,16 @@ export interface ReviewRecord {
 
 export function buildReviewRecord(
   redact: Redactor,
-  input: { kind: ReviewKind; taskLabel: string; url: string; title: string; verdict: string; sentence?: string; domainOnlySetting: boolean },
+  input: {
+    kind: ReviewKind;
+    taskLabel: string;
+    url: string;
+    title: string;
+    verdict: string;
+    sentence?: string;
+    domainOnlySetting: boolean;
+    bankingDomains?: ReadonlySet<string>;
+  },
 ): ReviewRecord | null {
   const parsed = parseUrl(input.url);
   if (!parsed) return null;
@@ -32,7 +41,7 @@ export function buildReviewRecord(
     domain: parsed.host,
     verdict: input.verdict,
   };
-  if (!input.domainOnlySetting && !isDomainOnly(parsed) && input.title.trim()) rec.title = sanitizeTitle(redact(input.title));
+  if (!input.domainOnlySetting && !isDomainOnly(parsed, input.bankingDomains) && input.title.trim()) rec.title = sanitizeTitle(redact(input.title));
   if (input.sentence !== undefined) rec.sentence = sanitizeSentence(redact(input.sentence));
   return rec;
 }

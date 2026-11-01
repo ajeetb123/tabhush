@@ -53,6 +53,7 @@ import {
 } from "@lockin/core";
 import { db, idbCacheStore, labels, review, tasks } from "./db";
 import { embed } from "./embedder";
+import { getBankingDomains, getCategoryTable } from "./categories";
 import { getRedactor } from "./lexicon";
 import { installPreBlocks, parkTab, removePreBlocks, sendToTab, unparkTab } from "./enforce";
 import { apply, newSession, saveSession, withSession, type ActiveSession } from "./session";
@@ -83,7 +84,10 @@ async function tier1Context(): Promise<Tier1Context> {
 interface Tier3Ready {
   redact: Redactor;
   domainOnly: boolean;
+  bankingDomains: ReadonlySet<string>;
 }
+
+const outCtx = (r: Tier3Ready) => ({ redact: r.redact, domainOnlySetting: r.domainOnly, bankingDomains: r.bankingDomains });
 
 /** Returns what is needed to call tier 3, or null when any gate is closed (INV-08/10/11, CLS-12). */
 async function tier3Ready(): Promise<Tier3Ready | null> {
@@ -106,7 +110,7 @@ async function tier3Ready(): Promise<Tier3Ready | null> {
     await chrome.tabs.create({ url: chrome.runtime.getURL(CONSENT_PAGE) });
   }
   if (!tier3Available(gate) || !redactor) return null;
-  return { redact: redactor, domainOnly: settings.domainOnly };
+  return { redact: redactor, domainOnly: settings.domainOnly, bankingDomains: await getBankingDomains() };
 }
 
 const vectorCache = new Map<string, number[]>();
@@ -167,14 +171,14 @@ export async function judgeItem(s: ActiveSession, task: Task, url: string, title
       memory: async () => null, // personal memory: beta 2 (CLS-22)
       tier3: ready
         ? async () => {
-            const req = buildJudgeRequest({ redact: ready.redact, domainOnlySetting: ready.domainOnly }, task.label, url, title);
+            const req = buildJudgeRequest(outCtx(ready), task.label, url, title);
             if (!req) throw new BackendUnavailable("unparseable URL");
             return judgeRemote(req);
           }
         : null,
       // CLS-21 is used whenever tier 3 is unavailable; moved to beta 1 when the LLM was switched off (Q-61).
       onDeviceParkingPath: ready === null,
-      onDeviceCategory: shippedCategory(url) ?? cachedCategory,
+      onDeviceCategory: shippedCategory(url, await getCategoryTable()) ?? cachedCategory,
       askBudgetAvailable: () => askBudgetAvailable(s.asks, Date.now()),
     });
     return { decision, key };
@@ -250,7 +254,7 @@ export async function start(): Promise<void> {
     if (result.reason === "no_recent_task") {
       const ready = await tier3Ready();
       const frontTabs = all.filter((t) => t.windowId === frontTab?.windowId && usableTitle(t));
-      const req = ready ? buildInferLabelRequest({ redact: ready.redact, domainOnlySetting: ready.domainOnly }, frontTabs.map((t) => ({ url: t.url!, title: t.title! }))) : null;
+      const req = ready ? buildInferLabelRequest(outCtx(ready), frontTabs.map((t) => ({ url: t.url!, title: t.title! }))) : null;
       const proposal = req ? await inferLabelRemote(req).catch(() => null) : null;
       if (proposal) {
         s.chip = { label: proposal.label, taskId: null, renamed: false };
@@ -605,7 +609,7 @@ type OverrideOutcome = "accepted" | "refused" | "unavailable";
 async function judgeOverride(taskLabel: string, url: string, title: string, sentence: string): Promise<{ verdict: "related" | "unrelated" | "unsure"; judged: boolean }> {
   const ready = await tier3Ready();
   if (!ready) return { verdict: "related", judged: false };
-  const req = buildOverrideRequest({ redact: ready.redact, domainOnlySetting: ready.domainOnly }, taskLabel, url, title, sentence);
+  const req = buildOverrideRequest(outCtx(ready), taskLabel, url, title, sentence);
   if (!req) return { verdict: "related", judged: false };
   try {
     return { verdict: (await judgeRemote(req)).verdict, judged: true };
@@ -631,7 +635,7 @@ async function acceptOverride(s: ActiveSession, task: Task, url: string, title: 
   s.overrideLog.push({ at: Date.now(), domain: itemDomain(url) ?? "", sentence, judged });
   const redactor = await getRedactor();
   if (redactor && !judged) {
-    const rec = buildReviewRecord(redactor, { kind: "unjudged_override", taskLabel: task.label, url, title, verdict: "accepted_unjudged", sentence, domainOnlySetting: (await getSettings()).domainOnly });
+    const rec = buildReviewRecord(redactor, { kind: "unjudged_override", taskLabel: task.label, url, title, verdict: "accepted_unjudged", sentence, domainOnlySetting: (await getSettings()).domainOnly, bankingDomains: await getBankingDomains() });
     if (rec) await review.add(rec);
   }
   await bump("corrections");
@@ -641,7 +645,7 @@ async function refuseOverride(task: Task, url: string, title: string, sentence: 
   // Refused: logged for review, never a label (INV-13).
   const redactor = await getRedactor();
   if (redactor) {
-    const rec = buildReviewRecord(redactor, { kind: "refused_override", taskLabel: task.label, url, title, verdict: "unrelated", sentence, domainOnlySetting: (await getSettings()).domainOnly });
+    const rec = buildReviewRecord(redactor, { kind: "refused_override", taskLabel: task.label, url, title, verdict: "unrelated", sentence, domainOnlySetting: (await getSettings()).domainOnly, bankingDomains: await getBankingDomains() });
     if (rec) await review.add(rec);
   }
   await bump("refused_overrides");
@@ -732,6 +736,7 @@ export async function answerParkCheck(tab: chrome.tabs.Tab, right: boolean): Pro
       title: tab.title ?? "",
       verdict: right ? "park_right" : "park_wrong",
       domainOnlySetting: (await getSettings()).domainOnly,
+      bankingDomains: await getBankingDomains(),
     });
     if (rec) await review.add(rec);
   });

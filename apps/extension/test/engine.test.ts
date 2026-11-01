@@ -5,6 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeEmbed, makeChrome } from "./fakeChrome";
 
 vi.mock("../src/background/embedder", () => ({ embed: async (texts: string[]) => fakeEmbed(texts) }));
+// Q-08 shipped categories: one games site, and a courseware domain wrongly listed to prove INV-01 wins.
+vi.mock("../src/background/categories", () => ({
+  getCategoryTable: async () => new Map([["arcade.example.com", "games"], ["instructure.com", "entertainment"]]),
+  getBankingDomains: async () => new Set<string>(),
+}));
 
 const W1 = 1;
 const W2 = 2;
@@ -157,6 +162,25 @@ describe("Active session", () => {
     const ok = { id: 51, windowId: W1, groupId: -1, url: "https://example.org/chemistry-lab-report-guide", title: "Lab report chemistry guide", active: true };
     await engine.onTabChanged(asTab(ok));
     expect(fake.overlaysShownOn()).not.toContain(51);
+  });
+
+  it("CLS-21: a low-similarity page in a shipped park category is parked on device (Q-08)", async () => {
+    await active();
+    const tab = { id: 80, windowId: W1, groupId: -1, url: "https://arcade.example.com/play", title: "Free online arcade", active: true };
+    fake.tabs.set(80, { ...tab, lastAccessed: Date.now() });
+    await fake.chrome.scripting.executeScript({ target: { tabId: 80 } });
+    await engine.onTabChanged(asTab(tab));
+    expect(fake.overlaysShownOn()).toContain(80);
+    expect((await session.loadSession())!.parked["80"]?.source).toBe("on_device_path");
+  });
+
+  it("INV-01: courseware in a shipped category is still never parked", async () => {
+    await active();
+    const tab = { id: 81, windowId: W1, groupId: -1, url: "https://canvas.instructure.com/courses/2/videos", title: "Totally unrelated video", active: true };
+    fake.tabs.set(81, { ...tab, lastAccessed: Date.now() });
+    await fake.chrome.scripting.executeScript({ target: { tabId: 81 } });
+    await engine.onTabChanged(asTab(tab));
+    expect(fake.overlaysShownOn()).not.toContain(81);
   });
 
   it("INV-02: a low-similarity page with no second signal is asked about, not parked", async () => {

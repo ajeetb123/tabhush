@@ -54,6 +54,12 @@ The redaction lists (Q-14) are built into the package too. Download the SSA nati
 npm run build-lexicons -w @lockin/extension -- --names ~/Downloads/names.zip
 ```
 
+The site-category and banking lists (Q-08, Q-48) come from the UT1 blacklists mirror at a pinned commit (about 1.3 MB):
+
+```bash
+npm run build-categories -w @lockin/extension
+```
+
 Then `npm run build` and load `apps/extension/dist` as an unpacked extension in Chrome, Edge or Brave (120+). Without the model, tier 2 is unavailable and every undecided page is allowed and flagged (INV-06).
 
 ## Backend
