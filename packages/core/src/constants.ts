@@ -105,6 +105,11 @@ export const EMBEDDING = {
   WARM_PER_ITEM_MS: 20, // [START]
   START_BATCH_SIZE: 16, // [START]
   LANGUAGE: "en",
+  // Verified 2026-10-31 via the Hugging Face API: int8 ONNX, 22,972,370 bytes, Apache-2.0.
+  HF_REPO: "Xenova/all-MiniLM-L6-v2",
+  HF_REVISION: "751bff37182d3f1213fa05d7196b954e230abad9",
+  ONNX_FILE: "onnx/model_int8.onnx",
+  TRANSFORMERS_DTYPE: "int8",
 } as const;
 
 // ───────────────────────── Task representation and thresholds (docs/05) ─────────────────────────

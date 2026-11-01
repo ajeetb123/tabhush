@@ -1,0 +1,21 @@
+{
+  "name": "@lockin/extension",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build && vite build -c vite.content.config.ts",
+    "fetch-model": "node ../../scripts/fetch-model.mjs",
+    "check:bundle": "node ../../scripts/check-bundle.mjs"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "4.3.2",
+    "@lockin/core": "*",
+    "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0"
+  },
+  "devDependencies": {
+    "@types/chrome": "0.3.7",
+    "happy-dom": "21.0.4",
+    "vite": "8.3.5"
+  }
+}
