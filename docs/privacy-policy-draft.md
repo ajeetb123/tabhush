@@ -1,42 +1,56 @@
-# Privacy policy (DRAFT, beta 1)
+# Tabhush privacy policy (DRAFT)
 
-> Draft for the owner. It must match `docs/06-privacy-data-contract.md` in substance (PRIV-80); any change to that contract needs a change here. Not legal advice. Items marked **[OWNER]** need a decision or legal review before publishing. The product name is undecided (Q-01); "Lock-in" is the working name.
+> Draft for the owner, matching `docs/06-privacy-data-contract.md` and the build as of 2026-11-01 (no LLM, Q-61). Any change to what the extension collects needs a change here first. Not legal advice. Items marked **[OWNER]** need a decision or legal review before publishing.
 
 Last updated: [OWNER: date of publication]
 
+## The short version
+
+Tabhush decides everything on your computer. Your browsing, your tasks and what you type never leave it. The only thing that can leave is a small daily count of how the app was used, with no web addresses, page titles or site names in it.
+
 ## Who we are
 
-Lock-in is a browser extension that blocks sites unrelated to your current work session and tracks time spent on it. It is run by [OWNER: legal name or LLC, country]. Contact: [OWNER: privacy contact email].
+Tabhush is a browser extension that blocks sites unrelated to your current work session and tracks time spent on it. It is run by [OWNER: legal name or LLC, country]. Contact: [OWNER: privacy contact email].
 
-## What never leaves your device
+## What Tabhush looks at, and where
 
-- Screenshots. Lock-in never takes any.
-- Page content. When Lock-in can't decide about a page, it may read a short snippet on your device only.
-- What you type on pages. Lock-in counts input (keys, clicks, scrolls) as numbers only, never their content.
-- Full web addresses, full page titles, your task names, your task list, your sessions and your time logs.
+To decide whether a tab belongs to what you're working on, Tabhush looks at, **on your computer only**:
 
-## What is sent
+- the address and title of your open tabs;
+- a short summary of a page: its title, description and top headings;
+- for YouTube videos, YouTube's own category label, the video title and channel name;
+- how many keys, clicks and scrolls happen on a page, as counts only. Tabhush never reads what you type.
 
-Nothing about your browsing. Lock-in decides every page on your device, with rules and a small model that ships inside the extension. Page titles, web addresses, domains, task names and anything you type stay on your device. The only thing that leaves is the daily usage counts below.
+It compares these with your task using rules, site lists and a small model that ships inside the extension. Nothing is sent anywhere to make that decision. Tabhush never takes screenshots.
 
-[OWNER: this matches the no-LLM decision (Q-61). If an AI check is ever added back, restore the AI-check sections from git history and the consent screen before shipping it.]
+## What Tabhush stores, and where
 
-## Usage statistics
+Stored in your browser, on your computer:
 
-Once a day Lock-in sends counts only: an install ID, browser and platform, whether you used it that day, and how many sessions, parks, corrections, refused overrides, bails, passes, sweep undos, task renames, gaps and Limited-mode time. Never titles, web addresses or domains. The install ID is personal data under the GDPR. Retention: [OWNER: period, Q-25].
+- your tasks and the courses it has noticed (like "CS 2114"), so it can name your next session for you;
+- your sessions: when they ran, your time goal, which sites were blocked and when, breaks, and how much time was on task;
+- your settings: school sites, essentials, and similar.
+
+It never learns from incognito tabs or from email, chat or banking sites. Uninstalling Tabhush deletes all of this.
+
+## What leaves your computer
+
+Once a day Tabhush sends **counts only**: an install ID, your browser and operating system, whether you used it that day, and how many sessions, blocks and similar events happened. Never web addresses, page titles, site names, task names or anything you typed. The install ID is personal data under the GDPR. [OWNER: how long these counts are kept, Q-25; whether to add an off switch in settings.] (In the current build these counts are not sent yet, because the server address isn't set, Q-26.)
+
+Tabhush does not use advertising, analytics or tracking services, and it does not sell or share data.
+
+## Why Chrome warns about "all your data"
+
+To see which tab you're on and to block the ones that aren't part of your work, Tabhush needs access to all websites. Chrome describes that access as being able to "read and change all your data on all websites". Tabhush uses it only for the decisions described above, on your computer.
 
 ## Children
 
-You must be at least 13, or older where your local law requires. [OWNER: the age-check onboarding ships in beta 2; until then confirm how beta 1 testers are screened.]
+You must be at least 13, or older where your local law requires.
 
 ## Your rights
 
-Under the GDPR you can ask to access or delete your data. Delete-my-data erases your install ID and its usage statistics from our server. [OWNER: lawful basis for each kind of data, for example consent for AI checks; how to make a request; the supervisory authority you can complain to.]
-
-## Not collected in beta 1
-
-Shared domain categories (PRIV-40) are not built yet. [OWNER: when they ship, add a section saying plainly that installs send domains with a distraction category under a separate, unlinked contribution ID to an endpoint that stores no IP addresses, and that it can be turned off in settings.]
+You can ask to access or delete the usage counts linked to your install ID. [OWNER: how to make a request, the lawful basis for usage counts (for example legitimate interest), and the supervisory authority you can complain to.]
 
 ## Changes
 
-We will update this page when what we collect changes, and the extension will show the change before it takes effect.
+If what Tabhush collects changes, this page changes first, and the extension tells you before the change takes effect.

@@ -34,6 +34,17 @@ No prompts at Start: tasks come from recent tasks or are named on device from th
 
 Piracy and streaming sites that no list has (UT1 misses yarrlist, fmovies, soap2day, hianime and the like) are blocked by what the page is about: title, description and headings read on device, compared with distraction and work topics (measured: 11/12 distraction pages, 0/14 work pages). Embedded players on a blocked page are paused too. Incognito still needs "Allow in Incognito" switched on by the user. A Today / Week / Sessions report with focused time, focus %, blocks, a day strip by task and an insight.
 
+## Pre-launch checklist (2026-11-01)
+
+Built: breaks (earned, automatic re-lock), first-run onboarding with school sites, the privacy policy rewritten for the current build (`docs/privacy-policy-draft.md`), and a Web Store listing draft (`docs/web-store-listing-draft.md`).
+
+Still on the owner:
+- Trademark search for "Tabhush", then buy `tabhush.com` (Q-01, Q-26).
+- Fill the [OWNER] parts of the privacy policy and host it on the site.
+- A real test week to measure wrong blocks (Gate A), on your own browsing.
+- Web Store: $5 registration, screenshots, submit unlisted.
+- Decide whether usage counts are on by default; set the backend address (Q-26) or leave them off.
+
 ## Backend (beta 1 subset)
 
 Install tokens with PoW (Q-06), tier 3 proxy with fixed prompts and strict schema, Free daily cap per UTC day (Q-58), telemetry intake, delete-my-data. Not built: IP rate limits, waves and the global dollar limit (Q-07), remote config (beta 2), licenses (v1), contributions.
