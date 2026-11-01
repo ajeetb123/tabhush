@@ -9,6 +9,7 @@ let content: typeof import("../src/content/content");
 beforeAll(async () => {
   vi.stubGlobal("chrome", {
     runtime: {
+      id: "test-extension",
       sendMessage: vi.fn(async (m: unknown) => void sent.push(m)),
       getURL: (p: string) => `chrome-extension://test/${p}`,
       onMessage: { addListener: (fn: typeof listener) => (listener = fn) },
@@ -57,6 +58,8 @@ describe("INV-07 input is measured as counts only", () => {
     const field = document.getElementById("secret")!;
     for (const key of ["p", "a", "s", "s"]) field.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
     window.dispatchEvent(new Event("pagehide"));
+    // Synthetic (untrusted) events are never counted; real ones arrive as a bare count per minute.
+    expect(sent.some((m) => (m as { type: string }).type === "input:counts")).toBe(false);
     const payload = JSON.stringify(sent);
     expect(payload).not.toMatch(/"key"|secret|"p"|pass/);
     for (const m of sent as Record<string, unknown>[]) {
@@ -116,3 +119,18 @@ describe("Q-65 page snippet", () => {
   });
 });
 
+
+describe("after the extension is reloaded", () => {
+  it("an orphaned copy shuts down quietly instead of throwing 'Extension context invalidated'", () => {
+    const send = (globalThis as unknown as { chrome: { runtime: { sendMessage: ReturnType<typeof vi.fn> } } }).chrome.runtime.sendMessage;
+    send.mockImplementation(() => {
+      throw new Error("Extension context invalidated.");
+    });
+    listener!({ type: "overlay:show", taskLabel: "Lab report", canOverride: false }, {}, () => undefined);
+    const end = [...content.shadowRootForTests()!.querySelectorAll("button")].find((b) => b.textContent === "End session…")!;
+    expect(() => end.click()).not.toThrow();
+    expect(content.isAliveForTests()).toBe(false);
+    expect(() => end.click()).not.toThrow(); // and stays quiet afterwards
+    expect(window.__tabhushAlive?.()).toBe(false); // a fresh copy may start
+  });
+});

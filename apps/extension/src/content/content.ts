@@ -12,12 +12,44 @@ const HOST_ID = `${BRAND.ID}-root`;
 
 declare global {
   interface Window {
-    __lockinContentLoaded?: boolean;
+    /** Set by the running copy: true only while it is still connected to the extension. */
+    __tabhushAlive?: () => boolean;
   }
 }
 
+// After the extension is reloaded or updated, Chrome leaves this script running in tabs that were
+// already open, cut off from the extension: any chrome.runtime call then throws "Extension context
+// invalidated" synchronously. The orphaned copy detects that and shuts itself down quietly.
+let alive = true;
+const teardown: (() => void)[] = [];
+
+function contextAlive(): boolean {
+  try {
+    return Boolean(chrome.runtime?.id);
+  } catch {
+    return false;
+  }
+}
+
+function shutdown(): void {
+  if (!alive) return;
+  alive = false;
+  for (const undo of teardown.splice(0)) undo();
+}
+
 function send(msg: FromContent): void {
-  chrome.runtime.sendMessage(msg).catch(() => undefined);
+  if (!alive) return;
+  if (!contextAlive()) return shutdown();
+  try {
+    chrome.runtime.sendMessage(msg).catch(() => undefined);
+  } catch {
+    shutdown();
+  }
+}
+
+/** For tests: whether this copy is still connected to the extension. */
+export function isAliveForTests(): boolean {
+  return alive;
 }
 
 const STYLE = `
@@ -155,7 +187,12 @@ export function showOverlay(taskLabel: string, canOverride: boolean, overrideNot
   backdrop.setAttribute("aria-labelledby", "lockin-title");
   backdrop.setAttribute("aria-describedby", "lockin-desc");
   const card = el("div", { className: "card" });
-  const mark = el("img", { className: "mark", src: chrome.runtime.getURL("icons/logo.svg"), alt: "" });
+  const mark = el("img", { className: "mark", alt: "" });
+  try {
+    mark.src = chrome.runtime.getURL("icons/logo.svg");
+  } catch {
+    mark.hidden = true; // orphaned after a reload: no logo
+  }
   const h1 = el("h1", { id: "lockin-title", textContent: "Blocked for this session" });
   const desc = el("p", {
     id: "lockin-desc",
@@ -304,11 +341,18 @@ function onInput(e: Event): void {
   count++; // a count only: no key, target or text is ever read
 }
 
-if (!window.__lockinContentLoaded) {
-  window.__lockinContentLoaded = true;
-  for (const type of ["keydown", "mousedown", "wheel"]) window.addEventListener(type, onInput, { capture: true, passive: true });
-  setInterval(flush, MS.MINUTE);
+// A copy orphaned by a reload no longer counts as loaded, so the fresh copy starts up.
+if (!window.__tabhushAlive?.()) {
+  window.__tabhushAlive = () => alive && contextAlive();
+  teardown.push(() => host?.remove());
+  for (const type of ["keydown", "mousedown", "wheel"]) {
+    window.addEventListener(type, onInput, { capture: true, passive: true });
+    teardown.push(() => window.removeEventListener(type, onInput, { capture: true }));
+  }
+  const flushTimer = setInterval(flush, MS.MINUTE);
+  teardown.push(() => clearInterval(flushTimer));
   window.addEventListener("pagehide", flush);
+  teardown.push(() => window.removeEventListener("pagehide", flush));
 
   chrome.runtime.onMessage.addListener((msg: ToContent, _sender, sendResponse) => {
     // Embedded frames only pause their media when the page is blocked; the top frame shows the UI.
@@ -352,10 +396,12 @@ if (!window.__lockinContentLoaded) {
     reportSnippet();
     // Single-page sites (YouTube and others) change without reloading; re-read when the head changes.
     if (document.head) {
-      new MutationObserver(() => {
+      const observer = new MutationObserver(() => {
         reportYoutube();
         reportSnippet();
-      }).observe(document.head, { childList: true, subtree: true, attributes: true });
+      });
+      observer.observe(document.head, { childList: true, subtree: true, attributes: true });
+      teardown.push(() => observer.disconnect());
     }
   }
 }
