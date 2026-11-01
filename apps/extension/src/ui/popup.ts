@@ -62,7 +62,7 @@ function breakCard(s: NonNullable<Awaited<ReturnType<typeof getSnapshot>>["sessi
   });
   const note = available >= BREAKS.OPTIONS_MIN[0]
     ? `${available} min of break earned`
-    : `Breaks unlock as you work: 1 min for every ${BREAKS.FOCUSED_MIN_PER_BREAK_MIN} focused`;
+    : `Earn 1 min per ${BREAKS.FOCUSED_MIN_PER_BREAK_MIN} focused`;
   return h("div", { className: "card stack" }, h("div", { className: "spread" }, h("b", { textContent: "Break" }), h("span", { className: "muted small", textContent: note })), h("div", { className: "chips" }, ...buttons));
 }
 
@@ -87,8 +87,12 @@ async function render(): Promise<void> {
   }
 
   if (!s || s.state === "IDLE") {
+    const setup = snap.settings.onboarded
+      ? null
+      : h("a", { href: chrome.runtime.getURL("ui/onboarding.html"), target: "_blank", className: "small", textContent: "Finish setting up (2 minutes)" });
     main.replaceChildren(
       hero({ text: "Ready" }, "Time to lock in", "It reads your tabs, picks the task, and blocks the rest."),
+      ...(setup ? [h("p", {}, setup)] : []),
       startButton("Start"),
       h("div", { className: "row", attrs: { style: "margin-top:10px" } }, reportLink()),
       ...[await incognitoNotice()].filter((n): n is HTMLElement => n !== null),

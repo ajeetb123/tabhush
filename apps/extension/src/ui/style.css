@@ -140,6 +140,8 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent);
 .chip:hover { border-color: color-mix(in srgb, var(--text) 25%, var(--border)); }
 .chip[aria-pressed="true"], .chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-text); }
 .chip.static { cursor: default; }
+.chip:disabled { opacity: .4; cursor: default; }
+.chip:disabled:hover { border-color: var(--border); }
 input.chip { width: 110px; font-weight: 600; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 

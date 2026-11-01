@@ -105,7 +105,8 @@ Pages a content script can't reach (Chrome Web Store, built-in PDF viewer, other
 ## EXT-11 Incognito
 Onboarding asks for incognito access and shows its status. Without it, incognito is unprotected in v1.
 
-## EXT-12 Onboarding [beta2]
+## EXT-12 Onboarding [beta2; built 2026-11-01 at the owner's pre-launch request]
+Built: install-warning explainer, school sites (typed by the user; automatic school mapping is still OPEN Q-10), optional essentials, incognito status, pinning, and a "13 or older" confirmation (the Terms minimum; the LLM-related age gate, PRIV-61/INV-11, is moot while Q-61 keeps the LLM off). Opens once on install; the popup links to it until finished.
 - Install warning explainer (pre-install screen, also on the site).
 - School (for school-hosted courseware domains).
 - Optional essentials list.

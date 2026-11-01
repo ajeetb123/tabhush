@@ -490,3 +490,18 @@ describe("breaks (LOOP-08, Q-34)", () => {
     expect(await engine.stop()).toBe(false);
   });
 });
+
+describe("school sites from onboarding (EXT-12, LOCK-02)", () => {
+  it("are never blocked, even when their page reads like a distraction", async () => {
+    const { setSettings } = await import("../src/background/settings");
+    await setSettings({ schoolSites: ["prairielearn.endeavour.cs.vt.edu"] });
+    await engine.start();
+    await engine.confirm(45);
+    const tab = { id: 190, windowId: W1, groupId: -1, url: "https://prairielearn.endeavour.cs.vt.edu/pl/course_instance/1/assessments", title: "Assessments", active: true };
+    fake.tabs.set(190, { ...tab, lastAccessed: Date.now() });
+    await fake.chrome.scripting.executeScript({ target: { tabId: 190 } });
+    await engine.onTabChanged(asTab(tab));
+    await engine.onPageSnippet(asTab(tab), tab.url, "Watch free movies and tv shows online. Live sports streams");
+    expect(blocked()).not.toContain(190);
+  });
+});

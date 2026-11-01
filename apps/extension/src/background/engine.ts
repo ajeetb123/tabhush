@@ -116,7 +116,7 @@ async function tier1Context(tabId?: number, url = "", title = ""): Promise<Tier1
     youtubeGenre: yt?.genre ?? null,
     youtubeLooksLikeMusic: youtubeVideoId(url) !== null && looksLikeMusic(yt?.title || title, yt?.channel ?? ""),
     essentials: settings.essentials,
-    schoolCoursewareDomains: [], // onboarding school domains: beta 2, mapping TODO_Q10
+    schoolCoursewareDomains: settings.schoolSites, // entered in onboarding or settings (EXT-12); automatic mapping is TODO_Q10
     coursewareFingerprint: false, // page fingerprint method TODO_Q10
     ownExtensionId: chrome.runtime.id,
   };

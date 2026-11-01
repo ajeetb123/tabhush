@@ -51,6 +51,7 @@ export default defineConfig({
         options: resolve(src, "ui/options.html"),
         blocked: resolve(src, "ui/blocked.html"),
         report: resolve(src, "ui/report.html"),
+        onboarding: resolve(src, "ui/onboarding.html"),
         offscreen: resolve(src, "offscreen/offscreen.html"),
       },
       output: {

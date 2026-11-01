@@ -103,8 +103,10 @@ chrome.runtime.onStartup.addListener(() => {
   })();
 });
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   void getInternal(); // mints the telemetry install ID
+  // EXT-12: first-run setup opens once, on a fresh install.
+  if (details.reason === "install") void chrome.tabs.create({ url: chrome.runtime.getURL("ui/onboarding.html") });
   void injectIntoOpenTabs();
   void chrome.alarms.create(TELEMETRY_ALARM, { periodInMinutes: TELEMETRY_PERIOD_MIN });
 });

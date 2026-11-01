@@ -103,3 +103,20 @@ export function goalRing(): { el: HTMLElement; update: (elapsedMs: number, goalM
     },
   };
 }
+
+/** "https://canvas.vt.edu/courses/1, notion.so" → ["canvas.vt.edu", "notion.so"]. */
+export function domainsFrom(text: string): string[] {
+  const out = text
+    .split(/[\s,]+/)
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean)
+    .map((t) => {
+      try {
+        return new URL(t.includes("://") ? t : `https://${t}`).hostname.replace(/^www\./, "");
+      } catch {
+        return "";
+      }
+    })
+    .filter((d) => d.includes("."));
+  return [...new Set(out)];
+}

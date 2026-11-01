@@ -12,6 +12,12 @@ export interface UserSettings {
   essentials: string[];
   /** Self-declared under the local age of digital consent (PRIV-61; onboarding is beta 2). */
   underDigitalConsentAge: boolean;
+  /** School-hosted courseware and sign-in sites, never blocked (LOCK-02, EXT-12; set in onboarding). */
+  schoolSites: string[];
+  /** Confirmed 13 or older (Terms: minimum age 13). */
+  ageConfirmed: boolean;
+  /** Finished the first-run setup (EXT-12). */
+  onboarded: boolean;
 }
 
 export interface InternalState {
@@ -35,6 +41,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   onDeviceOnly: false,
   essentials: [],
   underDigitalConsentAge: false,
+  schoolSites: [],
+  ageConfirmed: false,
+  onboarded: false,
 };
 
 export async function getSettings(): Promise<UserSettings> {

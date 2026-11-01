@@ -3,7 +3,7 @@
 // Locked during a session (LOCK-01).
 
 import { BRAND, CATEGORY_LIST, LLM, OWNER_RULES, type Tier3Request } from "@lockin/core";
-import { call, getSnapshot, h, onStateChange, setTitle, topbar } from "./common";
+import { call, domainsFrom, getSnapshot, h, onStateChange, setTitle, topbar } from "./common";
 
 setTitle("Settings");
 const main = document.querySelector("main")!;
@@ -37,6 +37,16 @@ async function render(): Promise<void> {
       (e: Error) => (err.textContent = e.message),
     );
 
+  const schoolSites = h("textarea", {
+    rows: 3,
+    value: settings.schoolSites.join("\n"),
+    disabled: locked,
+    placeholder: "canvas.vt.edu\nprairielearn.endeavour.cs.vt.edu",
+    attrs: { "aria-label": "School sites, one per line" },
+  });
+  const saveSchool = h("button", { className: "btn", textContent: "Save", disabled: locked });
+  saveSchool.addEventListener("click", () => void save({ type: "ui:settings", patch: { schoolSites: domainsFrom(schoolSites.value) } }));
+
   const essentials = h("textarea", {
     rows: 4,
     value: settings.essentials.join("\n"),
@@ -46,8 +56,7 @@ async function render(): Promise<void> {
   });
   const saveEssentials = h("button", { className: "btn", textContent: "Save", disabled: locked });
   saveEssentials.addEventListener("click", () => {
-    const list = essentials.value.split(/\s+/).map((d) => d.trim().toLowerCase()).filter(Boolean);
-    void save({ type: "ui:settings", patch: { essentials: list } });
+    void save({ type: "ui:settings", patch: { essentials: domainsFrom(essentials.value) } });
   });
 
   const incognito = await chrome.extension.isAllowedIncognitoAccess();
@@ -61,6 +70,12 @@ async function render(): Promise<void> {
     h("h1", { textContent: "Settings" }),
     h("p", { className: "lead", textContent: locked ? "Settings are locked until the session ends." : "Everything here stays on this device." }),
     h("p", {}, h("a", { href: chrome.runtime.getURL("ui/report.html"), textContent: "Open your focus report" })),
+    ...section(
+      "School sites",
+      h("p", { className: "muted small", textContent: "Your school’s course, quiz and sign-in sites. Never blocked, like Canvas and Gradescope." }),
+      schoolSites,
+      h("div", { className: "row" }, saveSchool),
+    ),
     ...section(
       "Essentials",
       h("p", { className: "muted small", textContent: "Sites that are never blocked, one per line. Subdomains are included." }),
