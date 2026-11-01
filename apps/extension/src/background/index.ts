@@ -28,6 +28,7 @@ import {
 } from "./engine";
 import { loadSession } from "./session";
 import { getInternal, getSettings, setInternal, setSettings } from "./settings";
+import { sendTelemetry, TELEMETRY_ALARM, TELEMETRY_PERIOD_MIN } from "./telemetry";
 import { onUpdateAvailable } from "./updates";
 
 const START_COMMAND = "start-session";
@@ -50,6 +51,7 @@ chrome.tabs.onRemoved.addListener((tabId) => forgetTab(tabId));
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === END_ALARM) void finishEnd();
+  if (alarm.name === TELEMETRY_ALARM) void sendTelemetry();
 });
 
 // INV-14: an update arriving mid-session waits until the session ends (applied in finishEnd).
@@ -71,6 +73,7 @@ chrome.runtime.onStartup.addListener(() => {
 
 chrome.runtime.onInstalled.addListener(() => {
   void getInternal(); // mints the telemetry install ID
+  void chrome.alarms.create(TELEMETRY_ALARM, { periodInMinutes: TELEMETRY_PERIOD_MIN });
 });
 
 chrome.runtime.onMessage.addListener((msg: FromUi | FromContent | { target?: string }, sender, sendResponse) => {
