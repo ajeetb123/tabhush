@@ -1,0 +1,366 @@
+# CONSTANTS.md: Every number in one place
+
+This is the single source for numeric values, lists and prices. Code must import from one constants module that mirrors this file. Values marked `RC` must also be overridable by the signed remote config (`docs/08-backend.md` BE-03). Values marked `[START]` are starting values to tune on Gate A and beta data. Anything shown as `TODO_Q<nn>` is undecided: see `docs/16-open-questions.md`. Do not fill it in.
+
+The block below is written as TypeScript for convenience. Names are implementation choices; values and comments are normative.
+
+```ts
+// ───────────────────────── Session lifecycle (docs/03) ─────────────────────────
+export const SESSION = {
+  MAX_LENGTH_MIN: 240,          // [START][RC] counts work + breaks, NOT idle pauses. Then one-tap extend prompt.
+  EXTEND_INCREMENT_MIN: "TODO_Q32",
+  NO_ANSWER_TO_EXTEND_ENDS_AS: "normal", // never "ended early"
+  IDLE_PAUSE_AFTER_MIN: 30,     // [START][RC] no input -> pause; locks stay on; time stops counting
+  IDLE_END_AFTER_MIN: 120,      // [START][RC] idle this long -> session ends (normal end)
+  RESUME_AFTER_RESTART: true,   // only if still within MAX_LENGTH_MIN; restored tabs re-judged before showing
+};
+
+// ───────────────────────── Active time and logging (docs/09) ─────────────────────────
+export const ACTIVE_TIME = {
+  NO_INPUT_STOP_MIN: 3,         // [START] normal page: time stops counting after 3 min without input
+  VIDEO_GRACE_MIN: 20,          // [START] video in an allowed FRONT tab counts up to 20 min after last input, then "Still here?"
+  PDF_GRACE_MIN: 5,             // [START] PDF in front counts up to 5 min after last input
+  DAY_BOUNDARY_HOUR_LOCAL: 4,   // a "day" runs 4am to 4am local time
+};
+
+// ───────────────────────── Sweep (docs/03) ─────────────────────────
+export const SWEEP = {
+  CONFIRM_REQUIRED_FIRST_N_SESSIONS: 5, // nothing parked until user taps Confirm for the first 5 sessions
+  UNDO_WINDOW_SEC: 30,                  // [START] every sweep
+  AUTO_COMMIT_MIN_CONFIDENCE: "TODO_Q16",
+  PREVIEW_MAX_GROUPS: "TODO_Q17",       // preview grouped by domain, capped to the largest groups
+  JUDGE_ORDER: ["recent", "visible"],   // recent and visible tabs judged first
+};
+
+// ───────────────────────── Task switch (docs/03, docs/05) ─────────────────────────
+export const SWITCH = {
+  COUNTDOWN_SEC: 30,                    // [START]
+  SUGGEST_AFTER_CONSECUTIVE_ITEMS: 3,   // 3 consecutive new items...
+  SUGGEST_MIN_SPAN_MIN: 2,              // ...over at least 2 minutes...
+  SUGGEST_SCORE_MARGIN: 0.15,           // ...each scoring 0.15 higher for another recent task
+};
+
+// ───────────────────────── Breaks (docs/03) ─────────────────────────
+export const BREAKS = {
+  OPTIONS_MIN: [5, 10, 15],             // free tier choices; Pro gets custom lengths
+  FOCUSED_MIN_PER_BREAK_MIN: 5,         // [START] cap: roughly 1 break minute per 5 focused minutes (accrual details TODO_Q34)
+  COUNTS_AS_BAIL: false,                // never
+};
+
+// ───────────────────────── Exits (docs/04) ─────────────────────────
+export const EXITS = {
+  PASS_DURATION_MIN: 10,                // [START] emergency pass unlocks ONE item
+  PASS_WAIT_SEC: 30,                    // [START]
+  PASSES_PER_DAY: 2,                    // [START]
+  END_COUNTDOWN_SEC: 120,               // [START] plus a one-line reason; session marked "ended early"
+  BAIL_WINDOW_SEC: 120,                 // emergency pass or early end within 2 min of a park = bail
+};
+
+export const STRICT_MODE = {            // v1.5, opt-in, Pro
+  PASSES_PER_DAY: 0,
+  END_COUNTDOWN_SEC: 600,               // [START]
+};
+
+// ───────────────────────── Asking the user (docs/05) ─────────────────────────
+export const ASK = {
+  MAX_PER_HOUR: 4,                      // [START][RC]
+  MIN_GAP_MIN: 5,                       // [START][RC] at most 1 ask every 5 minutes
+  CLARIFY_GUESSES: 3,                   // clarify prompt shows 3 guesses + a text box
+  OVER_BUDGET_ACTION: "allow_and_flag",
+};
+
+// ───────────────────────── Overrides -> labels (docs/05) ─────────────────────────
+export const OVERRIDE_LABEL = {
+  ACTIVE_MIN_REQUIRED: 3,               // 3 active minutes on that item in the session
+  INPUT_EVENTS_PER_ACTIVE_MIN: 10,      // an active minute has >= 10 input events (keys, clicks, scrolls). Counts only.
+  PLAYBACK_COUNTS: false,
+};
+
+// ───────────────────────── Labels and drift (docs/05) ─────────────────────────
+export const LABELS = {
+  STRONG_WEIGHT: 1.0,  STRONG_HALF_LIFE_DAYS: 90,
+  WEAK_WEIGHT: 0.3,    WEAK_HALF_LIFE_DAYS: 14,
+  DRIFT_PER_USER_WINDOW_ANSWERS: 15,    // last 15 sampled "Was this park right?" answers
+  DRIFT_CI_LEVEL: 0.90,
+  DRIFT_DISAGREE_LOWER_BOUND: 0.10,     // weak labels off for that user when 90% CI lower bound on disagreement > 10%
+  DRIFT_POOLED_CHECK: "weekly",         // pooled across users; remote config can switch weak labels off for everyone
+};
+
+// ───────────────────────── Embedding model (docs/05) ─────────────────────────
+export const EMBEDDING = {
+  MODEL: "all-MiniLM-L6-v2",            // verify exact Hugging Face repo for quantized ONNX before use
+  QUANTIZATION: "int8",
+  APPROX_SIZE_MB: 23,
+  DIMENSIONS: 384,
+  MAX_INPUT_TOKENS: 64,                 // titles cut to 64 tokens
+  RUNTIME: "Transformers.js on ONNX Runtime Web (WASM), bundled",
+  BENCHMARK_ALTERNATIVE: "bge-small-en-v1.5", // one benchmark on Gate A set; switch only if clearly better within budget
+  LOAD_BUDGET_MS: 3000,                 // [START]
+  WARM_PER_ITEM_MS: 20,                 // [START]
+  START_BATCH_SIZE: 16,                 // [START]
+  LANGUAGE: "en",                       // English-only in v1
+};
+
+// ───────────────────────── Task representation and thresholds (docs/05) ─────────────────────────
+export const TASK_REP = {
+  MAX_ITEM_PROTOTYPES: 50,              // oldest dropped first
+  TOP_K_FOR_AVG: 3,                     // s = max(sim(label), mean(top-3 sims to item prototypes))
+  PROTOTYPE_SEED_MIN_S: 0.45,
+  FEWER_THAN_K: "mean_of_existing",     // Q-53: 1-2 prototypes -> mean of those; 0 -> label term only
+};
+
+export const THRESHOLDS = {             // [START][RC]
+  ALLOW_MIN_S: 0.45,                    // s >= 0.45 -> allow
+  MIDDLE_MIN_S: 0.25,                   // 0.25 <= s < 0.45 -> middle (tier 3, or ask)
+                                        // s < 0.25 -> "looks unrelated" (still needs a second signal to park)
+  ON_DEVICE_PARK_CATEGORIES: ["entertainment", "social", "games", "shopping"],
+  TIER3_PARK_MIN_CONFIDENCE: 0.80,     // Q-16b: "unrelated" at >= 0.80 parks; below, or "unsure", asks; "related" allows
+  PRIOR_NUDGE_SIZE: "TODO_Q49",
+};
+
+// ───────────────────────── Personal memory (docs/05) ─────────────────────────
+export const MEMORY = {                 // beta 2+
+  K_NEIGHBORS: 5,                       // among labels for the SAME task ID
+  MIN_SIMILARITY: 0.70,                 // [START] calibrate on Gate A data
+  MIN_AGREEING_NEIGHBORS: 3,            // acts only when >= 3 qualifying neighbors agree
+  MAX_ENTRIES: 5000,                    // per user, 8-bit vectors (~2 MB), least recently used dropped first
+  VECTOR_FORMAT: "int8",
+};
+
+// ───────────────────────── Task registry and inference (docs/05) ─────────────────────────
+export const REGISTRY = {
+  SAME_AS_MIN_LABEL_SIM: 0.85,          // "Same as X?" if labels >= 0.85 similar,
+  SAME_AS_SHARED_COURSE_CODE: true,     // or share a course-code-like token (letters + digits),
+  SAME_AS_MIN_WORD_OVERLAP: 0.60,       // or overlap by >= 60% of words
+  EXACT_MATCH_NORMALIZE: ["case", "punctuation"], // exact match after normalization merges silently
+};
+
+export const INFERENCE = {
+  RECENT_TASK_WINDOW_DAYS: 14,
+  FRONT_TAB_WEIGHT: 2,                  // front tab counted double
+  TAB_SCORE_TOP_N: 3,                   // Q-51: task score = mean of the 3 highest tab s (front tab entered twice)
+  AUTOFILL_MIN_SCORE: 0.60,
+  AUTOFILL_MIN_MARGIN: 0.10,            // best must beat second best by 0.10, else clarify with top 3
+  LLM_LABEL_MAX_WORDS: 5,
+  ACCURACY_PLANNING_TARGET: 0.80,       // share of sessions where chip kept without rename
+};
+
+export const LEISURE = {
+  MIN_SIM_TO_LEISURE_SET: 0.60,
+  LEISURE_SET: ["break", "watch Netflix", "play games", "scroll"],
+  LEISURE_KEYWORDS: "TODO_Q13",
+  WORK_TERMS: ["class", "homework", "assignment", "project", "lecture", "edit"], // presence makes it a work task
+};
+
+export const NAMED_SITE_ALIASES = {     // short list; full list TODO_Q13
+  yt: "YouTube",
+  ig: "Instagram",
+};
+
+export const PROFILES = ["Homework", "Internship", "Projects", "Writing"]; // inferred, never picked by user
+
+// ───────────────────────── Verdict cache (docs/05) ─────────────────────────
+export const CACHE = {
+  KEY: "taskId + itemKey",
+  PAGE_KEY_TTL: "session_end",
+  PATH_KEY_TTL_DAYS: 7,
+  DOMAIN_KEY_TTL_DAYS: 30,
+  INVALIDATE_ALL_ON_REMOTE_CONFIG_VERSION_CHANGE: true,
+};
+
+// ───────────────────────── Tier 3 / LLM (docs/05, docs/08) ─────────────────────────
+export const LLM = {
+  PROVIDER: "OpenAI API",
+  MODEL: "GPT-5 nano",                  // verify exact API model string before use
+  REASONING: "lowest available setting",
+  PRICE_INPUT_PER_MTOK_USD: 0.05,
+  PRICE_OUTPUT_PER_MTOK_USD: 0.40,
+  EST_INPUT_TOKENS: 250,
+  EST_VISIBLE_OUTPUT_TOKENS: 20,        // reasoning tokens billed as output: treat cost as a floor; measure in setup week
+  EST_COST_PER_CALL_USD: 0.00002,
+  TITLE_MAX_CHARS: 120,                 // titles cut to 120 characters before sending
+  STRIP_CONTROL_CHARS: true,
+  CATEGORIES: ["work tool", "reference", "entertainment", "social", "games", "shopping", "other"],
+  VERDICTS: ["related", "unrelated", "unsure"],
+  BILLED_ACCESS_ONLY: true,             // never a free tier
+  FALLBACK_IF_TOO_SLOW: "TODO_Q37",
+};
+
+export const API = {                    // Q-03: /v1/ prefix, JSON errors {"error":{"code","message"}}
+  PREFIX: "/v1",
+  TOKEN_CHALLENGE: "/v1/token/challenge",
+  TOKEN: "/v1/token",
+  TIER3: "/v1/tier3",
+  CONFIG: "/v1/config",                 // beta2
+  LICENSE_ACTIVATE: "/v1/license/activate", // v1
+  TELEMETRY: "/v1/telemetry",
+  CONTRIBUTE: "/v1/contribute",
+  DELETE: "/v1/delete",
+  BASE_URL: "TODO_Q26",                 // backend host not decided (domain depends on Q-01 / Q-26)
+};
+
+export const POW = {                    // Q-06: SHA-256 hashcash; same cost for install tokens and contribution IDs
+  ALGORITHM: "SHA-256",
+  DIFFICULTY_BITS: 18,
+};
+
+export const AI_CAPS = {                // tier 3 calls per install per day [START][RC]
+  FREE_PER_DAY: 40,
+  PRO_PER_DAY: 300,
+  // => at most about 2.5 cents per free user per month
+};
+
+// ───────────────────────── Redaction (docs/06) ─────────────────────────
+export const REDACTION = {
+  PATTERNS: ["email", "phone", "long_number", "url"],
+  LONG_NUMBER_MIN_DIGITS: "TODO_Q15",
+  NAME_RULE: "capitalized word NOT in 50,000-word English dictionary, OR in first-name list -> [NAME]",
+  DICTIONARY_SIZE: 50000,               // source TODO_Q14
+  NAME_TOKEN: "[NAME]",
+  TEST_SET_TITLES: 500,
+  TARGET_NAME_RECALL: 0.95,             // over-redacting is fine
+};
+
+// ───────────────────────── Shared domain prior (docs/05, docs/06) ─────────────────────────
+export const SHARED_PRIOR = {
+  MIN_DISTINCT_CONTRIBUTION_IDS: 25,
+  MIN_CATEGORY_AGREEMENT: 0.80,
+  CAN_PARK: false,                      // only nudges
+};
+
+// ───────────────────────── Testing, eval, red team (docs/15) ─────────────────────────
+export const RED_TEAM = {
+  SET_SIZE: 200,                        // adversarial titles + override sentences
+  RUNS_INJECTED: 5,
+  RUNS_NEUTRAL: 5,
+  MAX_FLIP_RATE_DELTA_PP: 2,            // pass: injected flip rate <= neutral baseline + 2 percentage points
+};
+
+export const EVAL = {
+  GATE_A_SELF_LABELED_PAIRS: [300, 400],
+  BENCHMARK_TARGET_PAIRS: 1000,         // after beta 1, stratified by profile and site category
+  TUNE_SHARE: 0.70,
+  HOLDOUT_SHARE: 0.30,                  // held-out drawn ONLY from beta exports
+  CI_METHOD: "cluster bootstrap by person and domain",
+};
+
+// ───────────────────────── Performance budgets [START] (docs/15) ─────────────────────────
+export const PERF_EXTENSION = {
+  IDLE_CPU: "no measurable",
+  MAX_MEMORY_MB: 150,                   // including the model
+  TIER1_TIER2_VERDICT_MS: 100,
+  TIER3_P95_MS: 1500,
+  START_JUDGE_RECENT_TABS: 30,          // 30 most recent tabs judged within 2s of Start, even with 80+ open
+  START_JUDGE_WITHIN_MS: 2000,
+  MAX_STORAGE_PER_USER_MB: 50,
+};
+
+export const PERF_MAC = {
+  IDLE_CPU_PCT: 1,
+  MAX_MEMORY_MB: 200,
+};
+
+// ───────────────────────── Platform (docs/07, docs/11) ─────────────────────────
+export const PLATFORM = {
+  MIN_CHROMIUM_VERSION: 120,            // Chrome, Edge, Brave
+  MIN_MACOS: "13 Ventura",
+  CHROME_STORAGE_LOCAL_CAP_MB: 10,      // without unlimitedStorage -> use IndexedDB
+  SAFARI_WARM_JUDGE_MAX_MS: 50,         // Safari test pass criterion for classifying inside the extension
+  SAFARI_TEST_BUDGET_HOURS: 2,
+  APP_ATTEST_MIN_MACOS: 27,
+};
+
+export const CHROME_BUILTIN_AI = {      // NOT in v1; telemetry records availability only
+  REQ_GPU_MEMORY_GB_GT: 4,              // > 4 GB GPU memory, OR
+  REQ_RAM_GB: 16, REQ_CPU_CORES: 4,     // 16 GB RAM and 4 cores
+  REQ_FREE_STORAGE_GB: 22,              // plus 22 GB free storage
+  TEST_IN_V1_5_IF_ADOPTION_GTE: 0.30,
+};
+
+export const VSCODE_BRIDGE = {          // v1.1
+  BIND_HOST: "127.0.0.1",
+  FIXED_PORT_COUNT: 3,
+  PORTS: "TODO_Q27",
+  PAIRING_CODE_DIGITS: 6,
+  MESSAGE_FIELDS: ["workspaceName", "active", "timestamp"],
+};
+
+// ───────────────────────── Business (docs/10) ─────────────────────────
+export const PRICING_USD = {            // starting hypotheses
+  PRO_ANNUAL: 39.99,                    // default plan
+  PRO_MONTHLY_TEST: [6.99, 7.99],
+  FOUNDING_FIRST_YEAR: 24.99,           // then renews at PRO_ANNUAL; jump shown at checkout and in renewal reminder
+  REFUND_WINDOW_DAYS: 14,
+  MAC_TARGET: "spring week 10",
+  MAC_PUBLIC_DATE: "end of spring week 12", // missing this triggers full founding-plan refund
+  MOR_FEE: "about 5% + $0.50 per sale",
+};
+
+export const LICENSE = {
+  MAX_ACTIVATIONS_PER_KEY: 5,           // counted per browser install or Mac app
+  SELF_SERVE_DEACTIVATION: "merchant of record customer portal",
+  LOST_KEY_RECOVERY: "email via merchant of record",
+};
+
+export const AGE = {
+  MIN_AGE: 13,                          // or higher where local law requires
+  DIGITAL_CONSENT_RANGE: [13, 16],      // by country; table source TODO_Q40
+};
+
+// ───────────────────────── Gates (docs/14) ─────────────────────────
+export const GATES = {
+  GATE_0: { WAITLIST_STRANGERS_MIN: 200, BY: "mid-December" },
+  GATE_A: { PARKS_MIN: 200, WRONG_PARKS_MAX: 0, PEOPLE: 3, DISTINCT_SITES_MIN: 50,
+            TAB_SWITCH_SAMPLE_PER_PERSON: 100, CATCH_RATE_MIN: 0.85, BY: "mid-December" },
+  GATE_B: { PARKS_MIN: 500, WRONG_PARK_RATE_MAX: 0.02, CRITICAL_WRONG_PARKS_MAX: 0,
+            CATCH_RATE_MIN: 0.85, LOST_WORK_REPORTS_MAX: 0, ON_DEVICE_ONLY_CATCH_START_TARGET: 0.70,
+            TESTERS_PER_BETA: [60, 90] },
+  GATE_P: { FOUNDING_PLANS_MIN: 50, BY: "Mac app launch" },
+  GATE_C: { DAY7_RETENTION_MIN: 0.15, NON_FRIEND_INSTALLS_MIN: 200 },
+  WATCH_SESSIONS_PER_ACTIVE_USER_PER_WEEK: 5,
+};
+```
+
+## Lists that are partially defined
+
+Members given in the scope are normative. Extend only after the owner resolves the listed question.
+
+```
+Pure-distraction domains (blocked whole, never auto-lifted): Netflix, Steam, TikTok, ...   rest: TODO_Q09
+Mixed sites (judged per page/path; from the cache path rules): YouTube (video ID or channel), Reddit (subreddit),
+  Stack Overflow (question ID), X (account), ...                                          rest: TODO_Q09
+  Note: scope lists TikTok as pure-distraction AND as having an account path rule. Conflict: TODO_Q41
+Mirror domains (treated as the site they wrap): m.youtube.com, youtube-nocookie.com, Google Translate proxies
+Learning platforms (NEVER parked): Canvas, Blackboard, Moodle, Brightspace, Gradescope, WebAssign,
+  Pearson MyLab, McGraw Hill Connect, zyBooks, Top Hat, Piazza, Ed Discussion, Panopto, Kaltura
+  + school-hosted instances (e.g. canvas.vt.edu) via onboarding school domains and page fingerprint (TODO_Q10)
+Web meetings (never locked): Google Meet, Zoom, Teams
+Developer pages (never locked): localhost, 127.0.0.1, file://, *.local, GitHub, package registries (TODO_Q11)
+Domain-only (never send titles): webmail (Gmail, Outlook on the web), web chat (Discord, Messenger,
+  WhatsApp Web), banking, health                                                          (banking/health domain list TODO_Q48)
+Desktop excluded apps (never send titles): Messages, Mail, Slack, Discord
+Proctoring tools: Honorlock (extension suspends), Respondus LockDown Browser (desktop, v1.5)
+Content-script-unreachable pages (closed + restore list): Chrome Web Store, built-in PDF viewer
+Regression sites: YouTube, Canvas, Google Docs, Gmail, Meet, GitHub
+```
+
+## Domain mapping [DERIVED, owner to verify: Q-57]
+
+The scope names platforms; these are the domains the code uses for them. A listed domain also covers its subdomains.
+
+```
+Learning platforms   Canvas: instructure.com · Blackboard: blackboard.com, bbcollab.com · Moodle: moodlecloud.com
+                     Brightspace: brightspace.com, desire2learn.com, d2l.com · Gradescope: gradescope.com
+                     WebAssign: webassign.net, webassign.com · Pearson MyLab: pearson.com, pearsonmylabandmastering.com
+                     McGraw Hill Connect: mheducation.com · zyBooks: zybooks.com · Top Hat: tophat.com
+                     Piazza: piazza.com · Ed Discussion: edstem.org · Panopto: panopto.com, panopto.eu · Kaltura: kaltura.com
+Web meetings         Google Meet: meet.google.com · Zoom: zoom.us, zoom.com · Teams: teams.microsoft.com, teams.live.com
+Developer pages      GitHub: github.com
+Pure-distraction     Netflix: netflix.com · Steam: steampowered.com, steamcommunity.com · TikTok: tiktok.com
+Mixed sites          YouTube: youtube.com · Reddit: reddit.com · Stack Overflow: stackoverflow.com · X: x.com, twitter.com
+Mirrors              m.youtube.com, youtube-nocookie.com -> youtube.com · <host>.translate.goog -> decoded host
+Webmail              Gmail: mail.google.com · Outlook on the web: outlook.live.com, outlook.office.com, outlook.office365.com
+Web chat             Discord: discord.com · Messenger: messenger.com · WhatsApp Web: web.whatsapp.com
+Unreachable          Chrome Web Store: chromewebstore.google.com, chrome.google.com/webstore
+Named-site aliases   Instagram: instagram.com (alias "ig" from NAMED_SITE_ALIASES)
+```

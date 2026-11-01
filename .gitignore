@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+*.log
+.DS_Store
+# Bundled model and WASM files are fetched at build time (scripts/fetch-model.mjs), not committed.
+apps/extension/public/models/
+apps/extension/public/wasm/
