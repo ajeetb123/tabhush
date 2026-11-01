@@ -74,6 +74,22 @@ chrome.runtime.onUpdateAvailable.addListener(() => {
   });
 });
 
+/**
+ * After an install, update or reload, Chrome does not put the new content script into tabs that
+ * are already open (their old copy, if any, is cut off). Inject it now so they are covered without
+ * a refresh. The script's liveness flag lets the fresh copy start next to an orphaned one.
+ */
+async function injectIntoOpenTabs(): Promise<void> {
+  const open = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+  await Promise.all(
+    open.map((t) =>
+      t.id === undefined
+        ? undefined
+        : chrome.scripting.executeScript({ target: { tabId: t.id, allFrames: true }, files: ["content.js"] }).catch(() => undefined),
+    ),
+  );
+}
+
 chrome.runtime.onStartup.addListener(() => {
   void (async () => {
     // Restart recovery is beta 2 (LOOP-11). Without an active session, no rule may stay behind.
@@ -84,6 +100,7 @@ chrome.runtime.onStartup.addListener(() => {
 
 chrome.runtime.onInstalled.addListener(() => {
   void getInternal(); // mints the telemetry install ID
+  void injectIntoOpenTabs();
   void chrome.alarms.create(TELEMETRY_ALARM, { periodInMinutes: TELEMETRY_PERIOD_MIN });
 });
 
