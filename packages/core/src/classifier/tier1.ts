@@ -20,7 +20,7 @@ import {
   UNREACHABLE_HOSTS,
   UNREACHABLE_HOST_PATHS,
 } from "../lists";
-import type { Category } from "../constants";
+import { CATEGORY_LIST, type Category } from "../constants";
 
 export type NeverLockedReason = "system" | "learning_platform" | "meeting" | "developer";
 
@@ -83,10 +83,16 @@ export function isKnownUnreachable(url: ParsedUrl): boolean {
   return UNREACHABLE_HOST_PATHS.some((u) => url.rawHost === u.host && url.path.startsWith(u.pathPrefix));
 }
 
-/** Category from the shipped domain-category list (CLS-10 input 5, Q-08), loaded at runtime. */
+const CATEGORY_EXCEPTIONS: ReadonlySet<string> = new Set(CATEGORY_LIST.EXCEPTIONS);
+
+/**
+ * Category from the shipped domain-category list (CLS-10 input 5, Q-08), loaded at runtime.
+ * Work subdomains on the exceptions list never inherit a category (Q-62).
+ */
 export function shippedCategory(urlString: string, table: ReadonlyMap<string, Category>): Category | null {
   const url = parseUrl(urlString);
-  return url ? (lookupHost(url.host, table) ?? null) : null;
+  if (!url || hostInSet(url.host, CATEGORY_EXCEPTIONS)) return null;
+  return lookupHost(url.host, table) ?? null;
 }
 
 export function tier1(urlString: string, ctx: Tier1Context): Tier1Result {

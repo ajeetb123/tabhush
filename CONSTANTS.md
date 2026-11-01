@@ -245,6 +245,11 @@ export const CATEGORY_LIST = {
   MIRROR_COMMIT: "03501c64d230df9d84124176558d758351027be1", // 2026-10-12
   MAPPING: { games: "games", social_networks: "social", shopping: "shopping", "audio-video": "entertainment" },
   BANKING: "bank",                      // Q-48: domain-only; health still TODO_Q48
+  EXCEPTIONS: [                         // Q-62: never inherit a category (subdomains included)
+    "aws.amazon.com", "developers.facebook.com", "developer.amazon.com", "developer.spotify.com",
+    "dev.twitch.tv", "developer.x.com", "developer.twitter.com", "studio.youtube.com",
+    "business.facebook.com", "sellercentral.amazon.com",
+  ],
 };
 
 // ───────────────────────── Shared domain prior (docs/05, docs/06) ─────────────────────────

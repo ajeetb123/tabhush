@@ -266,6 +266,20 @@ export const CATEGORY_LIST = {
   MIRROR_COMMIT: "03501c64d230df9d84124176558d758351027be1", // 2026-10-12
   MAPPING: { games: "games", social_networks: "social", shopping: "shopping", "audio-video": "entertainment" } as Readonly<Record<string, Category>>,
   BANKING: "bank", // Q-48: domain-only; health still TODO_Q48
+  // Q-62 (owner 2026-11-01): work subdomains (and their subdomains) that never inherit a category
+  // from a listed parent domain, e.g. the AWS console under amazon.com (shopping).
+  EXCEPTIONS: [
+    "aws.amazon.com",
+    "developers.facebook.com",
+    "developer.amazon.com",
+    "developer.spotify.com",
+    "dev.twitch.tv",
+    "developer.x.com",
+    "developer.twitter.com",
+    "studio.youtube.com",
+    "business.facebook.com",
+    "sellercentral.amazon.com",
+  ],
 } as const;
 
 // ───────────────────────── Shared domain prior (docs/05, docs/06) ─────────────────────────

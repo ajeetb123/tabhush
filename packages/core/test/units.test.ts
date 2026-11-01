@@ -333,3 +333,18 @@ describe("shipped categories and banking (Q-08, Q-48)", async () => {
     expect(CATEGORY_LIST.BANKING).toBe("bank");
   });
 });
+
+describe("category exceptions (Q-62)", async () => {
+  const { shippedCategory } = await import("../src");
+  const table = new Map([["amazon.com", "shopping" as const], ["facebook.com", "social" as const], ["youtube.com", "entertainment" as const]]);
+  it.each(["https://console.aws.amazon.com/ec2", "https://aws.amazon.com/s3/", "https://developers.facebook.com/docs", "https://studio.youtube.com/channel/x", "https://sellercentral.amazon.com/home"])(
+    "%s never inherits a category",
+    (u) => expect(shippedCategory(u, table)).toBeNull(),
+  );
+  it("the parent domains keep theirs", () => {
+    expect(shippedCategory("https://www.amazon.com/dp/1", table)).toBe("shopping");
+    expect(shippedCategory("https://www.facebook.com/", table)).toBe("social");
+    expect(shippedCategory("https://www.youtube.com/watch?v=1", table)).toBe("entertainment");
+  });
+  it("look-alike hosts are not exempt", () => expect(shippedCategory("https://notaws.amazon.com/", table)).toBe("shopping"));
+});

@@ -65,7 +65,7 @@ Windows and tab groups other than the front one are flagged as **separate contex
 2. **User essentials:** always allow.
 3. **Known pure-distraction domains:** park/block. Tier 3 cannot override (INV-03). Lift only via an accepted override (CLS-55).
 4. **Inferred profile's tool list:** strong allows (e.g. docs sites are strong allows in the coding profiles). Profiles: Homework, Internship, Projects, Writing. Inferred from the task; never picked by the user. Tool lists: [OPEN Q-12].
-5. **Shipped domain-category list:** the UT1 web blacklists, CC BY-SA 4.0 (Q-08): `games` → games, `social_networks` → social, `shopping` → shopping, `audio-video` → entertainment. Built into the package at build time (`scripts/build-categories.mjs`) with its attribution notice. Provides categories used by the on-device parking path.
+5. **Shipped domain-category list:** the UT1 web blacklists, CC BY-SA 4.0 (Q-08): `games` → games, `social_networks` → social, `shopping` → shopping, `audio-video` → entertainment. Built into the package at build time (`scripts/build-categories.mjs`) with its attribution notice. Provides categories used by the on-device parking path. List entries cover their subdomains, except the work subdomains on `CATEGORY_LIST.EXCEPTIONS` (Q-62), which never inherit a category.
 6. **Shared domain prior:** crowd tags; **only nudges** the score, never parks (INV-04). Nudge size: [OPEN Q-49].
 
 ### CLS-11 Named sites (CLS-55 covers lifting)
