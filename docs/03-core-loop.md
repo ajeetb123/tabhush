@@ -75,6 +75,7 @@ Undecided: whether the idle timers run during ON_BREAK [OPEN Q-39]; what SUSPEND
 - The answer is a strong label.
 
 ### LOOP-04 Sweep [beta1]
+**Owner change 2026-11-01 (Q-63):** no 30-second undo; unticking in the preview is the only way to keep a tab. The clarify prompt accepts several tasks.
 - Unrelated items appear in a **preview grouped by domain**, capped to the largest groups so 80+ tabs stay readable. Cap value: [OPEN Q-17].
 - **Recent and visible tabs are judged first.** Budget: 30 most recent tabs judged within 2 s of Start even with 80+ open.
 - **First 5 sessions:** nothing is parked until the user taps **Confirm**.
@@ -85,6 +86,7 @@ Undecided: whether the idle timers run during ON_BREAK [OPEN Q-39]; what SUSPEND
 - [DERIVED] A separate window or tab group (LOOP-02) is shown as one question, "Park all" or "Keep open". Confirm waits until each is answered. "Park all" still never parks never-locked items or essentials. "Keep open" allows its tabs for the session's task (cached allow, no label).
 
 ### LOOP-05 Judge every new item [beta1; apps v1.5]
+**Owner change 2026-11-01 (Q-63):** no asks. Unsure items are allowed and flagged. YouTube browsing pages are allowed; music is allowed at 30% volume; always-allowed tools are listed in `CONSTANTS.md` OWNER_RULES.
 - **Related:** allowed; its time counts toward the task.
 - **Unrelated:** parked.
   - Pure-distraction domains (Netflix, Steam) are blocked whole.

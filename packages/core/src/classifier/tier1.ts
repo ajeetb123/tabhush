@@ -1,5 +1,7 @@
 // Tier 1: on-device rules and lists (docs/05 CLS-10), in this order of authority:
-// never-locked → user essentials → pure-distraction → profile tool list → shipped category list.
+// never-locked → user essentials → underground sites → pure-distraction → always-allowed tools →
+// music → YouTube browsing → profile tool list → shipped category list.
+// Underground sites, tools, music and YouTube browsing are owner rules (Q-63).
 // The shared domain prior is applied in relatedness as a nudge only (INV-04), never here.
 
 import { hostInSet, hostMatches, hostMatchesAny, lookupHost, parseUrl, type ParsedUrl } from "../domains";
@@ -20,7 +22,8 @@ import {
   UNREACHABLE_HOSTS,
   UNREACHABLE_HOST_PATHS,
 } from "../lists";
-import { CATEGORY_LIST, type Category } from "../constants";
+import { CATEGORY_LIST, OWNER_RULES, type Category } from "../constants";
+import { itemKeyFor } from "./cacheKey";
 
 export type NeverLockedReason = "system" | "learning_platform" | "meeting" | "developer";
 
@@ -28,6 +31,10 @@ export type Tier1Result =
   | { kind: "never_locked"; reason: NeverLockedReason }
   | { kind: "essential" }
   | { kind: "pure_distraction"; domain: string }
+  | { kind: "underground"; domain: string }
+  | { kind: "tool_allow" }
+  | { kind: "music" }
+  | { kind: "browse_allow" }
   | { kind: "profile_strong_allow" }
   | { kind: "none"; category: Category | null };
 
@@ -40,6 +47,10 @@ export interface Tier1Context {
   coursewareFingerprint: boolean;
   /** The app's own extension origin host (chrome-extension://<id>). */
   ownExtensionId: string;
+  /** UT1 warez domains (Q-63), loaded at runtime. */
+  undergroundDomains?: ReadonlySet<string>;
+  /** YouTube genre of the video playing in this tab, verified against its video ID by the content script. */
+  youtubeGenre?: string | null;
 }
 
 export function isLearningPlatform(url: ParsedUrl, ctx: Pick<Tier1Context, "schoolCoursewareDomains" | "coursewareFingerprint">): boolean {
@@ -56,6 +67,12 @@ export function neverLockedReason(url: ParsedUrl, ctx: Tier1Context): NeverLocke
   if (DEVELOPER_HOST_SUFFIXES.some((s) => url.rawHost.endsWith(s))) return "developer";
   if (hostMatchesAny(url.host, domainsOf(DEVELOPER_SITES))) return "developer";
   return null;
+}
+
+/** Underground streaming and piracy sites (Q-63): the UT1 warez list or a known name in the host. */
+export function undergroundDomain(url: ParsedUrl, warez?: ReadonlySet<string>): string | null {
+  if (OWNER_RULES.UNDERGROUND_HOST_KEYWORDS.some((k) => url.host.includes(k))) return url.host;
+  return warez && hostInSet(url.host, warez) ? url.host : null;
 }
 
 export function pureDistractionDomain(url: ParsedUrl): string | null {
@@ -104,8 +121,17 @@ export function tier1(urlString: string, ctx: Tier1Context): Tier1Result {
   const reason = neverLockedReason(url, ctx);
   if (reason) return { kind: "never_locked", reason };
   if (hostMatchesAny(url.host, ctx.essentials)) return { kind: "essential" };
+  const ug = undergroundDomain(url, ctx.undergroundDomains);
+  if (ug) return { kind: "underground", domain: ug };
   const pd = pureDistractionDomain(url);
   if (pd) return { kind: "pure_distraction", domain: pd };
+  if (hostMatchesAny(url.host, OWNER_RULES.ALWAYS_ALLOWED_TOOLS)) return { kind: "tool_allow" };
+  if (hostMatchesAny(url.host, OWNER_RULES.MUSIC_SITES)) return { kind: "music" };
+  if (hostMatches(url.host, "youtube.com")) {
+    if (ctx.youtubeGenre === OWNER_RULES.MUSIC_YOUTUBE_GENRE) return { kind: "music" };
+    // Browsing YouTube is allowed; individual videos and Shorts are judged (Q-63).
+    if (itemKeyFor(urlString)?.kind !== "path" || /\|channel:/.test(itemKeyFor(urlString)!.value)) return { kind: "browse_allow" };
+  }
   // Profile tool lists are TODO_Q12, so no profile strong allow is ever returned yet.
   // The shipped domain-category list is TODO_Q08, so no shipped category is known yet.
   return { kind: "none", category: null };

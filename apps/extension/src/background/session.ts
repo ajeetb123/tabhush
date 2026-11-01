@@ -56,11 +56,16 @@ export interface ActiveSession {
   startedAt: number;
   /** Front window, tab and group at the moment Start was pressed (glossary: start snapshot). */
   startFront: { tabId: number | null; windowId: number | null; groupId: number };
+  /** Primary task (the chip). */
   taskId: string | null;
+  /** Every task this session is for: the chip plus any picked together with it (Q-63). */
+  taskIds: string[];
+  /** Tasks picked alongside the chip in the clarify prompt (Q-63). */
+  extraTaskIds: string[];
   taskLabel: string | null;
   /** Proposed label (from the registry or the LLM) before Confirm; a rename is recorded (LOOP-02). */
   chip: { label: string; taskId: string | null; renamed: boolean } | null;
-  clarify: { guesses: { taskId: string; label: string }[] } | null;
+  clarify: { guesses: { taskId: string; label: string }[]; preselected: string[] } | null;
   sameAs: { label: string; candidates: { taskId: string; label: string }[] } | null;
   preview: PreviewItem[];
   separate: SeparateContext[];
@@ -92,6 +97,8 @@ export function newSession(now: number): ActiveSession {
     startedAt: now,
     startFront: { tabId: null, windowId: null, groupId: chrome.tabGroups.TAB_GROUP_ID_NONE },
     taskId: null,
+    taskIds: [],
+    extraTaskIds: [],
     taskLabel: null,
     chip: null,
     clarify: null,

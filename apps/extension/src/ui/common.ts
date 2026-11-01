@@ -51,3 +51,24 @@ export function onStateChange(render: () => void): void {
     if (area === "local" && ("session" in changes || "settings" in changes || "internal" in changes)) render();
   });
 }
+
+/** Brand header with an optional status pill. */
+export function topbar(status?: { text: string; tone?: "live" | "warn" }): HTMLElement {
+  const mark = h("div", { className: "mark", textContent: BRAND.NAME.charAt(0), attrs: { "aria-hidden": "true" } });
+  const brand = h("div", { className: "brand" }, mark, BRAND.NAME);
+  const pill = status ? h("span", { className: `pill${status.tone ? " " + status.tone : ""}`, textContent: status.text }) : null;
+  return h("header", { className: "topbar" }, brand, pill);
+}
+
+export function avatar(domain: string): HTMLElement {
+  return h("div", { className: "avatar", textContent: domain.replace(/^www\./, "").charAt(0) || "?", attrs: { "aria-hidden": "true" } });
+}
+
+export function stat(num: string, label: string): HTMLElement {
+  return h("div", { className: "card stat" }, h("div", { className: "num", textContent: num }), h("div", { className: "lbl", textContent: label }));
+}
+
+/** Items blocked so far: parked tabs plus blocked visits and closed tabs on the restore list. */
+export function blockedCount(s: ActiveSession): number {
+  return Object.keys(s.parked).length + s.restoreList.length;
+}

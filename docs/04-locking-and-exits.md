@@ -55,6 +55,8 @@ Browser settings stay reachable, which is exactly why disabling the extension is
 
 ## LOCK-04 Exit ladder, cheapest first
 
+**Owner change 2026-11-01 (Q-63):** steps 1 (override) and 2 (emergency pass) are removed, and blocks cannot be undone. Step 3 (End) stays, with a **30-second** countdown. The text below is the scope's original ladder, kept for reference.
+
 ```
 1. "This is for my task."    [beta1]
    One sentence of explanation, judged by the LLM (tier 3).

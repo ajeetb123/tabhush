@@ -218,6 +218,17 @@ The owner will not pay for or call a pre-existing LLM, and only wants to spend o
 UT1 entries cover their subdomains (by design), and the lookup follows that. Checked on the real lists 2026-11-01: `amazon.com` is shopping, so `console.aws.amazon.com` is shopping too, and the CLS-21 on-device path can park the AWS console when its title scores s < 0.25 against the task. `developers.facebook.com` (social) has the same issue. Google, Microsoft, GitHub, Notion, Overleaf and course sites are not listed. Options: an exceptions list of work subdomains, exact-host matching for umbrella domains, or rely on user essentials. Docs and editors are the critical category (`05` CLS-05).
 Answer: an **exceptions list** (`CATEGORY_LIST.EXCEPTIONS`): `aws.amazon.com`, `developers.facebook.com`, `developer.amazon.com`, `developer.spotify.com`, `dev.twitch.tv`, `developer.x.com`, `developer.twitter.com`, `studio.youtube.com`, `business.facebook.com`, `sellercentral.amazon.com`. These hosts and their subdomains never take a category from the shipped list, so the on-device path cannot park them; they are still judged and can be asked about. Extend the list by owner decision only.
 
+**Q-63 Owner product changes after the first real run** · **Resolved 2026-11-01 (owner)**
+The owner tried beta 1 in Chrome and changed these. They override the scope where they conflict; each owning doc says so.
+1. **Never ask.** No "Is this for the <task>?" questions (LOOP-05, CLS-25). Pages that are not clear distractions stay open and are flagged quietly. INV-02 is unchanged: a low score alone still never blocks, because people run several tasks at once.
+2. **Clear distractions are blocked**: the pure-distraction list, low-scoring pages in the UT1 games/social/shopping/entertainment lists (CLS-21), and **underground streaming/piracy sites**: UT1 `warez` plus any host containing `streameast` (its domains keep changing). These are blocked for the session.
+3. **Always allowed tools**: Claude (`claude.ai`), ChatGPT (`chatgpt.com`, `chat.openai.com`), Blender (`blender.org`), Stack Overflow (`stackoverflow.com`).
+4. **YouTube browsing is allowed** (home, search, subscriptions, channels); individual videos and Shorts are still judged.
+5. **Music is always allowed at 30% volume**: Spotify (`spotify.com`), YouTube Music (`music.youtube.com`), and YouTube videos whose page metadata says genre `Music` for the video actually playing.
+6. **No overrides and no take-backs.** "This is for my task" (LOCK-04 step 1), the emergency pass (step 2) and the 30-second sweep undo (LOOP-04) are removed. Before anything is blocked, the user can still untick tabs in the sweep preview. **End** stays (LOCK-04 step 3: the product is an accountability tool and must always have a way out).
+7. **End countdown is 30 seconds** (was 120). Reason line still required.
+8. **Several tasks at once** (design delegated to the agent): the "What's this session for?" prompt lets the user pick or type more than one task. A page is related if it is related to any of them. When two or more recent tasks both fit the open tabs (each ≥ 0.60), the prompt opens with them pre-ticked instead of auto-filling one.
+
 **Q-58 Tier 3 cap day boundary** · P1
 `AI_CAPS` are "per install per day" but the backend cannot see local time. The backend counts per UTC day [DERIVED]. Confirm, or decide how the client's day (4am local) should apply.
 

@@ -15,6 +15,7 @@ import {
   EXITS,
   findExact,
   inferTask,
+  taskScore,
   isBail,
   itemDomain,
   itemKeyFor,
@@ -22,6 +23,7 @@ import {
   judge,
   liftedPreBlockDomains,
   LLM,
+  OWNER_RULES,
   shippedCategory,
   MS,
   namedPureDistraction,
@@ -53,7 +55,7 @@ import {
 } from "@lockin/core";
 import { db, idbCacheStore, labels, review, tasks } from "./db";
 import { embed } from "./embedder";
-import { getBankingDomains, getCategoryTable } from "./categories";
+import { getBankingDomains, getCategoryTable, getUndergroundDomains } from "./categories";
 import { getRedactor } from "./lexicon";
 import { installPreBlocks, parkTab, removePreBlocks, sendToTab, unparkTab } from "./enforce";
 import { apply, newSession, saveSession, withSession, type ActiveSession } from "./session";
@@ -71,9 +73,28 @@ function cacheFor(s: ActiveSession | null, configVersion: number): VerdictCache 
   return new VerdictCache(idbCacheStore, { now: Date.now, sessionId: () => s?.id ?? null, configVersion: () => configVersion });
 }
 
-async function tier1Context(): Promise<Tier1Context> {
+// YouTube genre of the video playing in each tab, as reported (and checked against the video ID)
+// by the content script. Used for the always-allowed music rule (Q-63).
+const youtubeMeta = new Map<number, { videoId: string; genre: string | null }>();
+
+function youtubeGenre(tabId: number | undefined, url: string): string | null {
+  if (tabId === undefined) return null;
+  const meta = youtubeMeta.get(tabId);
+  const v = (() => {
+    try {
+      return new URL(url).searchParams.get("v");
+    } catch {
+      return null;
+    }
+  })();
+  return meta && v && meta.videoId === v ? meta.genre : null;
+}
+
+async function tier1Context(tabId?: number, url = ""): Promise<Tier1Context> {
   const settings = await getSettings();
   return {
+    undergroundDomains: await getUndergroundDomains(),
+    youtubeGenre: youtubeGenre(tabId, url),
     essentials: settings.essentials,
     schoolCoursewareDomains: [], // onboarding school domains: beta 2, mapping TODO_Q10
     coursewareFingerprint: false, // page fingerprint method TODO_Q10
@@ -150,11 +171,53 @@ async function ensureLabelVector(task: Task): Promise<Task> {
   return task;
 }
 
-export async function judgeItem(s: ActiveSession, task: Task, url: string, title: string): Promise<{ decision: Decision; key: ItemKey }> {
+/**
+ * The session's task: one task, or several picked together (Q-63). With several, an item's s is
+ * its best s over the tasks, cache keys use the combined ID, and labels go to the closest task.
+ */
+export type SessionTask = Task & { members: Task[] };
+
+function combine(members: Task[]): SessionTask {
+  if (members.length === 1) return { ...members[0]!, members };
+  return {
+    id: members.map((m) => m.id).sort().join("+"),
+    label: members.map((m) => m.label).join(" + "),
+    prototypes: [],
+    createdAt: Math.min(...members.map((m) => m.createdAt)),
+    lastUsedAt: Math.max(...members.map((m) => m.lastUsedAt)),
+    members,
+  };
+}
+
+async function sessionTask(s: ActiveSession): Promise<SessionTask | null> {
+  const ids = s.taskIds.length ? s.taskIds : s.taskId ? [s.taskId] : [];
+  const members = (await Promise.all(ids.map((id) => tasks.get(id)))).filter((t): t is Task => !!t);
+  return members.length ? combine(await Promise.all(members.map(ensureLabelVector))) : null;
+}
+
+async function memberScores(task: SessionTask, url: string, title: string): Promise<{ member: Task; s: number }[]> {
+  const v = await itemVector(url, title);
+  return task.members
+    .filter((m) => m.labelVector)
+    .map((m) => ({ member: m, s: relatedness(v, { label: m.labelVector!, prototypes: m.prototypes.map((p) => p.vector) }) }));
+}
+
+/** The task a label or prototype for this item belongs to. */
+async function memberFor(task: SessionTask, url: string, title: string): Promise<Task> {
+  if (task.members.length === 1) return task.members[0]!;
+  try {
+    const scored = await memberScores(task, url, title);
+    return scored.sort((a, b) => b.s - a.s)[0]?.member ?? task.members[0]!;
+  } catch {
+    return task.members[0]!;
+  }
+}
+
+export async function judgeItem(s: ActiveSession, task: SessionTask, url: string, title: string, tabId?: number): Promise<{ decision: Decision; key: ItemKey }> {
   const key = itemKeyFor(url) ?? { kind: "page", value: url };
   const internal = await getInternal();
   const ready = await tier3Ready();
-  const t1 = tier1(url, await tier1Context());
+  const t1 = tier1(url, await tier1Context(tabId, url));
   // CLS-21 may also use a tier 3 category cached on device from earlier calls (none while Q-61 holds).
   const cachedCategory = (await cacheFor(s, internal.configVersion).lookup(task.id, key))?.tier3?.category ?? null;
   try {
@@ -165,8 +228,9 @@ export async function judgeItem(s: ActiveSession, task: Task, url: string, title
       overridden: cacheKey(task.id, key) in s.overrides,
       cache: cacheFor(s, internal.configVersion),
       relatedness: async () => {
-        if (!task.labelVector) throw new Error("tier 2 unavailable");
-        return relatedness(await itemVector(url, title), { label: task.labelVector, prototypes: task.prototypes.map((p) => p.vector) });
+        const scored = await memberScores(task, url, title);
+        if (!scored.length) throw new Error("tier 2 unavailable");
+        return Math.max(...scored.map((x) => x.s));
       },
       memory: async () => null, // personal memory: beta 2 (CLS-22)
       tier3: ready
@@ -179,7 +243,8 @@ export async function judgeItem(s: ActiveSession, task: Task, url: string, title
       // CLS-21 is used whenever tier 3 is unavailable; moved to beta 1 when the LLM was switched off (Q-61).
       onDeviceParkingPath: ready === null,
       onDeviceCategory: shippedCategory(url, await getCategoryTable()) ?? cachedCategory,
-      askBudgetAvailable: () => askBudgetAvailable(s.asks, Date.now()),
+      // Q-63: never ask; unsure items are allowed and flagged.
+      askBudgetAvailable: () => OWNER_RULES.ASK_ENABLED && askBudgetAvailable(s.asks, Date.now()),
     });
     return { decision, key };
   } catch (e) {
@@ -188,15 +253,17 @@ export async function judgeItem(s: ActiveSession, task: Task, url: string, title
   }
 }
 
-async function addLabel(task: Task, itemKey: string, related: boolean, source: LabelSource, vector?: number[]): Promise<void> {
+async function addLabel(task: SessionTask, itemKey: string, related: boolean, source: LabelSource, url?: string, title = ""): Promise<void> {
   assertLabelSource(source); // INV-13
-  const label: Label = { taskId: task.id, itemKey, related, source, createdAt: Date.now(), ...(vector ? { vector } : {}) };
+  const owner = url ? await memberFor(task, url, title) : task.members[0]!;
+  const label: Label = { taskId: owner.id, itemKey, related, source, createdAt: Date.now() };
   await labels.add(label);
 }
 
-async function seedPrototype(task: Task, url: string, title: string, src: PrototypeSource): Promise<void> {
+async function seedPrototype(task: SessionTask, url: string, title: string, src: PrototypeSource): Promise<void> {
   try {
-    if (addPrototype(task, await itemVector(url, title), src, Date.now())) await tasks.put(task);
+    const owner = await memberFor(task, url, title);
+    if (addPrototype(owner, await itemVector(url, title), src, Date.now())) await tasks.put(owner);
   } catch {
     // tier 2 unavailable: no prototype
   }
@@ -243,6 +310,16 @@ export async function start(): Promise<void> {
       recentTabs.map((t, i) => ({ vector: vectors[i] ?? null, front: t.id === frontTab?.id })),
     );
 
+    // Q-63: when two or more recent tasks both fit the open tabs, ask with them pre-ticked.
+    const tabsForScore = recentTabs.map((t, i) => ({ vector: vectors[i] ?? null, front: t.id === frontTab?.id }));
+    const strong = recent.filter((t) => (taskScore(t, tabsForScore) ?? 0) >= OWNER_RULES.MULTI_TASK_MIN_SCORE);
+    if (strong.length >= 2) {
+      s.clarify = { guesses: strong.map((t) => ({ taskId: t.id, label: t.label })), preselected: strong.map((t) => t.id) };
+      apply(s, { type: "INFER_UNSURE" });
+      await saveSession(s);
+      return;
+    }
+
     if (result.kind === "autofill") {
       s.chip = { label: result.task.label, taskId: result.task.id, renamed: false };
       apply(s, { type: "INFER_CONFIDENT" });
@@ -264,7 +341,7 @@ export async function start(): Promise<void> {
         return;
       }
     }
-    s.clarify = { guesses: result.guesses.map((t) => ({ taskId: t.id, label: t.label })) };
+    s.clarify = { guesses: result.guesses.map((t) => ({ taskId: t.id, label: t.label })), preselected: [] };
     apply(s, { type: "INFER_UNSURE" });
     await saveSession(s);
   });
@@ -300,10 +377,24 @@ async function resolveLabel(s: ActiveSession, label: string): Promise<"resolved"
   return "resolved";
 }
 
-export async function clarify(label: string): Promise<void> {
+/**
+ * The clarify answer: one or several tasks (Q-63). With one, "Same as X?" applies (CLS-31). With
+ * several, each merges with an exact match or becomes a new task.
+ */
+export async function clarify(labelsIn: string[]): Promise<void> {
   await withSession(async (s) => {
-    if (!s || s.state !== "CLARIFY" || !normalizeLabel(label)) return;
-    if ((await resolveLabel(s, label)) === "same_as") return void (await saveSession(s));
+    const labels = [...new Map(labelsIn.filter((l) => normalizeLabel(l)).map((l) => [normalizeLabel(l), l.trim()])).values()];
+    if (!s || s.state !== "CLARIFY" || labels.length === 0) return;
+    s.extraTaskIds = [];
+    if (labels.length === 1) {
+      if ((await resolveLabel(s, labels[0]!)) === "same_as") return void (await saveSession(s));
+    } else {
+      const all = await tasks.all();
+      const resolved: Task[] = [];
+      for (const l of labels) resolved.push(findExact(all, l) ?? (await createTask(l)));
+      s.chip = { label: resolved[0]!.label, taskId: resolved[0]!.id, renamed: false };
+      s.extraTaskIds = resolved.slice(1).map((t) => t.id);
+    }
     s.clarify = null;
     apply(s, { type: "CLARIFY_ANSWERED" });
     await saveSession(s);
@@ -355,8 +446,10 @@ async function chipTask(s: ActiveSession): Promise<Task> {
 // ───────────────────────── Sweep (LOOP-04, CLS-34) ─────────────────────────
 
 async function buildPreview(s: ActiveSession, opts: { clarifyAnswer?: boolean } = {}): Promise<void> {
-  const task = await chipTask(s);
-  s.taskId = task.id;
+  const primary = await chipTask(s);
+  s.taskIds = [primary.id, ...s.extraTaskIds.filter((id) => id !== primary.id)];
+  s.taskId = primary.id;
+  const task = (await sessionTask(s))!;
   s.taskLabel = task.label;
   s.preview = [];
   s.separate = [];
@@ -367,7 +460,7 @@ async function buildPreview(s: ActiveSession, opts: { clarifyAnswer?: boolean } 
   if (opts.clarifyAnswer && frontTab?.url && usableTitle(frontTab)) {
     // LOOP-03: the clarify answer is a strong label.
     const k = itemKeyFor(frontTab.url);
-    if (k) await addLabel(task, cacheKey(task.id, k), true, "clarify");
+    if (k) await addLabel(task, cacheKey(task.id, k), true, "clarify", frontTab.url, frontTab.title ?? "");
   }
 
   const frontGroup = s.startFront.groupId;
@@ -389,7 +482,7 @@ async function buildPreview(s: ActiveSession, opts: { clarifyAnswer?: boolean } 
     if (!tab.id || !tab.url) continue;
     const ctx = contextOf(tab);
     if (ctx) members.set(ctx, [...(members.get(ctx) ?? []), tab]);
-    const { decision, key } = await judgeItem(s, task, tab.url, tab.title ?? "");
+    const { decision, key } = await judgeItem(s, task, tab.url, tab.title ?? "", tab.id);
     if (decision.source === "tier3") s.tier3Uncontested.push({ itemKey: cacheKey(task.id, key), related: decision.action === "allow" });
     // Never-locked pages are allowed for every task, so they are no evidence that a context matches.
     if (decision.action === "allow" && decision.source !== "never_locked" && ctx) related.set(ctx, true);
@@ -463,9 +556,9 @@ async function recordPark(s: ActiveSession, tab: chrome.tabs.Tab, itemKey: strin
 }
 
 async function commit(s: ActiveSession, how: "CONFIRM" | "AUTO_COMMIT"): Promise<void> {
-  const task = await chipTask(s);
+  const task = (await sessionTask(s))!;
   const internal = await getInternal();
-  const canOverride = true; // Q-38: an override is always available, with or without tier 3
+  const canOverride = OWNER_RULES.OVERRIDE_ENABLED; // Q-63: no overrides
   for (const item of s.preview) {
     const tab = await chrome.tabs.get(item.tabId).catch(() => null);
     if (!tab) continue;
@@ -475,7 +568,7 @@ async function commit(s: ActiveSession, how: "CONFIRM" | "AUTO_COMMIT"): Promise
       // A keep: strong related label, prototype, cached allow (LOOP-04, CLS-32).
       const key = itemKeyFor(item.url);
       if (key) await cacheFor(s, internal.configVersion).record(task.id, key, { decision: "allow" });
-      await addLabel(task, item.itemKey, true, "sweep_keep");
+      await addLabel(task, item.itemKey, true, "sweep_keep", item.url, item.title);
       await seedPrototype(task, item.url, item.title, { kind: "sweep_keep" });
     }
   }
@@ -495,8 +588,10 @@ async function commit(s: ActiveSession, how: "CONFIRM" | "AUTO_COMMIT"): Promise
     }
   }
   await installPreBlocks(s.liftedDomains);
-  task.lastUsedAt = Date.now();
-  await tasks.put(task);
+  for (const m of task.members) {
+    m.lastUsedAt = Date.now();
+    await tasks.put(m);
+  }
   s.committedAt = Date.now();
   apply(s, { type: how });
   await setInternal({ committedSessions: internal.committedSessions + 1 });
@@ -506,9 +601,10 @@ async function commit(s: ActiveSession, how: "CONFIRM" | "AUTO_COMMIT"): Promise
 
 /** Every sweep has a 30-second undo that restores all items it parked (LOOP-04). */
 export async function undo(): Promise<void> {
+  if (!OWNER_RULES.SWEEP_UNDO_ENABLED) return; // Q-63: no take-backs
   await withSession(async (s) => {
     if (s?.state !== "ACTIVE" || s.committedAt === null || !undoOpen(s.committedAt, Date.now())) return;
-    const task = await chipTask(s);
+    const task = (await sessionTask(s))!;
     const internal = await getInternal();
     for (const [id, p] of Object.entries(s.parked)) {
       if (!p.bySweep) continue;
@@ -528,25 +624,42 @@ export async function undo(): Promise<void> {
 
 const lastJudged = new Map<number, string>();
 
+const musicTabs = new Set<number>();
+
+/** YouTube genre for the playing video, reported by the content script (Q-63 music rule). */
+export async function onYoutubeMeta(tab: chrome.tabs.Tab, videoId: string, genre: string | null): Promise<void> {
+  if (!tab.id) return;
+  youtubeMeta.set(tab.id, { videoId, genre });
+  await onTabChanged(tab);
+}
+
 export async function onTabChanged(tab: chrome.tabs.Tab): Promise<void> {
   if (!tab.id || !tab.url) return;
-  const fingerprint = `${tab.url}\n${tab.title ?? ""}`;
+  const fingerprint = `${tab.url}\n${tab.title ?? ""}\n${youtubeGenre(tab.id, tab.url) ?? ""}`;
   if (lastJudged.get(tab.id) === fingerprint) return;
   lastJudged.set(tab.id, fingerprint);
   await withSession(async (s) => {
     if (s?.state !== "ACTIVE" || !s.taskId) return;
-    const task = await tasks.get(s.taskId);
+    const task = await sessionTask(s);
     if (!task) return;
-    const { decision, key } = await judgeItem(s, task, tab.url!, tab.title ?? "");
+    const { decision, key } = await judgeItem(s, task, tab.url!, tab.title ?? "", tab.id);
     const k = cacheKey(task.id, key);
     const parked = s.parked[String(tab.id)];
     if (decision.source === "tier3") s.tier3Uncontested.push({ itemKey: k, related: decision.action === "allow" });
     if (decision.tier3Failed) s.limited = true;
 
+    // Q-63: music is always allowed, at a lower volume.
+    if (decision.source === "music") {
+      musicTabs.add(tab.id!);
+      await sendToTab(tab.id!, { type: "music:on", volume: OWNER_RULES.MUSIC_VOLUME });
+    } else if (musicTabs.delete(tab.id!)) {
+      await sendToTab(tab.id!, { type: "music:off" });
+    }
+
     if (decision.action === "park") {
       if (parked?.itemKey === k) return;
       if (parked) delete s.parked[String(tab.id)];
-      await recordPark(s, tab, k, decision.source, false, true);
+      await recordPark(s, tab, k, decision.source, false, OWNER_RULES.OVERRIDE_ENABLED);
     } else {
       if (parked) {
         // The tab moved to an item that is allowed (e.g. SPA navigation, LOOP-05).
@@ -570,6 +683,8 @@ export async function onTabChanged(tab: chrome.tabs.Tab): Promise<void> {
 
 export function forgetTab(tabId: number): void {
   lastJudged.delete(tabId);
+  youtubeMeta.delete(tabId);
+  musicTabs.delete(tabId);
   void withSession(async (s) => {
     if (!s) return;
     delete s.parked[String(tabId)];
@@ -583,16 +698,16 @@ export async function answerAsk(tab: chrome.tabs.Tab, isRelated: boolean): Promi
   await withSession(async (s) => {
     if (s?.state !== "ACTIVE" || !s.taskId || !tab.id || !tab.url) return;
     const k = s.pendingAsk[String(tab.id)];
-    const task = await tasks.get(s.taskId);
+    const task = await sessionTask(s);
     const key = itemKeyFor(tab.url);
     if (!k || !task || !key) return;
     delete s.pendingAsk[String(tab.id)];
     await sendToTab(tab.id, { type: "ask:hide" });
     const internal = await getInternal();
     await cacheFor(s, internal.configVersion).record(task.id, key, { decision: isRelated ? "allow" : "park" });
-    await addLabel(task, k, isRelated, "ask_answer");
+    await addLabel(task, k, isRelated, "ask_answer", tab.url, tab.title ?? "");
     if (isRelated) await seedPrototype(task, tab.url, tab.title ?? "", { kind: "accepted_item" });
-    else await recordPark(s, tab, k, "ask", false, true);
+    else await recordPark(s, tab, k, "ask", false, OWNER_RULES.OVERRIDE_ENABLED);
     await saveSession(s);
   });
 }
@@ -652,10 +767,11 @@ async function refuseOverride(task: Task, url: string, title: string, sentence: 
 }
 
 export async function override(tab: chrome.tabs.Tab, sentence: string): Promise<OverrideOutcome> {
+  if (!OWNER_RULES.OVERRIDE_ENABLED) return "unavailable"; // Q-63: once blocked, it stays blocked
   return withSession(async (s) => {
     if (s?.state !== "ACTIVE" || !s.taskId || !tab.id || !tab.url) return "unavailable";
     const parked = s.parked[String(tab.id)];
-    const task = await tasks.get(s.taskId);
+    const task = await sessionTask(s);
     if (!parked || !task || !sentence.trim()) return "unavailable";
     const { verdict, judged } = await judgeOverride(task.label, tab.url, tab.title ?? "", sentence);
     let outcome: OverrideOutcome = "unavailable";
@@ -689,9 +805,9 @@ export async function onInputCounts(tab: chrome.tabs.Tab, minuteStart: number, c
     counter.addInputEvents(count, minuteStart);
     o.activity = counter.toJSON();
     if (counter.qualifiesForLabel()) {
-      const task = await tasks.get(s.taskId);
+      const task = await sessionTask(s);
       if (task) {
-        await addLabel(task, o.itemKey, true, "override_after_active_minutes");
+        await addLabel(task, o.itemKey, true, "override_after_active_minutes", o.url, o.title);
         await seedPrototype(task, o.url, o.title, { kind: "override_after_active_minutes" });
       }
       o.labeled = true;
@@ -702,9 +818,10 @@ export async function onInputCounts(tab: chrome.tabs.Tab, minuteStart: number, c
 
 /** Override from the blocked page of a pure-distraction domain (CLS-55): the only way to lift it. */
 export async function overrideBlocked(url: string, sentence: string): Promise<OverrideOutcome> {
+  if (!OWNER_RULES.OVERRIDE_ENABLED) return "unavailable"; // Q-63
   return withSession(async (s) => {
     if (s?.state !== "ACTIVE" || !s.taskId || !sentence.trim()) return "unavailable";
-    const task = await tasks.get(s.taskId);
+    const task = await sessionTask(s);
     const parsed = parseUrl(url);
     if (!task || !parsed || !pureDistractionDomain(parsed)) return "unavailable";
     const { verdict, judged } = await judgeOverride(task.label, url, "", sentence);
@@ -795,7 +912,7 @@ export async function finishEnd(): Promise<void> {
 /** Weak labels at End: parks and tier 3 verdicts nobody contested (CLS-60). Bails write none. */
 async function writeUncontestedLabels(s: ActiveSession): Promise<void> {
   if (!s.taskId || s.bail) return;
-  const task = await tasks.get(s.taskId);
+  const task = await sessionTask(s);
   if (!task) return;
   const contested = new Set(Object.keys(s.overrides));
   const parkedKeys = new Set(Object.values(s.parked).map((p) => p.itemKey));

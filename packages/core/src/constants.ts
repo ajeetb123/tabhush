@@ -56,7 +56,7 @@ export const EXITS = {
   PASS_DURATION_MIN: 10, // [START]
   PASS_WAIT_SEC: 30, // [START]
   PASSES_PER_DAY: 2, // [START]
-  END_COUNTDOWN_SEC: 120, // [START]
+  END_COUNTDOWN_SEC: 30, // owner 2026-11-01 (Q-63; scope start value was 120)
   BAIL_WINDOW_SEC: 120,
   OVERRIDE_WITHOUT_TIER3: "accept_and_log", // Q-38 (owner 2026-10-31)
 } as const;
@@ -259,6 +259,20 @@ export const REDACTION = {
 } as const;
 
 // ───────────────────────── Shipped domain-category list (docs/05 CLS-10, Q-08, Q-48) ─────────────────────────
+// ───────────────────────── Owner rules (Q-63, 2026-11-01) ─────────────────────────
+export const OWNER_RULES = {
+  ASK_ENABLED: false as boolean, // never ask "Is this for the <task>?"; unsure items are allowed and flagged
+  OVERRIDE_ENABLED: false as boolean, // no "This is for my task", no emergency pass
+  SWEEP_UNDO_ENABLED: false as boolean, // blocks cannot be taken back; untick in the preview instead
+  ALWAYS_ALLOWED_TOOLS: ["claude.ai", "chatgpt.com", "chat.openai.com", "blender.org", "stackoverflow.com"],
+  MUSIC_SITES: ["spotify.com", "music.youtube.com"],
+  MUSIC_YOUTUBE_GENRE: "Music", // YouTube's own genre metadata for the playing video
+  MUSIC_VOLUME: 0.3,
+  UNDERGROUND_LIST: "warez", // UT1 category, blocked for the session
+  UNDERGROUND_HOST_KEYWORDS: ["streameast"],
+  MULTI_TASK_MIN_SCORE: 0.6, // two recent tasks this strong → ask with both pre-ticked
+} as const;
+
 export const CATEGORY_LIST = {
   SOURCE: "UT1 web blacklists, Université Toulouse Capitole",
   LICENSE: "CC BY-SA 4.0",

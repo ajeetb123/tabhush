@@ -16,6 +16,10 @@ export type Action = "allow" | "park" | "ask" | "allow_and_flag";
 export type DecisionSource =
   | "never_locked"
   | "essential"
+  | "tool"
+  | "music"
+  | "browse"
+  | "underground"
   | "override"
   | "cache"
   | "distraction"
@@ -65,6 +69,11 @@ export async function judge(d: JudgeDeps): Promise<Decision> {
 
   if (d.tier1.kind === "never_locked") return { action: "allow", source: "never_locked" };
   if (d.tier1.kind === "essential") return { action: "allow", source: "essential" };
+  // Owner rules (Q-63), ahead of the cache so a stale verdict can never contradict them.
+  if (d.tier1.kind === "underground") return { action: "park", source: "underground" };
+  if (d.tier1.kind === "tool_allow") return { action: "allow", source: "tool" };
+  if (d.tier1.kind === "music") return { action: "allow", source: "music" };
+  if (d.tier1.kind === "browse_allow") return { action: "allow", source: "browse" };
   if (d.overridden) return { action: "allow", source: "override" };
 
   const cached = await d.cache.lookup(d.taskId, d.itemKey);

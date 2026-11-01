@@ -22,6 +22,10 @@ Current phase: **beta 1** (`docs/13-release-scope.md`). Nothing from beta 2 or l
 | Exit ladder: override, End | Built | Without tier 3 an override is accepted for the session and logged as "not checked" (Q-38). |
 | Review export, refused-override logging | Logging built, export gated | Format Q-28. |
 
+## Owner changes after the first real run (Q-63, 2026-11-01)
+
+No questions, no override, no undo; End has a 30-second countdown. Clear distractions (pure-distraction list, low-scoring UT1 games/social/shopping/video pages, UT1 warez and `streameast` hosts) are blocked; everything else stays open. Claude, ChatGPT, Blender and Stack Overflow are always allowed; YouTube browsing is allowed and videos are judged; music (Spotify, YouTube Music, YouTube videos labelled Music) plays at 30%. A session can cover several tasks. All pages and the overlay were redesigned.
+
 ## Backend (beta 1 subset)
 
 Install tokens with PoW (Q-06), tier 3 proxy with fixed prompts and strict schema, Free daily cap per UTC day (Q-58), telemetry intake, delete-my-data. Not built: IP rate limits, waves and the global dollar limit (Q-07), remote config (beta 2), licenses (v1), contributions.

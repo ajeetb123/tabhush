@@ -70,14 +70,14 @@ describe("QA-30 accessible overlay", () => {
     const root = content.shadowRootForTests()!;
     const dialog = root.querySelector('[role="dialog"]')!;
     expect(dialog.getAttribute("aria-modal")).toBe("true");
-    expect(root.getElementById(dialog.getAttribute("aria-labelledby")!)?.textContent).toBe("Parked for this session");
+    expect(root.getElementById(dialog.getAttribute("aria-labelledby")!)?.textContent).toBe("Blocked for this session");
     expect(root.activeElement?.tagName).toBe("BUTTON");
   });
 
   it("keeps Tab focus inside the overlay", () => {
     listener!({ type: "overlay:show", taskLabel: "Lab report", canOverride: true }, {}, () => undefined);
     const root = content.shadowRootForTests()!;
-    const buttons = [...root.querySelectorAll<HTMLButtonElement>("button")].filter((b) => !b.hidden);
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>("button")].filter((b) => !b.hidden && !b.closest("[hidden]"));
     buttons[buttons.length - 1]!.focus();
     const ev = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
     buttons[buttons.length - 1]!.dispatchEvent(ev);

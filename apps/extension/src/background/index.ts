@@ -17,6 +17,7 @@ import {
   onBlockedVisit,
   onInputCounts,
   onTabChanged,
+  onYoutubeMeta,
   override,
   overrideBlocked,
   rename,
@@ -97,6 +98,8 @@ chrome.runtime.onMessage.addListener((msg: FromUi | FromContent | { target?: str
       return tab ? done(onInputCounts(tab, m.minuteStart, m.count)) : false;
     case "ask:answer":
       return tab ? done(answerAsk(tab, m.related)) : false;
+    case "youtube:meta":
+      return tab ? done(onYoutubeMeta(tab, m.videoId, m.genre)) : false;
     case "check:answer":
       return tab ? done(answerParkCheck(tab, m.right)) : false;
     case "override:submit":
@@ -113,7 +116,7 @@ chrome.runtime.onMessage.addListener((msg: FromUi | FromContent | { target?: str
     case "ui:rename":
       return done(rename(m.label));
     case "ui:clarify":
-      return done(clarify(m.label));
+      return done(clarify(m.labels));
     case "ui:sameAs":
       return done(sameAs(m.taskId));
     case "ui:separate":

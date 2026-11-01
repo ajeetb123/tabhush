@@ -19,6 +19,7 @@ describe("build-categories (Q-08, Q-48)", () => {
     put("shopping", "etsy.com\n");
     put("audio-video", "example-video.com\n");
     put("bank", "mybank.com\n");
+    put("warez", "streameast.xyz\n");
     put("adult", "should-not-ship.com\n");
     const out = join(dir, "out");
     execFileSync("node", [script, "--from", dir, "--out", out]);
@@ -26,6 +27,7 @@ describe("build-categories (Q-08, Q-48)", () => {
     expect(readFileSync(join(out, "entertainment.txt"), "utf8")).toBe("example-video.com\n");
     expect(readFileSync(join(out, "social.txt"), "utf8")).toBe("example-social.com\n");
     expect(readFileSync(join(out, "banking.txt"), "utf8")).toBe("mybank.com\n");
+    expect(readFileSync(join(out, "underground.txt"), "utf8")).toBe("streameast.xyz\n");
     const notice = readFileSync(join(out, "NOTICE.txt"), "utf8");
     expect(notice).toContain("CC BY-SA 4.0");
     expect(notice).toContain("Université Toulouse Capitole");

@@ -52,7 +52,7 @@ export const EXITS = {
   PASS_DURATION_MIN: 10,                // [START] emergency pass unlocks ONE item
   PASS_WAIT_SEC: 30,                    // [START]
   PASSES_PER_DAY: 2,                    // [START]
-  END_COUNTDOWN_SEC: 120,               // [START] plus a one-line reason; session marked "ended early"
+  END_COUNTDOWN_SEC: 30,                // owner 2026-11-01 (Q-63; was 120) plus a one-line reason; "ended early"
   BAIL_WINDOW_SEC: 120,                 // emergency pass or early end within 2 min of a park = bail
   OVERRIDE_WITHOUT_TIER3: "accept_and_log", // Q-38 (owner 2026-10-31)
 };
@@ -250,6 +250,20 @@ export const CATEGORY_LIST = {
     "dev.twitch.tv", "developer.x.com", "developer.twitter.com", "studio.youtube.com",
     "business.facebook.com", "sellercentral.amazon.com",
   ],
+};
+
+// ───────────────────────── Owner rules (Q-63, 2026-11-01) ─────────────────────────
+export const OWNER_RULES = {
+  ASK_ENABLED: false,                   // never ask "Is this for the <task>?"; unsure items are allowed and flagged
+  OVERRIDE_ENABLED: false,              // no "This is for my task", no emergency pass
+  SWEEP_UNDO_ENABLED: false,            // blocks cannot be taken back; untick in the preview instead
+  ALWAYS_ALLOWED_TOOLS: ["claude.ai", "chatgpt.com", "chat.openai.com", "blender.org", "stackoverflow.com"],
+  MUSIC_SITES: ["spotify.com", "music.youtube.com"],
+  MUSIC_YOUTUBE_GENRE: "Music",         // YouTube's own genre metadata for the playing video
+  MUSIC_VOLUME: 0.3,
+  UNDERGROUND_LIST: "warez",            // UT1 category, blocked for the session
+  UNDERGROUND_HOST_KEYWORDS: ["streameast"],
+  MULTI_TASK_MIN_SCORE: 0.60,           // = INFERENCE.AUTOFILL_MIN_SCORE: two recent tasks this strong → ask with both pre-ticked
 };
 
 // ───────────────────────── Shared domain prior (docs/05, docs/06) ─────────────────────────

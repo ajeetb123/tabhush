@@ -2,6 +2,8 @@
 // reloading or unloading it (INV-17), pauses media and re-pauses it on every play event, and
 // reports input COUNTS only, never content (INV-07). Accessible: labelled dialog, focus kept
 // inside, full keyboard control, no motion (QA-30).
+// Owner rules (Q-63): allowed music plays at a lower volume; YouTube's genre for the playing
+// video is reported so music can be recognized.
 
 import { BRAND, MS } from "@lockin/core";
 import type { FromContent, ToContent } from "../shared/messages";
@@ -20,24 +22,53 @@ function send(msg: FromContent): void {
 
 const STYLE = `
 :host { all: initial; }
-.backdrop { position: fixed; inset: 0; z-index: 2147483647; background: #111; color: #f5f5f5;
-  display: flex; align-items: center; justify-content: center;
-  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-@media (prefers-color-scheme: light) { .backdrop { background: #fafafa; color: #111; } }
-.card { max-width: 28rem; padding: 2rem; }
-h1 { font-size: 1.4rem; margin: 0 0 .5rem; }
-p { margin: .5rem 0; }
+* { box-sizing: border-box; transition: none !important; animation: none !important; }
+.backdrop {
+  position: fixed; inset: 0; z-index: 2147483647;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: radial-gradient(1200px 600px at 50% -10%, #2a2f6b 0%, #12131a 55%, #0b0c10 100%);
+  color: #eef0f6;
+  font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.card {
+  width: min(440px, 100%); padding: 32px 30px 26px; border-radius: 22px;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+  box-shadow: 0 30px 80px rgba(0,0,0,.45); text-align: center;
+}
+.mark {
+  width: 52px; height: 52px; margin: 0 auto 18px; border-radius: 15px;
+  display: grid; place-items: center; font-weight: 800; font-size: 22px; color: #fff;
+  background: linear-gradient(135deg, #7c83ff, #5b5bf7 55%, #3b3bd1);
+  box-shadow: 0 8px 24px rgba(91,91,247,.45);
+}
+h1 { font-size: 22px; line-height: 1.25; margin: 0 0 8px; font-weight: 700; letter-spacing: -.01em; }
+p { margin: 6px 0; color: #b9bdcc; }
+.task {
+  display: inline-block; margin: 12px 0 4px; padding: 6px 14px; border-radius: 999px;
+  background: rgba(124,131,255,.16); border: 1px solid rgba(124,131,255,.45); color: #dfe1ff; font-weight: 600;
+}
+.note { margin-top: 14px; font-size: 13px; color: #9aa0b4; }
+.actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 22px; }
 button, textarea { font: inherit; }
-button { margin: .75rem .5rem 0 0; padding: .5rem 1rem; border-radius: .4rem; border: 1px solid currentColor;
-  background: transparent; color: inherit; cursor: pointer; }
-button:focus-visible, textarea:focus-visible { outline: 3px solid #4c9ffe; outline-offset: 2px; }
-textarea { width: 100%; box-sizing: border-box; margin-top: .75rem; padding: .5rem; border-radius: .4rem;
-  border: 1px solid currentColor; background: transparent; color: inherit; }
-.note { opacity: .8; }
-.ask { position: fixed; top: 0; left: 0; right: 0; z-index: 2147483647; display: flex; gap: .75rem; align-items: center;
-  padding: .5rem 1rem; background: #111; color: #f5f5f5; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
-.ask button { margin: 0; padding: .25rem .75rem; }
-* { transition: none !important; animation: none !important; }
+button {
+  padding: 10px 18px; border-radius: 12px; cursor: pointer; font-weight: 600;
+  border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: #eef0f6;
+}
+button.primary { background: #5b5bf7; border-color: #5b5bf7; color: #fff; }
+button:focus-visible, textarea:focus-visible { outline: 3px solid #a5a9ff; outline-offset: 2px; }
+textarea {
+  width: 100%; margin-top: 12px; padding: 10px 12px; border-radius: 12px; resize: vertical;
+  border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.25); color: inherit;
+}
+.check { margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.1); }
+.check p { margin-bottom: 8px; color: #dfe1ff; }
+.ask {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 2147483647;
+  display: flex; gap: 10px; align-items: center; padding: 10px 12px 10px 16px; border-radius: 14px;
+  background: #15161d; color: #eef0f6; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 12px 40px rgba(0,0,0,.35);
+  font: 14px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.ask button { padding: 6px 12px; border-radius: 10px; }
 `;
 
 let host: HTMLElement | null = null;
@@ -56,16 +87,26 @@ function ensureHost(): ShadowRoot {
   return shadow;
 }
 
-function clear(selector: string): void {
-  shadow?.querySelectorAll(selector).forEach((n) => n.remove());
-}
-
 /** The closed shadow root is unreachable from the page; tests read it through this. */
 export function shadowRootForTests(): ShadowRoot | null {
   return shadow;
 }
 
+function clear(selector: string): void {
+  shadow?.querySelectorAll(selector).forEach((n) => n.remove());
+}
+
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}): HTMLElementTagNameMap[K] {
+  return Object.assign(document.createElement(tag), props);
+}
+
 // ───────────────────────── media ─────────────────────────
+
+let musicVolume: number | null = null;
+
+function lowerVolume(m: HTMLMediaElement): void {
+  if (musicVolume !== null && m.volume > musicVolume) m.volume = musicVolume;
+}
 
 function pauseAll(): void {
   document.querySelectorAll<HTMLMediaElement>("video, audio").forEach((m) => {
@@ -74,11 +115,14 @@ function pauseAll(): void {
   if (document.pictureInPictureElement) void document.exitPictureInPicture().catch(() => undefined);
 }
 
-// Capturing listener: re-pause on every play event while parked (covers PiP and media keys).
+// Capturing listener: re-pause on every play event while parked (covers PiP and media keys);
+// for allowed music, start each new track at the lower volume.
 document.addEventListener(
   "play",
   (e) => {
-    if (parked && e.target instanceof HTMLMediaElement) e.target.pause();
+    if (!(e.target instanceof HTMLMediaElement)) return;
+    if (parked) e.target.pause();
+    else lowerVolume(e.target);
   },
   true,
 );
@@ -89,7 +133,7 @@ function trapFocus(container: HTMLElement): void {
   container.addEventListener("keydown", (e) => {
     e.stopPropagation(); // keys never reach the page underneath
     if (e.key !== "Tab") return;
-    const items = [...container.querySelectorAll<HTMLElement>("button, textarea")].filter((el) => !el.hidden);
+    const items = [...container.querySelectorAll<HTMLElement>("button, textarea")].filter((n) => !n.hidden && !n.closest("[hidden]"));
     if (items.length === 0) return;
     const first = items[0]!;
     const last = items[items.length - 1]!;
@@ -109,90 +153,79 @@ export function showOverlay(taskLabel: string, canOverride: boolean, overrideNot
   pauseAll();
   const root = ensureHost();
   clear(".backdrop");
-  const backdrop = document.createElement("div");
-  backdrop.className = "backdrop";
+  const backdrop = el("div", { className: "backdrop" });
   backdrop.setAttribute("role", "dialog");
   backdrop.setAttribute("aria-modal", "true");
   backdrop.setAttribute("aria-labelledby", "lockin-title");
   backdrop.setAttribute("aria-describedby", "lockin-desc");
-  const card = document.createElement("div");
-  card.className = "card";
-  const h1 = document.createElement("h1");
-  h1.id = "lockin-title";
-  h1.textContent = "Parked for this session";
-  const desc = document.createElement("p");
-  desc.id = "lockin-desc";
-  desc.textContent = `${BRAND.NAME} parked this page because it doesn’t look related to “${taskLabel}”. The page is kept as it was underneath.`;
-  card.append(h1, desc);
+  const card = el("div", { className: "card" });
+  const mark = el("div", { className: "mark", textContent: BRAND.NAME.charAt(0) });
+  mark.setAttribute("aria-hidden", "true");
+  const h1 = el("h1", { id: "lockin-title", textContent: "Blocked for this session" });
+  const desc = el("p", {
+    id: "lockin-desc",
+    textContent: "This doesn’t look like part of what you’re locked in on. It’s paused and kept as it was, and it opens again when the session ends.",
+  });
+  const task = el("div", { className: "task", textContent: taskLabel });
+  card.append(mark, h1, desc, task);
   if (overrideNote) {
-    const note = document.createElement("p");
-    note.className = "note";
+    const note = el("p", { className: "note", textContent: overrideNote });
     note.setAttribute("role", "status");
-    note.textContent = overrideNote;
     card.append(note);
   }
 
-  if (sampledCheck) {
-    const check = document.createElement("div");
-    check.setAttribute("role", "group");
-    check.setAttribute("aria-label", "Was this park right?");
-    const q = document.createElement("p");
-    q.textContent = "Was this park right?";
-    check.append(q);
-    for (const [label, right] of [["Yes", true], ["No", false]] as const) {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.textContent = label;
-      b.addEventListener("click", () => {
-        send({ type: "check:answer", right });
-        check.remove();
-      });
-      check.append(b);
-    }
-    card.append(check);
-  }
-
-  const form = document.createElement("form");
-  const label = document.createElement("label");
-  label.textContent = "Why is this for your task? (one sentence)";
-  const text = document.createElement("textarea");
-  text.rows = 2;
-  text.required = true;
-  label.append(text);
-  const submit = document.createElement("button");
-  submit.type = "submit";
-  submit.textContent = "Submit";
-  form.append(label, submit);
-  form.hidden = true;
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const sentence = text.value.replace(/\s+/g, " ").trim();
-    if (sentence) send({ type: "override:submit", sentence });
-  });
-
+  const actions = el("div", { className: "actions" });
+  card.append(actions);
   if (canOverride) {
-    const forTask = document.createElement("button");
-    forTask.type = "button";
-    forTask.textContent = "This is for my task";
+    const form = el("form");
+    form.hidden = true;
+    const text = el("textarea", { rows: 2, required: true, placeholder: "Why is this for your task? (one sentence)" });
+    text.setAttribute("aria-label", "Why is this for your task? (one sentence)");
+    const row = el("div", { className: "actions" });
+    row.append(el("button", { type: "submit", className: "primary", textContent: "Submit" }));
+    form.append(text, row);
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const sentence = text.value.replace(/\s+/g, " ").trim();
+      if (sentence) send({ type: "override:submit", sentence });
+    });
+    const forTask = el("button", { type: "button", textContent: "This is for my task" });
     forTask.addEventListener("click", () => {
       form.hidden = false;
       forTask.hidden = true;
       text.focus();
     });
-    card.append(forTask, form);
+    actions.append(forTask);
+    card.append(form);
   }
-  const end = document.createElement("button");
-  end.type = "button";
-  end.textContent = "End session…";
+  const end = el("button", { type: "button", textContent: "End session…" });
   end.addEventListener("click", () => send({ type: "open:session" }));
-  card.append(end);
+  actions.append(end);
+
+  if (sampledCheck) {
+    const check = el("div", { className: "check" });
+    check.setAttribute("role", "group");
+    check.setAttribute("aria-label", "Was this park right?");
+    check.append(el("p", { textContent: "Was this the right call?" }));
+    const row = el("div", { className: "actions" });
+    for (const [label, right] of [["Yes", true], ["No", false]] as const) {
+      const b = el("button", { type: "button", textContent: label });
+      b.addEventListener("click", () => {
+        send({ type: "check:answer", right });
+        check.remove();
+      });
+      row.append(b);
+    }
+    check.append(row);
+    card.append(check);
+  }
 
   backdrop.append(card);
   // The page underneath must not scroll or receive pointer input while parked.
   for (const type of ["wheel", "touchmove"]) backdrop.addEventListener(type, (e) => e.preventDefault(), { passive: false });
   trapFocus(backdrop);
   root.append(backdrop);
-  (card.querySelector("button") as HTMLButtonElement | null)?.focus();
+  card.querySelector<HTMLButtonElement>("button:not([hidden])")?.focus();
 }
 
 export function hideOverlay(): void {
@@ -200,28 +233,38 @@ export function hideOverlay(): void {
   clear(".backdrop");
 }
 
-// ───────────────────────── ask ─────────────────────────
+// ───────────────────────── ask (switched off by the owner, Q-63) ─────────────────────────
 
 export function showAsk(taskLabel: string): void {
   const root = ensureHost();
   clear(".ask");
-  const bar = document.createElement("div");
-  bar.className = "ask";
+  const bar = el("div", { className: "ask" });
   bar.setAttribute("role", "region");
   bar.setAttribute("aria-label", `${BRAND.NAME} question`);
   bar.setAttribute("aria-live", "polite");
-  const q = document.createElement("span");
-  q.textContent = `Is this for the ${taskLabel}?`;
-  const yes = document.createElement("button");
-  yes.type = "button";
-  yes.textContent = "Yes";
+  const yes = el("button", { type: "button", textContent: "Yes" });
   yes.addEventListener("click", () => send({ type: "ask:answer", related: true }));
-  const no = document.createElement("button");
-  no.type = "button";
-  no.textContent = "No";
+  const no = el("button", { type: "button", textContent: "No" });
   no.addEventListener("click", () => send({ type: "ask:answer", related: false }));
-  bar.append(q, yes, no);
+  bar.append(el("span", { textContent: `Is this for ${taskLabel}?` }), yes, no);
   root.append(bar);
+}
+
+// ───────────────────────── YouTube genre (Q-63 music rule) ─────────────────────────
+
+let lastYoutube = "";
+
+/** Reports YouTube's genre for the playing video, only when the page's metadata is for that video. */
+function reportYoutube(): void {
+  if (!/(^|\.)youtube\.com$/.test(location.hostname)) return;
+  const v = new URLSearchParams(location.search).get("v");
+  if (!v) return;
+  const id = document.querySelector('meta[itemprop="identifier"]')?.getAttribute("content");
+  const genre = id === v ? (document.querySelector('meta[itemprop="genre"]')?.getAttribute("content") ?? null) : null;
+  const key = `${v}|${genre}`;
+  if (key === lastYoutube) return;
+  lastYoutube = key;
+  send({ type: "youtube:meta", videoId: v, genre });
 }
 
 // ───────────────────────── input counts (CLS-62) ─────────────────────────
@@ -261,9 +304,19 @@ if (!window.__lockinContentLoaded) {
       case "ask:hide":
         clear(".ask");
         break;
+      case "music:on":
+        musicVolume = msg.volume;
+        document.querySelectorAll<HTMLMediaElement>("video, audio").forEach(lowerVolume);
+        break;
+      case "music:off":
+        musicVolume = null;
+        break;
     }
     sendResponse(true);
     return false;
   });
   send({ type: "content:ready" });
+  reportYoutube();
+  // YouTube changes pages without reloading; re-check its metadata when the head changes.
+  if (document.head) new MutationObserver(reportYoutube).observe(document.head, { childList: true, subtree: true, attributes: true });
 }

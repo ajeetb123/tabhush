@@ -29,6 +29,14 @@ export function getCategoryTable(): Promise<ReadonlyMap<string, Category>> {
   return table;
 }
 
+let underground: Promise<ReadonlySet<string>> | null = null;
+
+/** UT1 warez domains: underground streaming and piracy, blocked for the session (Q-63). */
+export function getUndergroundDomains(): Promise<ReadonlySet<string>> {
+  underground ??= readList("categories/underground.txt").then((l) => new Set(l));
+  return underground;
+}
+
 export function getBankingDomains(): Promise<ReadonlySet<string>> {
   banking ??= readList("categories/banking.txt").then((l) => new Set(l));
   return banking;

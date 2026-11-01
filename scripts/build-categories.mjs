@@ -7,7 +7,7 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { CATEGORY_LIST } from "../packages/core/src/constants.ts";
+import { CATEGORY_LIST, OWNER_RULES } from "../packages/core/src/constants.ts";
 
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`);
@@ -36,6 +36,9 @@ for (const [ut1, ours] of Object.entries(CATEGORY_LIST.MAPPING)) {
   writeFileSync(join(outDir, `${ours}.txt`), list.join("\n") + "\n");
   written.push(`${ours}.txt  ${list.length} domains  (UT1 ${ut1})`);
 }
+const underground = await domainsOf(OWNER_RULES.UNDERGROUND_LIST);
+writeFileSync(join(outDir, "underground.txt"), underground.join("\n") + "\n");
+written.push(`underground.txt  ${underground.length} domains  (UT1 ${OWNER_RULES.UNDERGROUND_LIST}, Q-63)`);
 const bank = await domainsOf(CATEGORY_LIST.BANKING);
 writeFileSync(join(outDir, "banking.txt"), bank.join("\n") + "\n");
 written.push(`banking.txt  ${bank.length} domains  (UT1 ${CATEGORY_LIST.BANKING})`);
@@ -50,8 +53,8 @@ at commit ${CATEGORY_LIST.MIRROR_COMMIT}.
 Licensed under Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0),
 https://creativecommons.org/licenses/by-sa/4.0/. These adapted lists are shared under the same license.
 
-Changes: only the categories ${Object.keys(CATEGORY_LIST.MAPPING).join(", ")} and ${CATEGORY_LIST.BANKING} are kept;
-they are renamed ${Object.entries(CATEGORY_LIST.MAPPING).map(([a, b]) => `${a} -> ${b}`).join(", ")}, ${CATEGORY_LIST.BANKING} -> banking;
+Changes: only the categories ${Object.keys(CATEGORY_LIST.MAPPING).join(", ")}, ${OWNER_RULES.UNDERGROUND_LIST} and ${CATEGORY_LIST.BANKING} are kept;
+they are renamed ${Object.entries(CATEGORY_LIST.MAPPING).map(([a, b]) => `${a} -> ${b}`).join(", ")}, ${OWNER_RULES.UNDERGROUND_LIST} -> underground, ${CATEGORY_LIST.BANKING} -> banking;
 entries are lowercased, de-duplicated and sorted.
 `,
 );
