@@ -20,3 +20,4 @@ export * from "./protocol";
 export * from "./pow";
 export * from "./review";
 export * from "./availability";
+export * from "./privacy/redactionEval";
