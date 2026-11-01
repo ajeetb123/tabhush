@@ -367,7 +367,8 @@ async function buildPreview(s: ActiveSession, opts: { clarifyAnswer?: boolean } 
     if (ctx) members.set(ctx, [...(members.get(ctx) ?? []), tab]);
     const { decision, key } = await judgeItem(s, task, tab.url, tab.title ?? "");
     if (decision.source === "tier3") s.tier3Uncontested.push({ itemKey: cacheKey(task.id, key), related: decision.action === "allow" });
-    if (decision.action === "allow" && ctx) related.set(ctx, true);
+    // Never-locked pages are allowed for every task, so they are no evidence that a context matches.
+    if (decision.action === "allow" && decision.source !== "never_locked" && ctx) related.set(ctx, true);
     if (decision.action === "allow_and_flag" || decision.action === "ask") s.flagged.push(cacheKey(task.id, key)); // the preview is the ask
     if (decision.action === "park") {
       s.preview.push({ tabId: tab.id, url: tab.url, title: tab.title ?? "", domain: itemDomain(tab.url) ?? "", itemKey: cacheKey(task.id, key), park: true, ...(ctx ? { contextId: ctx } : {}) });
