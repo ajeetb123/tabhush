@@ -21,6 +21,7 @@ export type DecisionSource =
   | "browse"
   | "underground"
   | "search_topic"
+  | "page_topic"
   | "override"
   | "cache"
   | "distraction"

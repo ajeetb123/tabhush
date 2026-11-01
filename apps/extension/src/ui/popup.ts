@@ -9,6 +9,13 @@ const main = document.querySelector("main")!;
 let timer: number | undefined;
 
 const openSessionPage = () => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/session.html") });
+const openReport = () => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/report.html") });
+
+function reportLink(): HTMLElement {
+  const b = h("button", { className: "btn block", textContent: "📊  Your focus report" });
+  b.addEventListener("click", openReport);
+  return b;
+}
 
 function hero(pill: Parameters<typeof topbar>[0], title: string, lead?: string): HTMLElement {
   return h("div", { className: "hero" }, topbar(pill), h("h1", { textContent: title }), lead ? h("p", { className: "lead", textContent: lead }) : null);
@@ -32,6 +39,7 @@ async function render(): Promise<void> {
     main.replaceChildren(
       hero({ text: "Ready" }, "Time to lock in", "It reads your tabs, picks the task, and blocks the rest."),
       start,
+      h("div", { className: "row", attrs: { style: "margin-top:10px" } }, reportLink()),
       ...[await incognitoNotice()].filter((n): n is HTMLElement => n !== null),
     );
     return;
@@ -48,7 +56,7 @@ async function render(): Promise<void> {
     const open = h("button", { className: "btn primary block", textContent: "See summary" });
     open.addEventListener("click", openSessionPage);
     const won = s.endKind === "normal";
-    main.replaceChildren(hero({ text: won ? "Goal reached" : "Ended" }, won ? "Nice work 🎯" : "Session over", s.taskLabel ?? ""), open);
+    main.replaceChildren(hero({ text: won ? "Goal reached" : "Ended" }, won ? "Nice work 🎯" : "Session over", s.taskLabel ?? ""), open, h("div", { className: "row", attrs: { style: "margin-top:10px" } }, reportLink()));
     return;
   }
 

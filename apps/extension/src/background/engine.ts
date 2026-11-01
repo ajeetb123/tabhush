@@ -22,6 +22,7 @@ import {
   courseCodesIn,
   goalReached,
   isDistractingSearch,
+  isDistractingPage,
   isDomainOnly,
   searchQuery,
   isBail,
@@ -226,7 +227,7 @@ export async function judgeItem(s: ActiveSession, task: SessionTask, url: string
   const internal = await getInternal();
   const ready = await tier3Ready();
   const t1 = tier1(url, await tier1Context(tabId, url));
-  const searched = await judgeSearch(s, task, url, key, t1.kind);
+  const searched = await judgeSearch(s, task, url, key, t1.kind, tabId);
   if (searched) return { decision: searched, key };
   // CLS-21 may also use a tier 3 category cached on device from earlier calls (none while Q-61 holds).
   const cachedCategory = (await cacheFor(s, internal.configVersion).lookup(task.id, key))?.tier3?.category ?? null;
@@ -263,7 +264,33 @@ export async function judgeItem(s: ActiveSession, task: SessionTask, url: string
   }
 }
 
-// Distraction and work topic vectors for search blocking (Q-64), embedded once.
+// Page snippets (title, description, headings) reported by content scripts, read on device only
+// (Q-65, PRIV-01). Keyed by tab, kept only while the tab shows that URL.
+const pageSnippets = new Map<number, { url: string; text: string }>();
+
+function snippetFor(tabId: number | undefined, url: string): string | null {
+  const snip = tabId === undefined ? undefined : pageSnippets.get(tabId);
+  return snip && snip.url === url ? snip.text : null;
+}
+
+export async function onPageSnippet(tab: chrome.tabs.Tab, url: string, text: string): Promise<void> {
+  if (!tab.id) return;
+  pageSnippets.set(tab.id, { url, text: text.slice(0, OWNER_RULES.PAGE_SNIPPET_MAX_CHARS) });
+  await onTabChanged(tab);
+}
+
+/** Asks a tab's content script for its snippet (used at Start, when tabs were already open). */
+async function requestSnippet(tab: chrome.tabs.Tab): Promise<void> {
+  if (!tab.id || !tab.url) return;
+  try {
+    const r = (await chrome.tabs.sendMessage(tab.id, { type: "snippet:request" })) as { url?: string; text?: string } | undefined;
+    if (r?.text && r.url) pageSnippets.set(tab.id, { url: r.url, text: r.text.slice(0, OWNER_RULES.PAGE_SNIPPET_MAX_CHARS) });
+  } catch {
+    // no content script: judged without a snippet
+  }
+}
+
+// Distraction and work topic vectors for search and page blocking (Q-64, Q-65), embedded once.
 let topicVectors: Promise<{ distraction: number[][]; work: number[][] }> | null = null;
 
 function getTopicVectors(): Promise<{ distraction: number[][]; work: number[][] }> {
@@ -280,9 +307,10 @@ function getTopicVectors(): Promise<{ distraction: number[][]; work: number[][] 
  * distraction topic, clearly closer to it than to work, and unrelated to the session's tasks.
  * Returns null when the page is not a search, the rules above it decide, or tier 2 is down.
  */
-async function judgeSearch(s: ActiveSession, task: SessionTask, url: string, key: ItemKey, t1Kind: string): Promise<Decision | null> {
+async function judgeSearch(s: ActiveSession, task: SessionTask, url: string, key: ItemKey, t1Kind: string, tabId?: number): Promise<Decision | null> {
   const q = searchQuery(url);
-  if (q === null || t1Kind === "never_locked" || t1Kind === "essential") return null;
+  if (q === null) return judgePage(s, task, url, key, t1Kind, tabId);
+  if (t1Kind === "never_locked" || t1Kind === "essential") return null;
   try {
     const [qv] = await embed([q]);
     const topics = await getTopicVectors();
@@ -293,6 +321,29 @@ async function judgeSearch(s: ActiveSession, task: SessionTask, url: string, key
     const internal = await getInternal();
     await cacheFor(s, internal.configVersion).record(task.id, key, { decision: "park" });
     return { action: "park", source: "search_topic", s: taskS };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Page topics (Q-65): judged only when no rule above decided (tier 1 kind "none"), so never-locked
+ * pages, essentials, tools, music and YouTube browsing are never touched by it.
+ */
+async function judgePage(s: ActiveSession, task: SessionTask, url: string, key: ItemKey, t1Kind: string, tabId?: number): Promise<Decision | null> {
+  const text = snippetFor(tabId, url);
+  if (!text || t1Kind !== "none") return null;
+  try {
+    const [pv] = await embed([text]);
+    const topics = await getTopicVectors();
+    if (!pv) return null;
+    const best = (vs: number[][]) => Math.max(...vs.map((v) => cosine(pv, v)));
+    const scored = task.members.filter((m) => m.labelVector).map((m) => relatedness(pv, { label: m.labelVector!, prototypes: m.prototypes.map((p) => p.vector) }));
+    const taskS = scored.length ? Math.max(...scored) : 0;
+    if (!isDistractingPage({ distraction: best(topics.distraction), work: best(topics.work), task: taskS })) return null;
+    const internal = await getInternal();
+    await cacheFor(s, internal.configVersion).record(task.id, key, { decision: "park" });
+    return { action: "park", source: "page_topic", s: taskS };
   } catch {
     return null;
   }
@@ -469,6 +520,7 @@ async function buildPreview(s: ActiveSession): Promise<void> {
   const items = all.filter((t) => t.url).map((t) => ({ url: t.url!, title: t.title ?? "" }));
   const budget = PERF_EXTENSION.START_JUDGE_RECENT_TABS;
   await prefetchVectors(items.slice(0, budget)); // the 30 most recent first (2 s budget)
+  await Promise.all(all.slice(0, budget).map(requestSnippet));
   let judged = 0;
   for (const tab of all) {
     if (!tab.id || !tab.url) continue;
@@ -482,6 +534,7 @@ async function buildPreview(s: ActiveSession): Promise<void> {
     if (++judged === budget) {
       await saveSession(s);
       await prefetchVectors(items.slice(budget));
+      await Promise.all(all.slice(budget).map(requestSnippet));
     }
   }
 
@@ -527,6 +580,7 @@ async function recordPark(s: ActiveSession, tab: chrome.tabs.Tab, itemKey: strin
   // The sampled "Was this park right?" check (docs/14). Rate is TODO_Q42, so nothing is sampled yet.
   const outcome = await parkTab(tab, s.taskLabel ?? "", canOverride, shouldSampleParkCheck());
   const now = Date.now();
+  s.blockEvents.push({ at: Date.now(), domain: itemDomain(tab.url ?? "") ?? "" });
   if (outcome === "closed") s.restoreList.push({ url: tab.url ?? "", title: tab.title ?? "", reason: "closed" });
   else s.parked[String(tab.id)] = { tabId: tab.id!, url: tab.url ?? "", title: tab.title ?? "", itemKey, at: now, bySweep, source };
   s.lastParkAt = now;
@@ -557,6 +611,7 @@ async function commit(s: ActiveSession, how: "CONFIRM" | "AUTO_COMMIT"): Promise
   }
   s.committedAt = Date.now();
   apply(s, { type: how });
+  logFocus(s, "on");
   await setInternal({ committedSessions: internal.committedSessions + 1 });
   await bump("sessions");
   await saveSession(s);
@@ -598,7 +653,7 @@ export async function onYoutubeMeta(tab: chrome.tabs.Tab, videoId: string, genre
 
 export async function onTabChanged(tab: chrome.tabs.Tab): Promise<void> {
   if (!tab.id || !tab.url) return;
-  const fingerprint = `${tab.url}\n${tab.title ?? ""}\n${youtubeGenre(tab.id, tab.url) ?? ""}`;
+  const fingerprint = `${tab.url}\n${tab.title ?? ""}\n${youtubeGenre(tab.id, tab.url) ?? ""}\n${snippetFor(tab.id, tab.url)?.length ?? 0}`;
   if (lastJudged.get(tab.id) === fingerprint) return;
   lastJudged.set(tab.id, fingerprint);
   await withSession(async (s) => {
@@ -620,6 +675,8 @@ export async function onTabChanged(tab: chrome.tabs.Tab): Promise<void> {
     }
 
     if (decision.action !== "park") await rememberCourses([tab]);
+    s.tabOnTask[String(tab.id)] = decision.action === "allow";
+    if (tab.active) logFocus(s, decision.action === "allow" ? "on" : "off");
 
     if (decision.action === "park") {
       if (parked?.itemKey === k) return;
@@ -646,7 +703,26 @@ export async function onTabChanged(tab: chrome.tabs.Tab): Promise<void> {
   });
 }
 
+// ───────────────────────── Focus time for the report (Q-65, TIME-01) ─────────────────────────
+
+function logFocus(s: ActiveSession, state: "on" | "off" | "away"): void {
+  if (s.state !== "ACTIVE") return;
+  if (s.focusLog[s.focusLog.length - 1]?.state === state) return;
+  s.focusLog.push({ at: Date.now(), state });
+}
+
+/** The front tab changed, or the browser lost or regained focus. */
+export async function onFocusChange(activeTabId: number | null): Promise<void> {
+  await withSession(async (s) => {
+    if (s?.state !== "ACTIVE") return;
+    if (activeTabId === null) logFocus(s, "away");
+    else logFocus(s, s.tabOnTask[String(activeTabId)] === false ? "off" : "on");
+    await saveSession(s);
+  });
+}
+
 export function forgetTab(tabId: number): void {
+  pageSnippets.delete(tabId);
   lastJudged.delete(tabId);
   youtubeMeta.delete(tabId);
   musicTabs.delete(tabId);
@@ -828,6 +904,7 @@ export async function onBlockedVisit(url: string): Promise<boolean> {
   return withSession(async (s) => {
     if (!s || (s.state !== "ACTIVE" && s.state !== "END_COUNTDOWN")) return false;
     s.restoreList.push({ url, title: itemDomain(url) ?? url, reason: "blocked" });
+    s.blockEvents.push({ at: Date.now(), domain: itemDomain(url) ?? "" });
     s.lastParkAt = Date.now();
     await bump("parks");
     await saveSession(s);
@@ -866,6 +943,7 @@ async function finishSession(s: ActiveSession, kind: "normal" | "early"): Promis
     await writeUncontestedLabels(s);
     s.parked = {};
     s.pendingAsk = {};
+    s.focusLog.push({ at: Date.now(), state: "away" });
     s.endedAt = Date.now();
     s.endKind = kind;
     if (kind === "normal") s.bail = false;

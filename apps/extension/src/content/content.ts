@@ -5,7 +5,7 @@
 // Owner rules (Q-63): allowed music plays at a lower volume; YouTube's genre for the playing
 // video is reported so music can be recognized.
 
-import { BRAND, MS } from "@lockin/core";
+import { BRAND, MS, OWNER_RULES } from "@lockin/core";
 import type { FromContent, ToContent } from "../shared/messages";
 
 const HOST_ID = `${BRAND.ID}-root`;
@@ -262,6 +262,31 @@ function reportYoutube(): void {
   send({ type: "youtube:meta", videoId: v, genre });
 }
 
+// ───────────────────────── page snippet (Q-65), read on device only ─────────────────────────
+
+const isTop = window === window.top;
+
+/** Title, description and top headings: what the page is about, never sent off the device. */
+export function pageSnippet(): string {
+  const meta = (sel: string) => document.querySelector<HTMLMetaElement>(sel)?.content ?? "";
+  const headings = [...document.querySelectorAll("h1, h2")].slice(0, 3).map((h) => h.textContent ?? "");
+  return [document.title, meta('meta[property="og:title"]'), meta('meta[name="description"]') || meta('meta[property="og:description"]'), ...headings]
+    .map((t) => t.replace(/\s+/g, " ").trim())
+    .filter((t, i, all) => t && all.indexOf(t) === i)
+    .join(". ")
+    .slice(0, OWNER_RULES.PAGE_SNIPPET_MAX_CHARS);
+}
+
+let lastSnippet = "";
+
+function reportSnippet(): void {
+  if (!isTop) return;
+  const text = pageSnippet();
+  if (!text || text === lastSnippet) return;
+  lastSnippet = text;
+  send({ type: "page:snippet", url: location.href, text });
+}
+
 // ───────────────────────── input counts (CLS-62) ─────────────────────────
 
 let minuteStart = Math.floor(Date.now() / MS.MINUTE) * MS.MINUTE;
@@ -286,7 +311,18 @@ if (!window.__lockinContentLoaded) {
   window.addEventListener("pagehide", flush);
 
   chrome.runtime.onMessage.addListener((msg: ToContent, _sender, sendResponse) => {
+    // Embedded frames only pause their media when the page is blocked; the top frame shows the UI.
+    if (!isTop) {
+      if (msg.type === "overlay:show") {
+        parked = true;
+        pauseAll();
+      } else if (msg.type === "overlay:hide") parked = false;
+      return false;
+    }
     switch (msg.type) {
+      case "snippet:request":
+        sendResponse({ url: location.href, text: pageSnippet() });
+        return false;
       case "overlay:show":
         showOverlay(msg.taskLabel, msg.canOverride, msg.overrideNote, msg.sampledCheck);
         break;
@@ -310,8 +346,16 @@ if (!window.__lockinContentLoaded) {
     sendResponse(true);
     return false;
   });
-  send({ type: "content:ready" });
-  reportYoutube();
-  // YouTube changes pages without reloading; re-check its metadata when the head changes.
-  if (document.head) new MutationObserver(reportYoutube).observe(document.head, { childList: true, subtree: true, attributes: true });
+  if (isTop) {
+    send({ type: "content:ready" });
+    reportYoutube();
+    reportSnippet();
+    // Single-page sites (YouTube and others) change without reloading; re-read when the head changes.
+    if (document.head) {
+      new MutationObserver(() => {
+        reportYoutube();
+        reportSnippet();
+      }).observe(document.head, { childList: true, subtree: true, attributes: true });
+    }
+  }
 }

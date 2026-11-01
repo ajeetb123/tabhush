@@ -5,6 +5,7 @@ export type ToContent =
   | { type: "overlay:hide" }
   | { type: "ask:show"; taskLabel: string }
   | { type: "ask:hide" }
+  | { type: "snippet:request" }
   | { type: "music:on"; volume: number }
   | { type: "music:off" };
 
@@ -15,6 +16,7 @@ export type FromContent =
   | { type: "override:submit"; sentence: string }
   | { type: "check:answer"; right: boolean }
   | { type: "youtube:meta"; videoId: string; genre: string | null }
+  | { type: "page:snippet"; url: string; text: string }
   | { type: "open:session" };
 
 export type ToOffscreen = { target: "offscreen"; type: "embed"; texts: string[] };

@@ -30,6 +30,10 @@ No questions, no override, no undo; End has a 30-second countdown. Clear distrac
 
 No prompts at Start: tasks come from recent tasks or are named on device from the tabs (course codes first), near-duplicates merge silently, and one start screen holds task chips (typed, or spoken when Chrome offers on-device speech), a time goal and the block list. Course codes are remembered locally, never from incognito or domain-only sites. Searches on Google/Bing/DuckDuckGo are blocked when the query matches a distraction topic (measured: 11/16 distractions, 0/16 work searches). UT1 sports sites are blocked. Past the time goal, Stop ends at once. New logo, icons and a more colorful UI.
 
+## Owner changes, round 3 (Q-65, 2026-11-01)
+
+Piracy and streaming sites that no list has (UT1 misses yarrlist, fmovies, soap2day, hianime and the like) are blocked by what the page is about: title, description and headings read on device, compared with distraction and work topics (measured: 11/12 distraction pages, 0/14 work pages). Embedded players on a blocked page are paused too. Incognito still needs "Allow in Incognito" switched on by the user. A Today / Week / Sessions report with focused time, focus %, blocks, a day strip by task and an insight.
+
 ## Backend (beta 1 subset)
 
 Install tokens with PoW (Q-06), tier 3 proxy with fixed prompts and strict schema, Free daily cap per UTC day (Q-58), telemetry intake, delete-my-data. Not built: IP rate limits, waves and the global dollar limit (Q-07), remote config (beta 2), licenses (v1), contributions.

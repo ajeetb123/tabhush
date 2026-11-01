@@ -285,6 +285,12 @@ export const OWNER_RULES = {
     "restaurants and food",
     "concert tickets",
     "fashion and sneakers",
+    // Q-65: added for page topics (piracy and streaming sites change domains faster than lists)
+    "watch free movies and tv shows online",
+    "movie trailers and film reviews",
+    "anime and manga",
+    "torrents and pirated downloads",
+    "live sports streams",
   ],
   SEARCH_WORK_TOPICS: [
     "programming and software",
@@ -295,9 +301,18 @@ export const OWNER_RULES = {
     "jobs and careers",
     "research paper",
     "studying for an exam",
+    // Q-65
+    "documentation and tutorials",
+    "online course and lectures",
+    "spreadsheets and documents",
+    "email and calendar",
   ],
   SEARCH_TOPIC_MIN: 0.25,
   SEARCH_TOPIC_MARGIN: 0.1,
+  // Q-65 page topics (measured 2026-11-01: 11/12 distraction pages, 0/14 work pages blocked)
+  PAGE_TOPIC_MIN: 0.3,
+  PAGE_TOPIC_MARGIN: 0.1,
+  PAGE_SNIPPET_MAX_CHARS: 400, // about the model's 64-token input; read on device only (PRIV-01)
   // Q-64 time goal (agent design)
   GOAL_PRESETS_MIN: [25, 45, 60, 90],
   GOAL_MIN_MIN: 15, // max is SESSION.MAX_LENGTH_MIN
@@ -437,6 +452,15 @@ export const GATES = {
   GATE_P: { FOUNDING_PLANS_MIN: 50, BY: "Mac app launch" },
   GATE_C: { DAY7_RETENTION_MIN: 0.15, NON_FRIEND_INSTALLS_MIN: 200 },
   WATCH_SESSIONS_PER_ACTIVE_USER_PER_WEEK: 5,
+} as const;
+
+// ───────────────────────── Report (UI-02, UI-04; Q-46 and Q-21 answered in Q-65) ─────────────────────────
+export const REPORT = {
+  STRIP_START_HOUR: 9, // day strip 9am to 9pm, widened to cover any session outside it (Q-46)
+  STRIP_END_HOUR: 21,
+  MORNING_ENDS_HOUR: 12, // insight wording: morning / afternoon / evening (Q-21)
+  AFTERNOON_ENDS_HOUR: 17,
+  WEEK_DAYS: 7,
 } as const;
 
 // ───────────────────────── Time units (not product values) ─────────────────────────

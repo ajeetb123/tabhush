@@ -66,6 +66,12 @@ export interface ActiveSession {
   liftedDomains: string[];
   /** Every override this session; the sentence stays on this device (PRIV-01). */
   overrideLog: { at: number; domain: string; sentence: string; judged: boolean }[];
+  /** Every block, for the report (domains stay on this device; telemetry has no domains, INV-19). */
+  blockEvents: { at: number; domain: string }[];
+  /** Front-tab state over time: on task, off task, or browser not in front (Q-65 report). */
+  focusLog: { at: number; state: "on" | "off" | "away" }[];
+  /** Last verdict per tab: true when allowed. */
+  tabOnTask: Record<string, boolean>;
   /** Named-site lifts and overrides, shown on the session card (LOOP-09). */
   suspensions: string[];
   restoreList: RestoreEntry[];
@@ -99,6 +105,9 @@ export function newSession(now: number): ActiveSession {
     pendingAsk: {},
     liftedDomains: [],
     overrideLog: [],
+    blockEvents: [],
+    focusLog: [],
+    tabOnTask: {},
     suspensions: [],
     restoreList: [],
     tier3Uncontested: [],

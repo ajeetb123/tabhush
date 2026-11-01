@@ -239,6 +239,13 @@ The owner tried beta 1 in Chrome and changed these. They override the scope wher
 6. **Time goal** (agent design): the user sets how long they will work (presets 25/45/60/90 min or custom, 15 to 240 min). The default is their typical session (median actual length of their last 10 sessions, rounded to 5 min). A note appears, never a question, when the goal is more than 1.5× their typical (over-ambitious) or under 15 min. When the goal is reached, the popup shows **Stop**: it ends at once as a normal end, with no countdown or reason. Before the goal, End keeps the 30-second countdown and reason ("ended early").
 7. **More fun UI** within UI-06 (still no badges, pets, leaderboards or confetti) and a **logo** with toolbar icons.
 
+**Q-65 Unlisted piracy/streaming sites, embedded video, and the report** · **Resolved 2026-11-01 (owner; details by the agent)**
+The owner found piracy and movie sites unblocked (yarrlist.net, a movie page playing an embedded trailer). Checked: UT1 misses most of them (yarrlist, fmovies, 123movies, soap2day, hianime, sportsurge…), because they change domains constantly.
+1. **Page topics:** pages are also judged by what they are about. The content script reads the title, description and top headings **on device only** (PRIV-01 page snippet; partly answers Q-50) and compares them with distraction and work topics. Blocked when distraction ≥ 0.30, it beats work by ≥ 0.10, and the page is unrelated to the session's tasks (s < 0.25). Measured on 26 realistic pages: 11 of 12 distraction pages blocked, 0 of 14 work pages. Counts as the INV-02 second signal.
+2. **Embedded media:** the content script also runs inside frames, so a blocked page's embedded players (e.g. a YouTube trailer) are paused too.
+3. **Incognito:** Chrome only lets an extension into incognito windows when the user switches on "Allow in Incognito"; the extension cannot turn that on. The popup and settings flag it.
+4. **Report (UI-02/UI-04, built early by owner request):** Today, Week and Sessions views like the scope's mockup: focused time, focus %, items blocked, a day strip colored by task (Q-46: 9am to 9pm, widened to cover any session outside it), time per task, and one insight sentence (Q-21: most-blocked site and when, plus the longest session's time of day). Focus % uses the time the front tab was on task versus off task; time with the browser out of focus is excluded (TIME-01).
+
 **Q-58 Tier 3 cap day boundary** · P1
 `AI_CAPS` are "per install per day" but the backend cannot see local time. The backend counts per UTC day [DERIVED]. Confirm, or decide how the client's day (4am local) should apply.
 

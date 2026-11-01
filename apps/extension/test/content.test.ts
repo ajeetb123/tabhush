@@ -106,3 +106,13 @@ describe("sampled park check (docs/14)", () => {
     expect(sent).toContainEqual({ type: "check:answer", right: false });
   });
 });
+
+describe("Q-65 page snippet", () => {
+  it("is the title, description and headings, read on device", () => {
+    document.head.innerHTML = '<meta name="description" content="Stream the latest TV series">';
+    document.title = "Watch Free Movies";
+    document.body.innerHTML = "<h1>Trending now</h1><h2>New releases</h2>";
+    expect(content.pageSnippet()).toBe("Watch Free Movies. Stream the latest TV series. Trending now. New releases");
+  });
+});
+

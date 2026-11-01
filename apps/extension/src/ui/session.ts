@@ -191,13 +191,25 @@ function endedView(s: ActiveSession): Node[] {
   setTitle("Session summary");
   const done = h("button", { className: "btn primary", textContent: "Done" });
   done.addEventListener("click", () => void call({ type: "ui:dismiss" }).then(() => window.close()));
-  setFooter(h("span"), done);
+  const report = h("button", { className: "btn", textContent: "📊 See your day" });
+  report.addEventListener("click", () => void call({ type: "ui:dismiss" }).then(() => location.replace(chrome.runtime.getURL("ui/report.html"))));
+  setFooter(report, done);
   const duration = (s.endedAt ?? Date.now()) - (s.committedAt ?? s.startedAt);
   const won = s.endKind === "normal";
   const out: Node[] = [
     hero({ text: won ? "Goal reached" : "Ended early" }, won ? "Nice work 🎯" : "Session over", s.taskLabel ?? undefined),
     h("div", { className: "stats" }, stat(formatDuration(duration), "locked in"), stat(s.goalMin ? `${s.goalMin} min` : "–", "goal"), stat(String(blockedCount(s)), "blocked")),
   ];
+  const byDomain = new Map<string, number>();
+  for (const e of s.blockEvents ?? []) if (e.domain) byDomain.set(e.domain, (byDomain.get(e.domain) ?? 0) + 1);
+  if (byDomain.size) {
+    out.push(h("h2", { textContent: "What got blocked" }));
+    const list = h("ul", { className: "items" });
+    for (const [d, n] of [...byDomain.entries()].sort((a, b) => b[1] - a[1])) {
+      list.append(h("li", { className: "spread" }, h("div", { className: "site" }, avatar(d), h("span", { textContent: d })), h("span", { className: "muted", textContent: `${n}×` })));
+    }
+    out.push(h("div", { className: "card" }, list));
+  }
   for (const sus of s.suspensions) out.push(h("p", { className: "muted small", textContent: sus }));
   if (s.restoreList.length) {
     out.push(h("h2", { textContent: "Reopen" }));

@@ -336,4 +336,37 @@ describe("Active session", () => {
     const { profile } = (await fake.chrome.storage.local.get("profile")) as { profile?: { courses: string[] } };
     expect(profile?.courses).toEqual(["CS 2114"]);
   });
+
+  it("Q-65: an unlisted piracy/movie page is blocked by what it's about", async () => {
+    await active();
+    const tab = await open(150, "https://yarrlist.net/", "YARRLIST");
+    expect(fake.overlaysShownOn()).not.toContain(150); // no snippet yet: the title alone says nothing
+    await engine.onPageSnippet(asTab(tab), tab.url, "YARRLIST. Watch free movies and tv shows online. Anime and manga. Torrents and pirated downloads. Live sports streams");
+    expect(fake.overlaysShownOn()).toContain(150);
+    expect((await session.loadSession())!.parked["150"]?.source).toBe("page_topic");
+  });
+
+  it("Q-65: a work page's snippet does not block it", async () => {
+    await active();
+    const tab = await open(151, "https://docs.example.org/titration", "Titration");
+    await engine.onPageSnippet(asTab(tab), tab.url, "Titration lab report chemistry guide. How to write the lab report draft");
+    expect(fake.overlaysShownOn()).not.toContain(151);
+  });
+
+  it("Q-65: a snippet never overrides never-locked or always-allowed pages", async () => {
+    await active();
+    const tab = await open(152, "https://canvas.instructure.com/courses/1/videos", "Course video");
+    await engine.onPageSnippet(asTab(tab), tab.url, "Watch free movies and tv shows online. Movie trailers and film reviews");
+    expect(fake.overlaysShownOn()).not.toContain(152);
+  });
+
+  it("Q-65: blocks and on-task time are recorded for the report", async () => {
+    await active();
+    await open(153, "https://www.netflix.com/title/1", "Netflix");
+    const s = (await session.loadSession())!;
+    expect(s.blockEvents.map((e) => e.domain)).toEqual(expect.arrayContaining(["netflix.com"]));
+    expect(s.focusLog[0]?.state).toBe("on");
+    await engine.onFocusChange(null);
+    expect((await session.loadSession())!.focusLog.at(-1)?.state).toBe("away");
+  });
 });

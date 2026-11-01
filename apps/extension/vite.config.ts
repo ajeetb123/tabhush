@@ -50,6 +50,7 @@ export default defineConfig({
         consent: resolve(src, "ui/consent.html"),
         options: resolve(src, "ui/options.html"),
         blocked: resolve(src, "ui/blocked.html"),
+        report: resolve(src, "ui/report.html"),
         offscreen: resolve(src, "offscreen/offscreen.html"),
       },
       output: {

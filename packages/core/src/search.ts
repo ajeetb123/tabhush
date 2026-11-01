@@ -32,3 +32,15 @@ export function isDistractingSearch(scores: { distraction: number; work: number;
     scores.task < THRESHOLDS.MIDDLE_MIN_S
   );
 }
+
+/**
+ * Page topics (Q-65): a page whose title, description and headings are close to a distraction
+ * topic, clearly closer to it than to work, and unrelated to the session's tasks.
+ */
+export function isDistractingPage(scores: { distraction: number; work: number; task: number }): boolean {
+  return (
+    scores.distraction >= OWNER_RULES.PAGE_TOPIC_MIN &&
+    scores.distraction - scores.work >= OWNER_RULES.PAGE_TOPIC_MARGIN &&
+    scores.task < THRESHOLDS.MIDDLE_MIN_S
+  );
+}

@@ -60,6 +60,7 @@ async function render(): Promise<void> {
     topbar(locked ? { text: "Locked in", tone: "live" } : undefined),
     h("h1", { textContent: "Settings" }),
     h("p", { className: "lead", textContent: locked ? "Settings are locked until the session ends." : "Everything here stays on this device." }),
+    h("p", {}, h("a", { href: chrome.runtime.getURL("ui/report.html"), textContent: "📊 Open your focus report" })),
     ...section(
       "Essentials",
       h("p", { className: "muted small", textContent: "Sites that are never blocked, one per line. Subdomains are included." }),

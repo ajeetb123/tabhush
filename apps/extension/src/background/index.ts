@@ -16,6 +16,8 @@ import {
   onInputCounts,
   onTabChanged,
   onYoutubeMeta,
+  onPageSnippet,
+  onFocusChange,
   override,
   overrideBlocked,
   requestEnd,
@@ -49,6 +51,13 @@ chrome.webNavigation.onHistoryStateUpdated.addListener((d) => {
   void chrome.tabs.get(d.tabId).then(onTabChanged, () => undefined);
 });
 chrome.tabs.onRemoved.addListener((tabId) => forgetTab(tabId));
+
+// Focus time for the report (Q-65): which tab is in front, and whether the browser is.
+chrome.tabs.onActivated.addListener(({ tabId }) => void onFocusChange(tabId));
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) return void onFocusChange(null);
+  void chrome.tabs.query({ active: true, windowId }).then(([t]) => onFocusChange(t?.id ?? null), () => undefined);
+});
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === END_ALARM) void finishEnd();
@@ -97,6 +106,8 @@ chrome.runtime.onMessage.addListener((msg: FromUi | FromContent | { target?: str
       return tab ? done(onInputCounts(tab, m.minuteStart, m.count)) : false;
     case "ask:answer":
       return tab ? done(answerAsk(tab, m.related)) : false;
+    case "page:snippet":
+      return tab ? done(onPageSnippet(tab, m.url, m.text)) : false;
     case "youtube:meta":
       return tab ? done(onYoutubeMeta(tab, m.videoId, m.genre)) : false;
     case "check:answer":
