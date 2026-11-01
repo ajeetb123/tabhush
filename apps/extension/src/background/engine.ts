@@ -3,6 +3,7 @@
 
 import {
   addPrototype,
+  ASK,
   askBudgetAvailable,
   assertLabelSource,
   buildInferLabelRequest,
@@ -16,6 +17,13 @@ import {
   findExact,
   inferTask,
   taskScore,
+  autoLabel,
+  clampGoal,
+  courseCodesIn,
+  goalReached,
+  isDistractingSearch,
+  isDomainOnly,
+  searchQuery,
   isBail,
   itemDomain,
   itemKeyFor,
@@ -218,6 +226,8 @@ export async function judgeItem(s: ActiveSession, task: SessionTask, url: string
   const internal = await getInternal();
   const ready = await tier3Ready();
   const t1 = tier1(url, await tier1Context(tabId, url));
+  const searched = await judgeSearch(s, task, url, key, t1.kind);
+  if (searched) return { decision: searched, key };
   // CLS-21 may also use a tier 3 category cached on device from earlier calls (none while Q-61 holds).
   const cachedCategory = (await cacheFor(s, internal.configVersion).lookup(task.id, key))?.tier3?.category ?? null;
   try {
@@ -250,6 +260,41 @@ export async function judgeItem(s: ActiveSession, task: SessionTask, url: string
   } catch (e) {
     // INV-06: no tier confident (tier 2 down, unexpected error) → allow and flag.
     return { decision: { action: "allow_and_flag", source: "fail_open", tier3Failed: e instanceof CapReached || e instanceof BackendUnavailable }, key };
+  }
+}
+
+// Distraction and work topic vectors for search blocking (Q-64), embedded once.
+let topicVectors: Promise<{ distraction: number[][]; work: number[][] }> | null = null;
+
+function getTopicVectors(): Promise<{ distraction: number[][]; work: number[][] }> {
+  topicVectors ??= embed([...OWNER_RULES.SEARCH_DISTRACTION_TOPICS, ...OWNER_RULES.SEARCH_WORK_TOPICS]).then((v) => ({
+    distraction: v.slice(0, OWNER_RULES.SEARCH_DISTRACTION_TOPICS.length),
+    work: v.slice(OWNER_RULES.SEARCH_DISTRACTION_TOPICS.length),
+  }));
+  topicVectors.catch(() => (topicVectors = null));
+  return topicVectors;
+}
+
+/**
+ * Search results pages are judged by their query (Q-64): blocked when the query is close to a
+ * distraction topic, clearly closer to it than to work, and unrelated to the session's tasks.
+ * Returns null when the page is not a search, the rules above it decide, or tier 2 is down.
+ */
+async function judgeSearch(s: ActiveSession, task: SessionTask, url: string, key: ItemKey, t1Kind: string): Promise<Decision | null> {
+  const q = searchQuery(url);
+  if (q === null || t1Kind === "never_locked" || t1Kind === "essential") return null;
+  try {
+    const [qv] = await embed([q]);
+    const topics = await getTopicVectors();
+    if (!qv) return null;
+    const best = (vs: number[][]) => Math.max(...vs.map((v) => cosine(qv, v)));
+    const taskS = Math.max(...task.members.filter((m) => m.labelVector).map((m) => relatedness(qv, { label: m.labelVector!, prototypes: m.prototypes.map((p) => p.vector) })));
+    if (!isDistractingSearch({ distraction: best(topics.distraction), work: best(topics.work), task: taskS })) return null;
+    const internal = await getInternal();
+    await cacheFor(s, internal.configVersion).record(task.id, key, { decision: "park" });
+    return { action: "park", source: "search_topic", s: taskS };
+  } catch {
+    return null;
   }
 }
 
@@ -297,53 +342,46 @@ export async function start(): Promise<void> {
     await chrome.tabs.create({ url: chrome.runtime.getURL(SESSION_PAGE) });
 
     const recentTabs = all.filter(usableTitle).slice(0, PERF_EXTENSION.START_JUDGE_RECENT_TABS);
+    await rememberCourses(recentTabs);
     let vectors: (number[] | null)[] = recentTabs.map(() => null);
     try {
       vectors = await embed(recentTabs.map((t) => itemText(t.title ?? "", itemDomain(t.url!) ?? "")));
     } catch {
-      // tier 2 unavailable → thin signal → clarify
+      // tier 2 unavailable: the task is named from the tabs instead
     }
-    const now = Date.now();
-    const recent = await Promise.all(recentTasks(await tasks.all(), now).map(ensureLabelVector));
-    const result = inferTask(
-      recent,
-      recentTabs.map((t, i) => ({ vector: vectors[i] ?? null, front: t.id === frontTab?.id })),
-    );
-
-    // Q-63: when two or more recent tasks both fit the open tabs, ask with them pre-ticked.
+    const recent = await Promise.all(recentTasks(await tasks.all(), Date.now()).map(ensureLabelVector));
     const tabsForScore = recentTabs.map((t, i) => ({ vector: vectors[i] ?? null, front: t.id === frontTab?.id }));
-    const strong = recent.filter((t) => (taskScore(t, tabsForScore) ?? 0) >= OWNER_RULES.MULTI_TASK_MIN_SCORE);
-    if (strong.length >= 2) {
-      s.clarify = { guesses: strong.map((t) => ({ taskId: t.id, label: t.label })), preselected: strong.map((t) => t.id) };
-      apply(s, { type: "INFER_UNSURE" });
-      await saveSession(s);
-      return;
-    }
+    const scored = recent
+      .map((task) => ({ task, score: taskScore(task, tabsForScore) }))
+      .filter((x): x is { task: Task; score: number } => x.score !== null)
+      .sort((a, b) => b.score - a.score);
 
-    if (result.kind === "autofill") {
-      s.chip = { label: result.task.label, taskId: result.task.id, renamed: false };
-      apply(s, { type: "INFER_CONFIDENT" });
-      await saveSession(s);
-      await buildPreview(s);
-      return;
-    }
-    // No recent task fits: the LLM proposes a label from redacted front-window titles (CLS-50).
-    if (result.reason === "no_recent_task") {
+    // Q-64: no prompt. Several strong recent tasks → all of them; one confident → it; otherwise a
+    // label proposed by tier 3 (when on) or named on device from the tabs.
+    const strong = scored.filter((x) => x.score >= OWNER_RULES.MULTI_TASK_MIN_SCORE).map((x) => x.task);
+    const result = inferTask(recent, tabsForScore);
+    let chosen: Task[] = [];
+    if (strong.length >= 2) chosen = strong;
+    else if (result.kind === "autofill") chosen = [result.task];
+    else {
       const ready = await tier3Ready();
       const frontTabs = all.filter((t) => t.windowId === frontTab?.windowId && usableTitle(t));
       const req = ready ? buildInferLabelRequest(outCtx(ready), frontTabs.map((t) => ({ url: t.url!, title: t.title! }))) : null;
       const proposal = req ? await inferLabelRemote(req).catch(() => null) : null;
-      if (proposal) {
-        s.chip = { label: proposal.label, taskId: null, renamed: false };
-        apply(s, { type: "INFER_CONFIDENT" });
-        await saveSession(s);
-        await buildPreview(s);
-        return;
-      }
+      const label = proposal?.label ?? autoLabel(learnableTabs(recentTabs).map((t) => ({ title: t.title ?? "", front: t.id === frontTab?.id })), await knownCourses());
+      if (label) chosen = [await resolveOrCreate(label)];
     }
-    s.clarify = { guesses: result.guesses.map((t) => ({ taskId: t.id, label: t.label })), preselected: [] };
-    apply(s, { type: "INFER_UNSURE" });
+    s.taskIds = chosen.map((t) => t.id);
+    s.taskId = s.taskIds[0] ?? null;
+    s.chip = chosen[0] ? { label: chosen[0].label, taskId: chosen[0].id, renamed: false } : null;
+    s.suggestions = scored
+      .map((x) => x.task)
+      .filter((t) => !s.taskIds.includes(t.id))
+      .slice(0, ASK.CLARIFY_GUESSES)
+      .map((t) => ({ taskId: t.id, label: t.label }));
+    apply(s, { type: "INFER_CONFIDENT" });
     await saveSession(s);
+    await buildPreview(s);
   });
 }
 
@@ -354,141 +392,91 @@ async function createTask(label: string): Promise<Task> {
   return ensureLabelVector(task);
 }
 
-/** Exact match merges silently; a near match asks "Same as X?" (CLS-31); otherwise a new task. */
-async function resolveLabel(s: ActiveSession, label: string): Promise<"resolved" | "same_as"> {
+/**
+ * Exact matches merge silently (CLS-31). Q-64: the "Same as X?" triggers (label similarity ≥ 0.85,
+ * a shared course code) also merge silently, since there are no prompts. Otherwise a new task.
+ */
+async function resolveOrCreate(label: string): Promise<Task> {
   const all = await tasks.all();
   const exact = findExact(all, label);
-  if (exact) {
-    s.chip = { label: exact.label, taskId: exact.id, renamed: s.chip?.renamed ?? false };
-    return "resolved";
-  }
+  if (exact) return ensureLabelVector(exact);
   let labelVec: number[] | null = null;
   try {
     labelVec = (await embed([label]))[0] ?? null;
   } catch {
     labelVec = null;
   }
-  const candidates = sameAsCandidates(label, all, (t) => (labelVec && t.labelVector ? cosine(labelVec, t.labelVector) : null));
-  if (candidates.length > 0) {
-    s.sameAs = { label, candidates: candidates.map((c) => ({ taskId: c.task.id, label: c.task.label })) };
-    return "same_as";
-  }
-  s.chip = { label: label.trim(), taskId: null, renamed: s.chip?.renamed ?? false };
-  return "resolved";
+  const near = sameAsCandidates(label, all, (t) => (labelVec && t.labelVector ? cosine(labelVec, t.labelVector) : null))[0];
+  return near ? ensureLabelVector(near.task) : createTask(label);
 }
 
-/**
- * The clarify answer: one or several tasks (Q-63). With one, "Same as X?" applies (CLS-31). With
- * several, each merges with an exact match or becomes a new task.
- */
-export async function clarify(labelsIn: string[]): Promise<void> {
+/** The start screen's task chips: toggled suggestions, typed or spoken tasks (Q-64). */
+export async function setTasks(labelsIn: string[]): Promise<void> {
   await withSession(async (s) => {
+    if (s?.state !== "SWEEP_PREVIEW") return;
     const labels = [...new Map(labelsIn.filter((l) => normalizeLabel(l)).map((l) => [normalizeLabel(l), l.trim()])).values()];
-    if (!s || s.state !== "CLARIFY" || labels.length === 0) return;
-    s.extraTaskIds = [];
-    if (labels.length === 1) {
-      if ((await resolveLabel(s, labels[0]!)) === "same_as") return void (await saveSession(s));
-    } else {
-      const all = await tasks.all();
-      const resolved: Task[] = [];
-      for (const l of labels) resolved.push(findExact(all, l) ?? (await createTask(l)));
-      s.chip = { label: resolved[0]!.label, taskId: resolved[0]!.id, renamed: false };
-      s.extraTaskIds = resolved.slice(1).map((t) => t.id);
+    const chosen: Task[] = [];
+    for (const l of labels) {
+      const t = await resolveOrCreate(l);
+      if (!chosen.some((c) => c.id === t.id)) chosen.push(t);
     }
-    s.clarify = null;
-    apply(s, { type: "CLARIFY_ANSWERED" });
-    await saveSession(s);
-    await buildPreview(s, { clarifyAnswer: true });
-  });
-}
-
-/** "Same as X?" answer. Prompt details are OPEN Q-35; "No" creates a new task. */
-export async function sameAs(taskId: string | null): Promise<void> {
-  await withSession(async (s) => {
-    if (!s?.sameAs) return;
-    const chosen = taskId ? s.sameAs.candidates.find((c) => c.taskId === taskId) : undefined;
-    s.chip = chosen ? { label: chosen.label, taskId: chosen.taskId, renamed: s.chip?.renamed ?? false } : { label: s.sameAs.label, taskId: null, renamed: s.chip?.renamed ?? false };
-    s.sameAs = null;
-    const fromClarify = s.state === "CLARIFY";
-    if (fromClarify) {
-      s.clarify = null;
-      apply(s, { type: "CLARIFY_ANSWERED" });
+    const before = s.taskIds.join("+");
+    s.taskIds = chosen.map((t) => t.id);
+    s.taskId = s.taskIds[0] ?? null;
+    // A change to the inferred tasks is the inference-accuracy signal (LOOP-02, docs/14).
+    if (s.chip && !s.chip.renamed && before !== s.taskIds.join("+")) {
+      s.chip.renamed = true;
+      await bump("chip_renames");
     }
-    await saveSession(s);
-    await buildPreview(s, { clarifyAnswer: fromClarify });
-  });
-}
-
-/** Renaming the chip before the sweep is the inference-accuracy signal (LOOP-02, docs/14). */
-export async function rename(label: string): Promise<void> {
-  await withSession(async (s) => {
-    if (!s || s.state !== "SWEEP_PREVIEW" || !s.chip || !normalizeLabel(label)) return;
-    if (normalizeLabel(label) === normalizeLabel(s.chip.label)) return;
-    if (!s.chip.renamed) await bump("chip_renames");
-    s.chip.renamed = true;
-    if ((await resolveLabel(s, label)) === "same_as") return void (await saveSession(s));
+    s.chip = chosen[0] ? { label: chosen[0].label, taskId: chosen[0].id, renamed: s.chip?.renamed ?? true } : s.chip;
     await saveSession(s);
     await buildPreview(s);
   });
 }
 
-async function chipTask(s: ActiveSession): Promise<Task> {
-  if (!s.chip) throw new Error("no task chip");
-  if (s.chip.taskId) {
-    const t = await tasks.get(s.chip.taskId);
-    if (t) return ensureLabelVector(t);
-  }
-  const t = await createTask(s.chip.label);
-  s.chip.taskId = t.id;
-  return t;
+// ───────────────────────── Local memory of courses (Q-64) ─────────────────────────
+
+/** Tabs the app may learn from: never incognito, never domain-only sites (webmail, chat, banking). */
+function learnableTabs(tabs: chrome.tabs.Tab[]): chrome.tabs.Tab[] {
+  return tabs.filter((t) => {
+    const p = t.url ? parseUrl(t.url) : null;
+    return !t.incognito && p !== null && !isDomainOnly(p);
+  });
 }
 
-// ───────────────────────── Sweep (LOOP-04, CLS-34) ─────────────────────────
+async function knownCourses(): Promise<string[]> {
+  const { profile } = await chrome.storage.local.get("profile");
+  return ((profile as { courses?: string[] } | undefined)?.courses ?? []).slice();
+}
 
-async function buildPreview(s: ActiveSession, opts: { clarifyAnswer?: boolean } = {}): Promise<void> {
-  const primary = await chipTask(s);
-  s.taskIds = [primary.id, ...s.extraTaskIds.filter((id) => id !== primary.id)];
-  s.taskId = primary.id;
-  const task = (await sessionTask(s))!;
-  s.taskLabel = task.label;
+async function rememberCourses(tabs: chrome.tabs.Tab[]): Promise<void> {
+  const found = learnableTabs(tabs).flatMap((t) => courseCodesIn(t.title ?? ""));
+  if (!found.length) return;
+  const courses = [...new Set([...(await knownCourses()), ...found])];
+  await chrome.storage.local.set({ profile: { courses } });
+}
+
+// ───────────────────────── Sweep (LOOP-04) ─────────────────────────
+
+async function buildPreview(s: ActiveSession): Promise<void> {
   s.preview = [];
-  s.separate = [];
+  const task = await sessionTask(s);
+  s.taskLabel = task?.label ?? null;
+  if (!task) return void (await saveSession(s)); // no task yet: the start screen asks for one
+
+  // Q-64: no window or group questions; every tab is judged on its own.
   const { all } = await snapshot();
-  const frontWindowId = s.startFront.windowId ?? undefined;
-  const frontTab = all.find((t) => t.id === s.startFront.tabId);
-
-  if (opts.clarifyAnswer && frontTab?.url && usableTitle(frontTab)) {
-    // LOOP-03: the clarify answer is a strong label.
-    const k = itemKeyFor(frontTab.url);
-    if (k) await addLabel(task, cacheKey(task.id, k), true, "clarify", frontTab.url, frontTab.title ?? "");
-  }
-
-  const frontGroup = s.startFront.groupId;
-  const ownPage = chrome.runtime.getURL("");
-  const contextOf = (t: chrome.tabs.Tab): string | null => {
-    if (t.url?.startsWith(ownPage)) return null; // the app's own pages are never part of a context
-    if (frontWindowId !== undefined && t.windowId !== frontWindowId) return `window:${t.windowId}`;
-    if (t.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE && t.groupId !== frontGroup) return `group:${t.groupId}`;
-    return null;
-  };
-
   const items = all.filter((t) => t.url).map((t) => ({ url: t.url!, title: t.title ?? "" }));
   const budget = PERF_EXTENSION.START_JUDGE_RECENT_TABS;
   await prefetchVectors(items.slice(0, budget)); // the 30 most recent first (2 s budget)
-  const related = new Map<string, boolean>();
-  const members = new Map<string, chrome.tabs.Tab[]>();
   let judged = 0;
   for (const tab of all) {
     if (!tab.id || !tab.url) continue;
-    const ctx = contextOf(tab);
-    if (ctx) members.set(ctx, [...(members.get(ctx) ?? []), tab]);
     const { decision, key } = await judgeItem(s, task, tab.url, tab.title ?? "", tab.id);
     if (decision.source === "tier3") s.tier3Uncontested.push({ itemKey: cacheKey(task.id, key), related: decision.action === "allow" });
-    // Never-locked pages are allowed for every task, so they are no evidence that a context matches.
-    if (decision.action === "allow" && decision.source !== "never_locked" && ctx) related.set(ctx, true);
-    if (decision.action === "allow_and_flag" || decision.action === "ask") s.flagged.push(cacheKey(task.id, key)); // the preview is the ask
+    if (decision.action === "allow_and_flag" || decision.action === "ask") s.flagged.push(cacheKey(task.id, key));
     if (decision.action === "park") {
-      s.preview.push({ tabId: tab.id, url: tab.url, title: tab.title ?? "", domain: itemDomain(tab.url) ?? "", itemKey: cacheKey(task.id, key), park: true, ...(ctx ? { contextId: ctx } : {}) });
+      s.preview.push({ tabId: tab.id, url: tab.url, title: tab.title ?? "", domain: itemDomain(tab.url) ?? "", itemKey: cacheKey(task.id, key), park: true });
     }
     // The 30 most recent tabs land in the preview first (PERF budget); the rest follow.
     if (++judged === budget) {
@@ -497,27 +485,11 @@ async function buildPreview(s: ActiveSession, opts: { clarifyAnswer?: boolean } 
     }
   }
 
-  // A separate window or group that does not match the task is asked about as a whole (LOOP-02).
-  for (const [id, tabsIn] of members) {
-    if (related.get(id)) continue;
-    const isWindow = id.startsWith("window:");
-    let title = isWindow ? `Another window (${tabsIn.length} tabs)` : `Tab group (${tabsIn.length} tabs)`;
-    if (!isWindow) {
-      const g = await chrome.tabGroups.get(Number(id.slice("group:".length))).catch(() => null);
-      if (g?.title) title = `Tab group “${g.title}” (${tabsIn.length} tabs)`;
-    }
-    s.separate.push({ id, kind: isWindow ? "window" : "group", title, tabIds: tabsIn.map((t) => t.id!), park: null });
-  }
-  s.preview = s.preview.filter((p) => !p.contextId || related.get(p.contextId));
-
-  for (const name of namedPureDistraction(task.label)) s.suspensions.push(`${name} named in the task: still blocked (needs an override)`);
+  s.suspensions = [];
+  for (const name of namedPureDistraction(task.label)) s.suspensions.push(`${name} is in the task name but stays blocked.`);
   s.liftedDomains = liftedPreBlockDomains(task.label);
-  for (const d of s.liftedDomains) s.suspensions.push(`${d}: domain-wide pre-block lifted (named in the task); pages still judged`);
+  for (const d of s.liftedDomains) s.suspensions.push(`${d} is in the task name, so it isn’t blocked as a whole; its pages are still judged.`);
   await saveSession(s);
-
-  const internal = await getInternal();
-  // Session 6+ auto-commits only at high confidence, which is TODO_Q16(a): always waits for now.
-  if (canAutoCommit(internal.committedSessions, 0)) await commit(s, "AUTO_COMMIT");
 }
 
 export async function togglePreview(tabId: number, park: boolean): Promise<void> {
@@ -529,19 +501,25 @@ export async function togglePreview(tabId: number, park: boolean): Promise<void>
   });
 }
 
-export async function answerSeparate(contextId: string, park: boolean): Promise<void> {
+/** Lock in with a time goal (Q-64). */
+export async function confirm(goalMin: number): Promise<void> {
   await withSession(async (s) => {
-    if (s?.state !== "SWEEP_PREVIEW") return;
-    const c = s.separate.find((x) => x.id === contextId);
-    if (c) c.park = park;
-    await saveSession(s);
+    if (s?.state !== "SWEEP_PREVIEW" || s.taskIds.length === 0) return;
+    s.goalMin = clampGoal(goalMin);
+    await commit(s, "CONFIRM");
   });
 }
 
-export async function confirm(): Promise<void> {
-  await withSession(async (s) => {
-    if (s?.state !== "SWEEP_PREVIEW" || s.separate.some((c) => c.park === null)) return;
-    await commit(s, "CONFIRM");
+/** Past the goal, Stop ends at once as a normal end: no countdown, no reason (Q-64). */
+export async function stop(): Promise<boolean> {
+  return withSession(async (s) => {
+    if (!s || (s.state !== "ACTIVE" && s.state !== "END_COUNTDOWN") || !goalReached(s.committedAt, s.goalMin, Date.now())) return false;
+    if (s.state === "ACTIVE") apply(s, { type: "END_REQUESTED" });
+    s.endCountdown = { startedAt: Date.now(), reason: "goal reached" };
+    await chrome.alarms.clear(END_ALARM);
+    await saveSession(s);
+    await finishSession(s, "normal");
+    return true;
   });
 }
 
@@ -570,21 +548,6 @@ async function commit(s: ActiveSession, how: "CONFIRM" | "AUTO_COMMIT"): Promise
       if (key) await cacheFor(s, internal.configVersion).record(task.id, key, { decision: "allow" });
       await addLabel(task, item.itemKey, true, "sweep_keep", item.url, item.title);
       await seedPrototype(task, item.url, item.title, { kind: "sweep_keep" });
-    }
-  }
-  for (const c of s.separate) {
-    for (const tabId of c.tabIds) {
-      const tab = await chrome.tabs.get(tabId).catch(() => null);
-      if (!tab?.url) continue;
-      const key = itemKeyFor(tab.url);
-      if (!key) continue;
-      if (c.park) {
-        const t1 = tier1(tab.url, await tier1Context());
-        if (t1.kind === "never_locked" || t1.kind === "essential") continue; // INV-01: never parked
-        await recordPark(s, tab, cacheKey(task.id, key), "separate_context", true, canOverride);
-      } else {
-        await cacheFor(s, internal.configVersion).record(task.id, key, { decision: "allow" });
-      }
     }
   }
   await installPreBlocks(s.liftedDomains);
@@ -655,6 +618,8 @@ export async function onTabChanged(tab: chrome.tabs.Tab): Promise<void> {
     } else if (musicTabs.delete(tab.id!)) {
       await sendToTab(tab.id!, { type: "music:off" });
     }
+
+    if (decision.action !== "park") await rememberCourses([tab]);
 
     if (decision.action === "park") {
       if (parked?.itemKey === k) return;
@@ -888,6 +853,13 @@ export async function requestEnd(reason: string): Promise<boolean> {
 export async function finishEnd(): Promise<void> {
   await withSession(async (s) => {
     if (s?.state !== "END_COUNTDOWN") return;
+    // Ending after the goal is a normal end (Q-64); before it, "ended early".
+    await finishSession(s, goalReached(s.committedAt, s.goalMin, Date.now()) ? "normal" : "early");
+  });
+}
+
+async function finishSession(s: ActiveSession, kind: "normal" | "early"): Promise<void> {
+  {
     for (const p of Object.values(s.parked)) await unparkTab(p.tabId, true);
     for (const tabId of Object.keys(s.pendingAsk)) await sendToTab(Number(tabId), { type: "ask:hide" });
     await removePreBlocks();
@@ -895,7 +867,8 @@ export async function finishEnd(): Promise<void> {
     s.parked = {};
     s.pendingAsk = {};
     s.endedAt = Date.now();
-    s.endKind = "early"; // a user-initiated End is "ended early"
+    s.endKind = kind;
+    if (kind === "normal") s.bail = false;
     apply(s, { type: "END_COUNTDOWN_DONE" });
     await saveSession(s);
     await db.put("sessions", s);
@@ -906,7 +879,16 @@ export async function finishEnd(): Promise<void> {
       await setInternal({ pendingUpdate: false });
       chrome.runtime.reload();
     }
-  });
+  }
+}
+
+/** Actual lengths (minutes) of past sessions, oldest first, for the time-goal default (Q-64). */
+export async function sessionHistoryMinutes(): Promise<number[]> {
+  const past = await db.all<ActiveSession>("sessions");
+  return past
+    .filter((p) => p.committedAt !== null && p.endedAt !== null)
+    .sort((a, b) => a.endedAt! - b.endedAt!)
+    .map((p) => (p.endedAt! - p.committedAt!) / MS.MINUTE);
 }
 
 /** Weak labels at End: parks and tier 3 verdicts nobody contested (CLS-60). Bails write none. */

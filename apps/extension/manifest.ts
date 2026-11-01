@@ -12,7 +12,12 @@ export const manifest = {
   version: "0.1.0",
   minimum_chrome_version: String(PLATFORM.MIN_CHROMIUM_VERSION),
   background: { service_worker: "background.js", type: "module" },
-  action: { default_popup: "ui/popup.html", default_title: BRAND.NAME },
+  icons: { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
+  action: {
+    default_popup: "ui/popup.html",
+    default_title: BRAND.NAME,
+    default_icon: { "16": "icons/icon-16.png", "32": "icons/icon-32.png" },
+  },
   options_page: "ui/options.html",
   commands: {
     // No suggested key: the shortcut is undecided, so users assign it in the browser.
@@ -21,7 +26,7 @@ export const manifest = {
   permissions: ["tabs", "tabGroups", "webNavigation", "declarativeNetRequest", "offscreen", "storage", "scripting", "alarms"],
   host_permissions: ["<all_urls>"],
   content_scripts: [{ matches: ["<all_urls>"], js: ["content.js"], run_at: "document_idle" }],
-  web_accessible_resources: [{ resources: ["ui/blocked.html"], matches: ["<all_urls>"] }],
+  web_accessible_resources: [{ resources: ["ui/blocked.html", "icons/logo.svg"], matches: ["<all_urls>"] }],
   // INV-05: no remote code. WASM needs 'wasm-unsafe-eval'; nothing else is loosened.
   content_security_policy: { extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'" },
 } as const;

@@ -1,6 +1,7 @@
 // Verdict cache item keys (docs/05 CLS-40). key = taskId + itemKey.
 
 import { parseUrl } from "../domains";
+import { normalizeQuery, searchQuery } from "../search";
 import { mixedSiteDomain, pureDistractionDomain } from "./tier1";
 
 export type ItemKeyKind = "domain" | "path" | "page";
@@ -55,6 +56,9 @@ export function itemKeyFor(urlString: string): ItemKey | null {
     const rule = mixedPathRule(mixed, url.path, url.search);
     if (rule) return { kind: "path", value: `${mixed}|${rule}` };
   }
+  // Search results are keyed by their query (Q-64), so one blocked search does not block all searches.
+  const q = searchQuery(urlString);
+  if (q !== null) return { kind: "page", value: `${url.scheme}://${url.host}${url.path}?q=${normalizeQuery(q)}` };
   // origin + path, query string (and fragment) dropped
   const origin = `${url.scheme}://${url.host}`;
   return { kind: "page", value: `${origin}${url.path}` };

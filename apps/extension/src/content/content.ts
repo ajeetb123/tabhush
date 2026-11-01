@@ -26,7 +26,8 @@ const STYLE = `
 .backdrop {
   position: fixed; inset: 0; z-index: 2147483647;
   display: flex; align-items: center; justify-content: center; padding: 24px;
-  background: radial-gradient(1200px 600px at 50% -10%, #2a2f6b 0%, #12131a 55%, #0b0c10 100%);
+  background: radial-gradient(900px 500px at 15% -10%, rgba(109,93,252,.55) 0%, transparent 60%),
+    radial-gradient(900px 500px at 95% 110%, rgba(255,95,162,.35) 0%, transparent 60%), #0e0f14;
   color: #eef0f6;
   font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
@@ -35,17 +36,12 @@ const STYLE = `
   background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
   box-shadow: 0 30px 80px rgba(0,0,0,.45); text-align: center;
 }
-.mark {
-  width: 52px; height: 52px; margin: 0 auto 18px; border-radius: 15px;
-  display: grid; place-items: center; font-weight: 800; font-size: 22px; color: #fff;
-  background: linear-gradient(135deg, #7c83ff, #5b5bf7 55%, #3b3bd1);
-  box-shadow: 0 8px 24px rgba(91,91,247,.45);
-}
+.mark { width: 56px; height: 56px; margin: 0 auto 18px; border-radius: 16px; display: block; box-shadow: 0 8px 24px rgba(181,92,240,.45); }
 h1 { font-size: 22px; line-height: 1.25; margin: 0 0 8px; font-weight: 700; letter-spacing: -.01em; }
 p { margin: 6px 0; color: #b9bdcc; }
 .task {
   display: inline-block; margin: 12px 0 4px; padding: 6px 14px; border-radius: 999px;
-  background: rgba(124,131,255,.16); border: 1px solid rgba(124,131,255,.45); color: #dfe1ff; font-weight: 600;
+  background: rgba(255,95,162,.14); border: 1px solid rgba(255,95,162,.45); color: #ffd9ea; font-weight: 600;
 }
 .note { margin-top: 14px; font-size: 13px; color: #9aa0b4; }
 .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 22px; }
@@ -54,7 +50,7 @@ button {
   padding: 10px 18px; border-radius: 12px; cursor: pointer; font-weight: 600;
   border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: #eef0f6;
 }
-button.primary { background: #5b5bf7; border-color: #5b5bf7; color: #fff; }
+button.primary { background: linear-gradient(135deg, #6d5dfc, #ff5fa2); border-color: transparent; color: #fff; }
 button:focus-visible, textarea:focus-visible { outline: 3px solid #a5a9ff; outline-offset: 2px; }
 textarea {
   width: 100%; margin-top: 12px; padding: 10px 12px; border-radius: 12px; resize: vertical;
@@ -159,8 +155,7 @@ export function showOverlay(taskLabel: string, canOverride: boolean, overrideNot
   backdrop.setAttribute("aria-labelledby", "lockin-title");
   backdrop.setAttribute("aria-describedby", "lockin-desc");
   const card = el("div", { className: "card" });
-  const mark = el("div", { className: "mark", textContent: BRAND.NAME.charAt(0) });
-  mark.setAttribute("aria-hidden", "true");
+  const mark = el("img", { className: "mark", src: chrome.runtime.getURL("icons/logo.svg"), alt: "" });
   const h1 = el("h1", { id: "lockin-title", textContent: "Blocked for this session" });
   const desc = el("p", {
     id: "lockin-desc",

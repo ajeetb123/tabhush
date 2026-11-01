@@ -1,7 +1,7 @@
 // Shared helpers for extension pages. Style rules (UI-06): one color per task, whitespace,
 // system font, dark mode, no badges or confetti.
 
-import { BRAND } from "@lockin/core";
+import { BRAND, MS } from "@lockin/core";
 import type { ActiveSession } from "../background/session";
 import type { InternalState, UserSettings } from "../background/settings";
 import type { FromUi } from "../shared/messages";
@@ -10,6 +10,8 @@ export interface Snapshot {
   session: ActiveSession | null;
   settings: UserSettings;
   internal: InternalState;
+  /** Actual lengths of past sessions in minutes, oldest first (Q-64 time goal). */
+  history: number[];
 }
 
 export async function call<T = unknown>(msg: FromUi): Promise<T> {
@@ -54,7 +56,7 @@ export function onStateChange(render: () => void): void {
 
 /** Brand header with an optional status pill. */
 export function topbar(status?: { text: string; tone?: "live" | "warn" }): HTMLElement {
-  const mark = h("div", { className: "mark", textContent: BRAND.NAME.charAt(0), attrs: { "aria-hidden": "true" } });
+  const mark = h("img", { className: "mark", src: chrome.runtime.getURL("icons/logo.svg"), alt: "" });
   const brand = h("div", { className: "brand" }, mark, BRAND.NAME);
   const pill = status ? h("span", { className: `pill${status.tone ? " " + status.tone : ""}`, textContent: status.text }) : null;
   return h("header", { className: "topbar" }, brand, pill);
@@ -71,4 +73,32 @@ export function stat(num: string, label: string): HTMLElement {
 /** Items blocked so far: parked tabs plus blocked visits and closed tabs on the restore list. */
 export function blockedCount(s: ActiveSession): number {
   return Object.keys(s.parked).length + s.restoreList.length;
+}
+
+/** A progress ring toward the time goal (Q-64). Call update() every second. */
+export function goalRing(): { el: HTMLElement; update: (elapsedMs: number, goalMin: number | null, label: string) => void } {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 120 120");
+  svg.setAttribute("aria-hidden", "true");
+  svg.innerHTML =
+    '<defs><linearGradient id="ringgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6d5dfc"/><stop offset="1" stop-color="#ff5fa2"/></linearGradient></defs>' +
+    '<circle class="track" cx="60" cy="60" r="52" fill="none" stroke-width="10"/>' +
+    '<circle class="bar" cx="60" cy="60" r="52" fill="none" stroke-width="10"/>';
+  const bar = svg.querySelector<SVGCircleElement>(".bar")!;
+  const length = 2 * Math.PI * 52;
+  bar.style.strokeDasharray = String(length);
+  const time = h("div", { className: "timer", attrs: { role: "timer" } });
+  const sub = h("div", { className: "goal" });
+  const el = h("div", { className: "ring" }, h("div", { className: "center" }, h("div", {}, time, sub)));
+  el.prepend(svg);
+  return {
+    el,
+    update(elapsedMs, goalMin, label) {
+      const frac = goalMin ? Math.min(1, elapsedMs / (goalMin * MS.MINUTE)) : 0;
+      bar.style.strokeDashoffset = String(length * (1 - frac));
+      time.textContent = formatDuration(elapsedMs);
+      sub.textContent = label;
+    },
+  };
 }

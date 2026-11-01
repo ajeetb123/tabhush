@@ -11,17 +11,6 @@ export interface PreviewItem {
   itemKey: string;
   /** true = will be parked on Confirm; un-checking makes it a keep (strong related label). */
   park: boolean;
-  /** Set for tabs in a separate window or tab group, which is asked about as a whole (LOOP-02). */
-  contextId?: string;
-}
-
-export interface SeparateContext {
-  id: string;
-  kind: "window" | "group";
-  title: string;
-  tabIds: number[];
-  /** null until the user answers; Confirm waits for every answer. */
-  park: boolean | null;
 }
 
 export interface ParkedTab {
@@ -60,15 +49,14 @@ export interface ActiveSession {
   taskId: string | null;
   /** Every task this session is for: the chip plus any picked together with it (Q-63). */
   taskIds: string[];
-  /** Tasks picked alongside the chip in the clarify prompt (Q-63). */
-  extraTaskIds: string[];
+  /** Other recent tasks offered as chips on the start screen (Q-64). */
+  suggestions: { taskId: string; label: string }[];
+  /** How long the user said they would work, in minutes (Q-64). */
+  goalMin: number | null;
   taskLabel: string | null;
   /** Proposed label (from the registry or the LLM) before Confirm; a rename is recorded (LOOP-02). */
   chip: { label: string; taskId: string | null; renamed: boolean } | null;
-  clarify: { guesses: { taskId: string; label: string }[]; preselected: string[] } | null;
-  sameAs: { label: string; candidates: { taskId: string; label: string }[] } | null;
   preview: PreviewItem[];
-  separate: SeparateContext[];
   committedAt: number | null;
   parked: Record<string, ParkedTab>;
   lastParkAt: number | null;
@@ -98,13 +86,11 @@ export function newSession(now: number): ActiveSession {
     startFront: { tabId: null, windowId: null, groupId: chrome.tabGroups.TAB_GROUP_ID_NONE },
     taskId: null,
     taskIds: [],
-    extraTaskIds: [],
+    suggestions: [],
+    goalMin: null,
     taskLabel: null,
     chip: null,
-    clarify: null,
-    sameAs: null,
     preview: [],
-    separate: [],
     committedAt: null,
     parked: {},
     lastParkAt: null,

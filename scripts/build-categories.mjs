@@ -31,10 +31,17 @@ async function domainsOf(ut1Category) {
 
 mkdirSync(outDir, { recursive: true });
 const written = [];
+// Several UT1 lists can map to one of ours (audio-video and sports → entertainment): merge them.
+const merged = new Map();
 for (const [ut1, ours] of Object.entries(CATEGORY_LIST.MAPPING)) {
-  const list = await domainsOf(ut1);
-  writeFileSync(join(outDir, `${ours}.txt`), list.join("\n") + "\n");
-  written.push(`${ours}.txt  ${list.length} domains  (UT1 ${ut1})`);
+  const set = merged.get(ours) ?? { domains: new Set(), from: [] };
+  for (const d of await domainsOf(ut1)) set.domains.add(d);
+  set.from.push(ut1);
+  merged.set(ours, set);
+}
+for (const [ours, { domains, from: sources }] of merged) {
+  writeFileSync(join(outDir, `${ours}.txt`), [...domains].sort().join("\n") + "\n");
+  written.push(`${ours}.txt  ${domains.size} domains  (UT1 ${sources.join(" + ")})`);
 }
 const underground = await domainsOf(OWNER_RULES.UNDERGROUND_LIST);
 writeFileSync(join(outDir, "underground.txt"), underground.join("\n") + "\n");

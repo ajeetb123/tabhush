@@ -10,6 +10,7 @@ beforeAll(async () => {
   vi.stubGlobal("chrome", {
     runtime: {
       sendMessage: vi.fn(async (m: unknown) => void sent.push(m)),
+      getURL: (p: string) => `chrome-extension://test/${p}`,
       onMessage: { addListener: (fn: typeof listener) => (listener = fn) },
     },
   });

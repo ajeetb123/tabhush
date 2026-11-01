@@ -1,26 +1,24 @@
-// Toolbar popup (UI-05): Start, the current task(s) and timer, End with its countdown.
-// Owner rules (Q-63): no sweep undo, a 30-second End countdown.
+// Toolbar popup (UI-05): Start, the current task(s) and the goal ring, then Stop or End.
+// Q-64: past the time goal, Stop ends at once (normal end); before it, End keeps the 30-second
+// countdown and a one-line reason (Q-63).
 
-import { EXITS, MS } from "@lockin/core";
-import { blockedCount, call, formatDuration, getSnapshot, h, onStateChange, setTitle, stat, topbar } from "./common";
+import { EXITS, goalReached, MS } from "@lockin/core";
+import { blockedCount, call, formatDuration, getSnapshot, goalRing, h, onStateChange, setTitle, stat, topbar } from "./common";
 
 const main = document.querySelector("main")!;
 let timer: number | undefined;
 
 const openSessionPage = () => void chrome.tabs.create({ url: chrome.runtime.getURL("ui/session.html") });
 
+function hero(pill: Parameters<typeof topbar>[0], title: string, lead?: string): HTMLElement {
+  return h("div", { className: "hero" }, topbar(pill), h("h1", { textContent: title }), lead ? h("p", { className: "lead", textContent: lead }) : null);
+}
+
 async function incognitoNotice(): Promise<HTMLElement | null> {
-  const allowed = await chrome.extension.isAllowedIncognitoAccess();
-  if (allowed) return null;
+  if (await chrome.extension.isAllowedIncognitoAccess()) return null;
   const fix = h("button", { className: "btn", textContent: "Turn it on" });
   fix.addEventListener("click", () => void chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}` }));
-  return h(
-    "div",
-    { className: "card small" },
-    h("p", { textContent: "Incognito windows aren’t covered yet." }),
-    h("p", { className: "muted", textContent: "On the extension page, switch on “Allow in Incognito”." }),
-    h("div", { className: "row" }, fix),
-  );
+  return h("div", { className: "card small spread" }, h("span", { className: "muted", textContent: "Incognito isn’t covered yet." }), fix);
 }
 
 async function render(): Promise<void> {
@@ -32,9 +30,7 @@ async function render(): Promise<void> {
     const start = h("button", { className: "btn primary block", textContent: "Start" });
     start.addEventListener("click", () => void call({ type: "ui:start" }).then(() => window.close()));
     main.replaceChildren(
-      topbar({ text: "Ready" }),
-      h("h1", { textContent: "Lock in on what’s in front of you" }),
-      h("p", { className: "lead", textContent: "It figures out the task from your tabs and blocks what isn’t part of it." }),
+      hero({ text: "Ready" }, "Time to lock in", "It reads your tabs, picks the task, and blocks the rest."),
       start,
       ...[await incognitoNotice()].filter((n): n is HTMLElement => n !== null),
     );
@@ -44,59 +40,70 @@ async function render(): Promise<void> {
   if (s.state === "INFERRING" || s.state === "CLARIFY" || s.state === "SWEEP_PREVIEW") {
     const open = h("button", { className: "btn primary block", textContent: "Finish starting" });
     open.addEventListener("click", openSessionPage);
-    main.replaceChildren(
-      topbar({ text: "Starting" }),
-      h("h1", { textContent: s.state === "INFERRING" ? "Reading your tabs…" : "One more step" }),
-      h("p", { className: "lead", textContent: "Confirm the task and what gets blocked." }),
-      open,
-    );
+    main.replaceChildren(hero({ text: "Starting" }, s.state === "INFERRING" ? "Reading your tabs…" : "Almost there", "Pick your time and lock in."), open);
     return;
   }
 
   if (s.state === "ENDED") {
     const open = h("button", { className: "btn primary block", textContent: "See summary" });
     open.addEventListener("click", openSessionPage);
-    main.replaceChildren(topbar({ text: "Ended" }), h("h1", { textContent: "Session ended" }), h("p", { className: "lead", textContent: s.taskLabel ?? "" }), open);
+    const won = s.endKind === "normal";
+    main.replaceChildren(hero({ text: won ? "Goal reached" : "Ended" }, won ? "Nice work 🎯" : "Session over", s.taskLabel ?? ""), open);
     return;
   }
 
-  const clock = h("div", { className: "timer", attrs: { role: "timer" } });
   const ending = s.state === "END_COUNTDOWN" && s.endCountdown;
-  const tick = () => {
+  const ring = goalRing();
+  const actions = h("div", { className: "stack" });
+  let shownReached: boolean | null = null;
+
+  const renderActions = (reached: boolean) => {
     if (ending) {
-      const left = s.endCountdown!.startedAt + EXITS.END_COUNTDOWN_SEC * MS.SECOND - Date.now();
-      clock.textContent = formatDuration(left);
-      clock.setAttribute("aria-label", `Session ends in ${formatDuration(left)}`);
+      actions.replaceChildren(h("p", { className: "muted small", attrs: { role: "status" }, textContent: "Blocks stay on until the countdown finishes." }));
+    } else if (reached) {
+      const stop = h("button", { className: "btn primary block", textContent: "Stop, I’m done" });
+      stop.addEventListener("click", () => void call({ type: "ui:stop" }));
+      actions.replaceChildren(h("p", { className: "note", textContent: "You hit your goal. You’re locked in, so stop whenever you like." }), stop);
     } else {
-      clock.textContent = formatDuration(Date.now() - (s.committedAt ?? s.startedAt));
+      const reason = h("input", { type: "text", placeholder: "Why end early? (one line)", attrs: { "aria-label": "Reason for ending" } });
+      const end = h("button", { className: "btn danger", textContent: `End early (${EXITS.END_COUNTDOWN_SEC}s)` });
+      const err = h("p", { className: "error", attrs: { role: "alert" } });
+      const submit = () =>
+        void call<boolean>({ type: "ui:end", reason: reason.value }).then((ok) => {
+          if (!ok) err.textContent = "Add a one-line reason to end early.";
+        });
+      end.addEventListener("click", submit);
+      reason.addEventListener("keydown", (e) => e.key === "Enter" && submit());
+      actions.replaceChildren(reason, h("div", { className: "row" }, end), err);
     }
   };
+
+  const soFar = stat("", "so far");
+  const tick = () => {
+    const elapsed = Date.now() - (s.committedAt ?? s.startedAt);
+    soFar.querySelector(".num")!.textContent = formatDuration(elapsed);
+    if (ending) {
+      const left = Math.max(0, s.endCountdown!.startedAt + EXITS.END_COUNTDOWN_SEC * MS.SECOND - Date.now());
+      ring.update(left, null, "until it ends");
+      return;
+    }
+    const reached = goalReached(s.committedAt, s.goalMin, Date.now());
+    ring.update(elapsed, s.goalMin, reached ? "goal reached" : s.goalMin ? `of ${s.goalMin} min` : "focused");
+    if (reached !== shownReached) {
+      shownReached = reached;
+      renderActions(reached);
+    }
+  };
+  if (ending) renderActions(false);
   tick();
   timer = window.setInterval(tick, MS.SECOND);
 
-  const tasks = h("div", { className: "chips" }, ...(s.taskLabel ?? "").split(" + ").map((t) => h("span", { className: "chip static on", textContent: t })));
-  const parts: (HTMLElement | null)[] = [
-    topbar(ending ? { text: "Ending", tone: "warn" } : s.state === "SUSPENDED" ? { text: "Paused" } : { text: "Locked in", tone: "live" }),
-    tasks,
-    h("div", { className: "card" }, h("div", { className: "muted small", textContent: ending ? "Ends in" : "Focused for" }), clock),
-    h("div", { className: "stats" }, stat(String(blockedCount(s)), "blocked so far")),
-  ];
-
-  if (ending) {
-    parts.push(h("p", { className: "muted small", attrs: { role: "status" }, textContent: "Blocks stay on until the countdown finishes." }));
-  } else {
-    const reason = h("input", { type: "text", placeholder: "Why are you ending? (one line)", attrs: { "aria-label": "Reason for ending" } });
-    const end = h("button", { className: "btn danger", textContent: `End (${EXITS.END_COUNTDOWN_SEC}s)` });
-    const err = h("p", { className: "error", attrs: { role: "alert" } });
-    const submit = () =>
-      void call<boolean>({ type: "ui:end", reason: reason.value }).then((ok) => {
-        if (!ok) err.textContent = "Add a one-line reason to end.";
-      });
-    end.addEventListener("click", submit);
-    reason.addEventListener("keydown", (e) => e.key === "Enter" && submit());
-    parts.push(h("h2", { textContent: "End session" }), reason, h("div", { className: "row", attrs: { style: "margin-top:10px" } }, end), err);
-  }
-  main.replaceChildren(...parts.filter((p): p is HTMLElement => p !== null));
+  main.replaceChildren(
+    hero(ending ? { text: "Ending", tone: "warn" } : { text: "Locked in", tone: "live" }, s.taskLabel ?? "Locked in"),
+    ring.el,
+    h("div", { className: "stats" }, stat(String(blockedCount(s)), "blocked"), soFar),
+    actions,
+  );
 }
 
 onStateChange(() => void render());

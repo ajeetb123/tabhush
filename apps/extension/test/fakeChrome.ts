@@ -84,7 +84,10 @@ export function makeChrome(initialTabs: Omit<FakeTab, "groupId" | "lastAccessed"
         dynamicRules = dynamicRules.filter((r) => !o.removeRuleIds?.includes(r.id)).concat(o.addRules ?? []);
       },
     },
-    alarms: { create: async (name: string, a: { when: number }) => void alarms.set(name, a.when) },
+    alarms: {
+      create: async (name: string, a: { when: number }) => void alarms.set(name, a.when),
+      clear: async (name: string) => alarms.delete(name),
+    },
     offscreen: { Reason: { WORKERS: "WORKERS" }, createDocument: vi.fn() },
   };
 
@@ -108,7 +111,7 @@ export function makeChrome(initialTabs: Omit<FakeTab, "groupId" | "lastAccessed"
  * dimensions, so items that share words with the task label score high.
  */
 export function fakeEmbed(texts: string[]): number[][] {
-  const DIMS = 64;
+  const DIMS = 512; // wide enough that unrelated words rarely collide
   return texts.map((t) => {
     const v = new Array<number>(DIMS).fill(0);
     for (const w of t.toLowerCase().split(/[^a-z0-9]+/).filter((x) => x.length > 2)) {

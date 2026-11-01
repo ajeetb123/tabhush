@@ -329,7 +329,7 @@ describe("shipped categories and banking (Q-08, Q-48)", async () => {
     expect(buildJudgeRequest(ctx, "Lab", "https://online.mybank.com/acct", "Checking account")).not.toHaveProperty("title");
   });
   it("uses the decided mapping", () => {
-    expect(CATEGORY_LIST.MAPPING).toEqual({ games: "games", social_networks: "social", shopping: "shopping", "audio-video": "entertainment" });
+    expect(CATEGORY_LIST.MAPPING).toEqual({ games: "games", social_networks: "social", shopping: "shopping", "audio-video": "entertainment", sports: "entertainment" });
     expect(CATEGORY_LIST.BANKING).toBe("bank");
   });
 });

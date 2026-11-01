@@ -26,6 +26,10 @@ Current phase: **beta 1** (`docs/13-release-scope.md`). Nothing from beta 2 or l
 
 No questions, no override, no undo; End has a 30-second countdown. Clear distractions (pure-distraction list, low-scoring UT1 games/social/shopping/video pages, UT1 warez and `streameast` hosts) are blocked; everything else stays open. Claude, ChatGPT, Blender and Stack Overflow are always allowed; YouTube browsing is allowed and videos are judged; music (Spotify, YouTube Music, YouTube videos labelled Music) plays at 30%. A session can cover several tasks. All pages and the overlay were redesigned.
 
+## Owner changes, round 2 (Q-64, 2026-11-01)
+
+No prompts at Start: tasks come from recent tasks or are named on device from the tabs (course codes first), near-duplicates merge silently, and one start screen holds task chips (typed, or spoken when Chrome offers on-device speech), a time goal and the block list. Course codes are remembered locally, never from incognito or domain-only sites. Searches on Google/Bing/DuckDuckGo are blocked when the query matches a distraction topic (measured: 11/16 distractions, 0/16 work searches). UT1 sports sites are blocked. Past the time goal, Stop ends at once. New logo, icons and a more colorful UI.
+
 ## Backend (beta 1 subset)
 
 Install tokens with PoW (Q-06), tier 3 proxy with fixed prompts and strict schema, Free daily cap per UTC day (Q-58), telemetry intake, delete-my-data. Not built: IP rate limits, waves and the global dollar limit (Q-07), remote config (beta 2), licenses (v1), contributions.

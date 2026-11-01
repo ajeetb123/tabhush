@@ -8,7 +8,8 @@
     "fetch-model": "node ../../scripts/fetch-model.mjs",
     "check:bundle": "node ../../scripts/check-bundle.mjs",
     "build-lexicons": "node ../../scripts/build-lexicons.mjs",
-    "build-categories": "node ../../scripts/build-categories.mjs"
+    "build-categories": "node ../../scripts/build-categories.mjs",
+    "icons": "node ../../scripts/make-icons.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "4.3.2",

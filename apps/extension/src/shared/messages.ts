@@ -23,12 +23,10 @@ export type OffscreenReply = { ok: true; vectors: number[][] } | { ok: false; er
 export type FromUi =
   | { type: "ui:start" }
   | { type: "ui:get" }
-  | { type: "ui:rename"; label: string }
-  | { type: "ui:clarify"; labels: string[] }
-  | { type: "ui:sameAs"; taskId: string | null }
-  | { type: "ui:separate"; contextId: string; park: boolean }
+  | { type: "ui:setTasks"; labels: string[] }
   | { type: "ui:toggle"; tabId: number; park: boolean }
-  | { type: "ui:confirm" }
+  | { type: "ui:confirm"; goalMin: number }
+  | { type: "ui:stop" }
   | { type: "ui:undo" }
   | { type: "ui:end"; reason: string }
   | { type: "ui:dismiss" }

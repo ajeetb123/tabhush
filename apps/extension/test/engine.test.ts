@@ -48,73 +48,120 @@ beforeEach(async () => {
 
 async function startToPreview() {
   await engine.start();
-  let s = await session.loadSession();
-  expect(s?.state).toBe("CLARIFY"); // no recent tasks and tier 3 unavailable → clarify
-  await engine.clarify(["Lab report chemistry"]);
-  s = await session.loadSession();
-  expect(s?.state).toBe("SWEEP_PREVIEW");
+  const s = await session.loadSession();
+  expect(s?.state).toBe("SWEEP_PREVIEW"); // Q-64: no prompt, straight to the start screen
   return s!;
 }
 
-describe("Start → clarify → sweep preview", () => {
-  it("opens the session page and asks what the session is for", async () => {
-    await engine.start();
+describe("Start (Q-64: no prompts)", () => {
+  it("opens the start screen with a task named from the tabs", async () => {
+    const s = await startToPreview();
     expect(fake.created.some((u) => u.endsWith("ui/session.html"))).toBe(true);
-    expect((await session.loadSession())?.state).toBe("CLARIFY");
+    expect(s.taskLabel).toBe("Lab report draft chemistry"); // front tab title, cut to 5 words
   });
 
-  it("proposes Netflix for parking, never Canvas, and asks about the other window as a whole", async () => {
+  it("proposes Netflix for blocking, never Canvas or Piazza; other windows are judged tab by tab", async () => {
     const s = await startToPreview();
     expect(s.preview.map((p) => p.tabId)).toEqual([2]);
-    expect(s.separate).toHaveLength(1);
-    expect(s.separate[0]!.tabIds.sort()).toEqual([5, 6]);
   });
 
-  it("parks nothing before Confirm in the first 5 sessions (LOOP-04)", async () => {
+  it("parks nothing before Lock in (LOOP-04)", async () => {
     await startToPreview();
     expect(fake.overlaysShownOn()).toEqual([]);
     expect(fake.rules()).toEqual([]);
   });
 
-  it("Confirm waits until every separate context is answered", async () => {
+  it("several tasks can be set at once; a page for any of them stays open", async () => {
     await startToPreview();
-    await engine.confirm();
-    expect((await session.loadSession())?.state).toBe("SWEEP_PREVIEW");
+    await engine.setTasks(["Calculus homework", "Internship resume"]);
+    let s = (await session.loadSession())!;
+    expect(s.taskIds).toHaveLength(2);
+    expect(s.taskLabel).toBe("Calculus homework + Internship resume");
+    await engine.confirm(45);
+    const tab = { id: 120, windowId: W1, groupId: -1, url: "https://example.org/resume-tips", title: "Internship resume tips", active: true };
+    fake.tabs.set(120, { ...tab, lastAccessed: Date.now() });
+    await fake.chrome.scripting.executeScript({ target: { tabId: 120 } });
+    await engine.onTabChanged(asTab(tab));
+    expect(fake.overlaysShownOn()).not.toContain(120);
+    s = (await session.loadSession())!;
+    expect(s.goalMin).toBe(45);
+  });
+
+  it("near-duplicate task names merge silently (shared course code)", async () => {
+    await startToPreview();
+    await engine.setTasks(["CS2114 project"]);
+    const first = (await session.loadSession())!.taskIds[0];
+    await engine.setTasks(["CS2114 homework"]);
+    expect((await session.loadSession())!.taskIds[0]).toBe(first);
+  });
+
+  it("can't lock in without a task", async () => {
+    await startToPreview();
+    await engine.setTasks([]);
+    await engine.confirm(45);
+    expect((await session.loadSession())!.state).toBe("SWEEP_PREVIEW");
   });
 });
 
-describe("Confirm, undo, End", () => {
-  async function confirmWith(parkOtherWindow: boolean) {
-    const s = await startToPreview();
-    await engine.answerSeparate(s.separate[0]!.id, parkOtherWindow);
-    await engine.confirm();
+describe("Lock in, Stop, End", () => {
+  async function confirmWith(goal = 45) {
+    await startToPreview();
+    await engine.confirm(goal);
     return (await session.loadSession())!;
   }
 
   it("parks with mute + overlay and installs pre-blocks", async () => {
-    const s = await confirmWith(false);
+    const s = await confirmWith();
     expect(s.state).toBe("ACTIVE");
     expect(fake.overlaysShownOn()).toEqual([2]);
     expect(fake.muted.get(2)).toBe(true);
     expect(fake.rules().length).toBeGreaterThan(0);
   });
 
-  it("INV-01: 'Park all' on a separate window still never parks a learning platform", async () => {
-    await confirmWith(true);
-    expect(fake.overlaysShownOn()).toContain(5);
-    expect(fake.overlaysShownOn()).not.toContain(6); // piazza.com
-    expect(fake.overlaysShownOn()).not.toContain(3); // canvas
+  it("the goal is clamped to 15-240 minutes", async () => {
+    expect((await confirmWith(5)).goalMin).toBe(15);
+  });
+
+  it("Q-64: Stop does nothing before the goal", async () => {
+    await confirmWith(25);
+    expect(await engine.stop()).toBe(false);
+    expect((await session.loadSession())!.state).toBe("ACTIVE");
+  });
+
+  it("Q-64: past the goal, Stop ends at once as a normal end and lifts everything", async () => {
+    await confirmWith(25);
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now + 26 * 60_000);
+    expect(await engine.stop()).toBe(true);
+    const s = (await session.loadSession())!;
+    vi.restoreAllMocks();
+    expect(s.state).toBe("ENDED");
+    expect(s.endKind).toBe("normal");
+    expect(s.bail).toBe(false);
+    expect(fake.overlaysHiddenOn()).toContain(2);
+    expect(fake.rules()).toEqual([]);
+  });
+
+  it("past sessions feed the time-goal default", async () => {
+    await confirmWith(25);
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now + 40 * 60_000);
+    await engine.stop();
+    vi.restoreAllMocks();
+    const history = await engine.sessionHistoryMinutes();
+    expect(history).toHaveLength(1);
+    expect(Math.round(history[0]!)).toBe(40);
   });
 
   it("Q-63: a sweep can't be undone; blocks hold until End", async () => {
-    await confirmWith(false);
+    await confirmWith();
     await engine.undo();
     expect(Object.keys((await session.loadSession())!.parked)).toEqual(["2"]);
     expect(fake.overlaysHiddenOn()).not.toContain(2);
   });
 
   it("End: needs a reason, counts down 30 seconds (Q-63), marks ended early, lifts everything", async () => {
-    await confirmWith(false);
+    await confirmWith();
     expect(await engine.requestEnd("  ")).toBe(false);
     expect(await engine.requestEnd("done for today")).toBe(true);
     let s = (await session.loadSession())!;
@@ -130,7 +177,7 @@ describe("Confirm, undo, End", () => {
   });
 
   it("INV-14: an update that arrived mid-session is applied at End", async () => {
-    await confirmWith(false);
+    await confirmWith();
     const { setInternal } = await import("../src/background/settings");
     await setInternal({ pendingUpdate: true });
     await engine.requestEnd("done");
@@ -142,9 +189,8 @@ describe("Confirm, undo, End", () => {
 
 describe("Active session", () => {
   async function active() {
-    const s = await startToPreview();
-    await engine.answerSeparate(s.separate[0]!.id, false);
-    await engine.confirm();
+    await startToPreview();
+    await engine.confirm(45);
   }
 
   it("a new pure-distraction page is parked; a related page is allowed", async () => {
@@ -262,22 +308,32 @@ describe("Active session", () => {
     await open(112, "https://pirate-example.to/movie", "Watch free");
     for (const id of [110, 111, 112]) expect(fake.overlaysShownOn()).toContain(id);
   });
-});
 
-describe("Q-63 several tasks at once", () => {
-  it("the clarify answer can name several tasks; pages for any of them stay open", async () => {
-    await engine.start();
-    await engine.clarify(["Lab report chemistry", "Internship resume"]);
-    const s = (await session.loadSession())!;
-    expect(s.state).toBe("SWEEP_PREVIEW");
-    expect(s.taskIds).toHaveLength(2);
-    expect(s.taskLabel).toBe("Lab report chemistry + Internship resume");
-    await engine.answerSeparate(s.separate[0]!.id, false);
-    await engine.confirm();
-    const tab = { id: 120, windowId: W1, groupId: -1, url: "https://example.org/resume-tips", title: "Internship resume tips", active: true };
-    fake.tabs.set(120, { ...tab, lastAccessed: Date.now() });
-    await fake.chrome.scripting.executeScript({ target: { tabId: 120 } });
-    await engine.onTabChanged(asTab(tab));
-    expect(fake.overlaysShownOn()).not.toContain(120);
+  it("Q-64: a search for a distraction topic is blocked; a work search is not", async () => {
+    await active();
+    await open(130, "https://www.google.com/search?q=lebron+basketball+stats", "lebron basketball stats - Google Search");
+    await open(131, "https://www.google.com/search?q=chemistry+titration+curve", "chemistry titration curve - Google Search");
+    expect(fake.overlaysShownOn()).toContain(130);
+    expect(fake.overlaysShownOn()).not.toContain(131);
+    expect((await session.loadSession())!.parked["130"]?.source).toBe("search_topic");
+  });
+
+  it("Q-64: blocking one search does not block every search", async () => {
+    await active();
+    await open(132, "https://www.google.com/search?q=basketball+scores", "basketball scores - Google Search");
+    await open(133, "https://www.google.com/search?q=lab+report+format", "lab report format - Google Search");
+    expect(fake.overlaysShownOn()).toContain(132);
+    expect(fake.overlaysShownOn()).not.toContain(133);
+  });
+
+  it("Q-64: course codes are remembered from normal tabs, never from incognito or webmail", async () => {
+    await active();
+    await open(140, "https://example.org/cs", "CS 2114 notes");
+    const mail = { id: 141, windowId: W1, groupId: -1, url: "https://mail.google.com/mail/u/0", title: "MATH 1226 grades - Gmail", active: true };
+    await engine.onTabChanged(asTab(mail));
+    const priv = { id: 142, windowId: W1, groupId: -1, url: "https://example.org/x", title: "BIO 1105 private", active: true, incognito: true };
+    await engine.onTabChanged(asTab(priv));
+    const { profile } = (await fake.chrome.storage.local.get("profile")) as { profile?: { courses: string[] } };
+    expect(profile?.courses).toEqual(["CS 2114"]);
   });
 });

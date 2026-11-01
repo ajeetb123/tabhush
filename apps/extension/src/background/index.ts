@@ -6,8 +6,6 @@ import { removePreBlocks } from "./enforce";
 import {
   answerAsk,
   answerParkCheck,
-  answerSeparate,
-  clarify,
   confirm,
   consent,
   dismiss,
@@ -20,11 +18,12 @@ import {
   onYoutubeMeta,
   override,
   overrideBlocked,
-  rename,
   requestEnd,
-  sameAs,
   sessionInProgress,
+  sessionHistoryMinutes,
+  setTasks,
   start,
+  stop,
   togglePreview,
   undo,
 } from "./engine";
@@ -111,20 +110,21 @@ chrome.runtime.onMessage.addListener((msg: FromUi | FromContent | { target?: str
       return done(start());
     case "ui:get":
       return done(
-        (async () => ({ session: await loadSession(), settings: await getSettings(), internal: await getInternal() }))(),
+        (async () => ({
+          session: await loadSession(),
+          settings: await getSettings(),
+          internal: await getInternal(),
+          history: await sessionHistoryMinutes(),
+        }))(),
       );
-    case "ui:rename":
-      return done(rename(m.label));
-    case "ui:clarify":
-      return done(clarify(m.labels));
-    case "ui:sameAs":
-      return done(sameAs(m.taskId));
-    case "ui:separate":
-      return done(answerSeparate(m.contextId, m.park));
+    case "ui:setTasks":
+      return done(setTasks(m.labels));
     case "ui:toggle":
       return done(togglePreview(m.tabId, m.park));
     case "ui:confirm":
-      return done(confirm());
+      return done(confirm(m.goalMin));
+    case "ui:stop":
+      return done(stop());
     case "ui:undo":
       return done(undo());
     case "ui:end":

@@ -20,11 +20,12 @@ describe("build-categories (Q-08, Q-48)", () => {
     put("audio-video", "example-video.com\n");
     put("bank", "mybank.com\n");
     put("warez", "streameast.xyz\n");
+    put("sports", "example-sports.com\n");
     put("adult", "should-not-ship.com\n");
     const out = join(dir, "out");
     execFileSync("node", [script, "--from", dir, "--out", out]);
     expect(readFileSync(join(out, "games.txt"), "utf8")).toBe("kongregate.com\nminiclip.com\n");
-    expect(readFileSync(join(out, "entertainment.txt"), "utf8")).toBe("example-video.com\n");
+    expect(readFileSync(join(out, "entertainment.txt"), "utf8")).toBe("example-sports.com\nexample-video.com\n");
     expect(readFileSync(join(out, "social.txt"), "utf8")).toBe("example-social.com\n");
     expect(readFileSync(join(out, "banking.txt"), "utf8")).toBe("mybank.com\n");
     expect(readFileSync(join(out, "underground.txt"), "utf8")).toBe("streameast.xyz\n");

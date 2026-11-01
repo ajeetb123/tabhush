@@ -270,7 +270,41 @@ export const OWNER_RULES = {
   MUSIC_VOLUME: 0.3,
   UNDERGROUND_LIST: "warez", // UT1 category, blocked for the session
   UNDERGROUND_HOST_KEYWORDS: ["streameast"],
-  MULTI_TASK_MIN_SCORE: 0.6, // two recent tasks this strong → ask with both pre-ticked
+  MULTI_TASK_MIN_SCORE: 0.6, // two recent tasks this strong → both pre-selected
+  // Q-64 search blocking (agent design from measured data; tune at Gate A)
+  SEARCH_ENGINES: ["google", "bing.com", "duckduckgo.com"],
+  SEARCH_DISTRACTION_TOPICS: [
+    "sports scores and players",
+    "basketball",
+    "football",
+    "celebrity gossip",
+    "video games",
+    "online shopping deals",
+    "movies and tv shows",
+    "funny videos",
+    "restaurants and food",
+    "concert tickets",
+    "fashion and sneakers",
+  ],
+  SEARCH_WORK_TOPICS: [
+    "programming and software",
+    "computer science",
+    "math and science homework",
+    "chemistry",
+    "writing an essay",
+    "jobs and careers",
+    "research paper",
+    "studying for an exam",
+  ],
+  SEARCH_TOPIC_MIN: 0.25,
+  SEARCH_TOPIC_MARGIN: 0.1,
+  // Q-64 time goal (agent design)
+  GOAL_PRESETS_MIN: [25, 45, 60, 90],
+  GOAL_MIN_MIN: 15, // max is SESSION.MAX_LENGTH_MIN
+  GOAL_HISTORY_SESSIONS: 10,
+  GOAL_ROUND_MIN: 5,
+  GOAL_OVERAMBITIOUS_FACTOR: 1.5,
+  AUTO_LABEL_MAX_WORDS: 5,
 } as const;
 
 export const CATEGORY_LIST = {
@@ -278,7 +312,7 @@ export const CATEGORY_LIST = {
   LICENSE: "CC BY-SA 4.0",
   MIRROR_REPO: "olbat/ut1-blacklists",
   MIRROR_COMMIT: "03501c64d230df9d84124176558d758351027be1", // 2026-10-12
-  MAPPING: { games: "games", social_networks: "social", shopping: "shopping", "audio-video": "entertainment" } as Readonly<Record<string, Category>>,
+  MAPPING: { games: "games", social_networks: "social", shopping: "shopping", "audio-video": "entertainment", sports: "entertainment" } as Readonly<Record<string, Category>>, // sports: Q-64
   BANKING: "bank", // Q-48: domain-only; health still TODO_Q48
   // Q-62 (owner 2026-11-01): work subdomains (and their subdomains) that never inherit a category
   // from a listed parent domain, e.g. the AWS console under amazon.com (shopping).

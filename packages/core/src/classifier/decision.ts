@@ -20,6 +20,7 @@ export type DecisionSource =
   | "music"
   | "browse"
   | "underground"
+  | "search_topic"
   | "override"
   | "cache"
   | "distraction"

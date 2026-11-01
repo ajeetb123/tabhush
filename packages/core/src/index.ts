@@ -22,3 +22,6 @@ export * from "./review";
 export * from "./availability";
 export * from "./privacy/redactionEval";
 export * from "./metrics";
+export * from "./search";
+export * from "./autoLabel";
+export * from "./goal";

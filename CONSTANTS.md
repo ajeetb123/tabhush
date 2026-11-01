@@ -243,7 +243,7 @@ export const CATEGORY_LIST = {
   LICENSE: "CC BY-SA 4.0",
   MIRROR_REPO: "olbat/ut1-blacklists",
   MIRROR_COMMIT: "03501c64d230df9d84124176558d758351027be1", // 2026-10-12
-  MAPPING: { games: "games", social_networks: "social", shopping: "shopping", "audio-video": "entertainment" },
+  MAPPING: { games: "games", social_networks: "social", shopping: "shopping", "audio-video": "entertainment", sports: "entertainment" }, // sports: Q-64
   BANKING: "bank",                      // Q-48: domain-only; health still TODO_Q48
   EXCEPTIONS: [                         // Q-62: never inherit a category (subdomains included)
     "aws.amazon.com", "developers.facebook.com", "developer.amazon.com", "developer.spotify.com",
@@ -263,7 +263,22 @@ export const OWNER_RULES = {
   MUSIC_VOLUME: 0.3,
   UNDERGROUND_LIST: "warez",            // UT1 category, blocked for the session
   UNDERGROUND_HOST_KEYWORDS: ["streameast"],
-  MULTI_TASK_MIN_SCORE: 0.60,           // = INFERENCE.AUTOFILL_MIN_SCORE: two recent tasks this strong → ask with both pre-ticked
+  MULTI_TASK_MIN_SCORE: 0.60,           // = INFERENCE.AUTOFILL_MIN_SCORE: two recent tasks this strong → both pre-selected
+  // Q-64 search blocking (agent design from measured data; tune at Gate A)
+  SEARCH_ENGINES: ["google", "bing.com", "duckduckgo.com"],
+  SEARCH_DISTRACTION_TOPICS: ["sports scores and players", "basketball", "football", "celebrity gossip", "video games",
+    "online shopping deals", "movies and tv shows", "funny videos", "restaurants and food", "concert tickets", "fashion and sneakers"],
+  SEARCH_WORK_TOPICS: ["programming and software", "computer science", "math and science homework", "chemistry",
+    "writing an essay", "jobs and careers", "research paper", "studying for an exam"],
+  SEARCH_TOPIC_MIN: 0.25,
+  SEARCH_TOPIC_MARGIN: 0.10,
+  // Q-64 time goal (agent design)
+  GOAL_PRESETS_MIN: [25, 45, 60, 90],
+  GOAL_MIN_MIN: 15,                     // max is SESSION.MAX_LENGTH_MIN
+  GOAL_HISTORY_SESSIONS: 10,
+  GOAL_ROUND_MIN: 5,
+  GOAL_OVERAMBITIOUS_FACTOR: 1.5,
+  AUTO_LABEL_MAX_WORDS: 5,              // = INFERENCE.LLM_LABEL_MAX_WORDS
 };
 
 // ───────────────────────── Shared domain prior (docs/05, docs/06) ─────────────────────────

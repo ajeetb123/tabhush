@@ -2,7 +2,7 @@
 // arrives in the fragment and never leaves the device; it goes on the restore list.
 // Owner rule (Q-63): no override here; the block holds until the session ends.
 
-import { BRAND, itemDomain } from "@lockin/core";
+import { itemDomain } from "@lockin/core";
 import { call, h, setTitle } from "./common";
 
 const original = (() => {
@@ -29,10 +29,10 @@ void call<boolean>({ type: "ui:blocked", url: original }).then((active) => {
     h(
       "div",
       { className: "card" },
-      h("div", { className: "mark", textContent: BRAND.NAME.charAt(0), attrs: { "aria-hidden": "true" } }),
-      h("h1", { textContent: "Blocked for this session" }),
+      h("img", { className: "mark", src: chrome.runtime.getURL("icons/logo.svg"), alt: "" }),
+      h("h1", { textContent: "Nope, not right now 🔒" }),
       h("p", { className: "chips", attrs: { style: "justify-content:center;margin:14px 0" } }, h("span", { className: "chip static", textContent: domain })),
-      h("p", { className: "muted", textContent: "It’s on your reopen list for when the session ends." }),
+      h("p", { className: "muted", textContent: "You’re locked in. It’s waiting on your reopen list for when you’re done." }),
       h("div", { className: "row", attrs: { style: "justify-content:center;margin-top:18px" } }, back),
     ),
   );
