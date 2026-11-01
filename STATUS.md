@@ -15,7 +15,7 @@ Current phase: **beta 1** (`docs/13-release-scope.md`). Nothing from beta 2 or l
 | Tier 1, zero-label similarity, tier 3 via backend, verdict cache | Built, tier 3 gated | Tier 3 is off until Q-14/Q-15 (redaction), Q-26 (backend host) and Q-60 (model setting) are answered. |
 | Full never-locked list | Partial | Courseware, meetings, GitHub, localhost, browser pages done. School-hosted courseware (Q-10), package registries (Q-11), school sign-in pages (Q-56) open. Domains need owner check (Q-57). |
 | Consent before the first tier 3 call | Built | PRIV-60, INV-10. |
-| Privacy policy | Not started | Needs the provider's current retention terms checked first (PRIV-20). |
+| Privacy policy | Draft | `docs/privacy-policy-draft.md`, OpenAI retention terms checked 2026-10-31. Legal name, contact, lawful basis and telemetry retention (Q-25) are for the owner. |
 | Basic telemetry | Built, not sent | PRIV-30 allowlist on both ends. The client has no backend host (Q-26). Retention Q-25. |
 | Sampled "Was this park right?" check | Gated | Rate is Q-42. |
 | Exit ladder: override, End | Built | Override outcome when tier 3 is unsure/unavailable is Q-38: the item stays parked. |
