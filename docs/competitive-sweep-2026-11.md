@@ -43,7 +43,7 @@ Prepared for the owner. Facts come from vendor pages and recent reviews found on
 
 ## Recommendations to get the edge and make money
 
-1. **Pick the name now (Q-01).** "LockIn"/"Lock-in" collides with LockIn MCP: trademark risk and you'd fight them in search. Do the trademark search this week; it blocks the domain, landing page and waitlist (Gate 0).
+1. **Pick the name now (Q-01).** "LockIn"/"Lock-in" collides with LockIn MCP: trademark risk and you'd fight them in search. Done 2026-11-01: **Tabhush**. Still to do: the trademark search, then buy the domain, landing page and waitlist (Gate 0).
 2. **Lead with zero setup and privacy**, the two things competitors don't have: "Hit Start. It already knows it's CS 2114. Nothing leaves your laptop." Show it in the Road to SWE clips; a 10-second demo of Start → right task → YouTube music still playing → lebron stats blocked is the ad.
 3. **Publish real numbers.** Run Gate A, then put the wrong-block rate and catch rate on the landing page (only numbers the app recorded, per PROD-03). Nobody in this category does, and a 2.6★ competitor shows how much trust matters.
 4. **Own the student wedge before going broad.** Course awareness is hard for generic tools to copy quickly. Grow through CS clubs and course Discords with the free tier; keep Pro for history, schedules and higher limits as the spec plans.

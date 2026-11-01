@@ -10,7 +10,7 @@ Read this file completely before writing code. It applies to every agent and IDE
   2. The topic doc in `docs/` that owns the area (see `README.md` file map)
   3. `README.md`
 - If code and spec disagree, the spec wins. If you believe the spec is wrong, change the spec in the same PR and say so in the PR description. Never silently diverge.
-- The product name is undecided (`docs/16-open-questions.md` Q-01). Use the working name `lockin` in code identifiers and `Lock-in` in UI strings, isolated in one constant so it can be renamed.
+- The product name is **Tabhush** (owner, 2026-11-01; trademark search pending, `docs/16-open-questions.md` Q-01). UI strings read it from the single `BRAND` constant; internal package names keep the old working name `lockin`.
 
 ## 2. No-invention rules
 

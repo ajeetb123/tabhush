@@ -1,4 +1,4 @@
-// Draws the Lock-in logo (rounded square, violet→pink gradient, white "L" with a focus dot) and
+// Draws the Tabhush logo (rounded square, violet→pink gradient, white "T" with a hush dot) and
 // writes toolbar icons as PNG plus an SVG for pages. Pure Node: shapes are rasterized with 4x4
 // supersampling and encoded with zlib, so no image tools are needed.
 import { writeFileSync, mkdirSync } from "node:fs";
@@ -20,9 +20,9 @@ function sample(x, y) {
   if (!roundRect(x, y, 0, 0, 1, 1, 0.24)) return null;
   const t = Math.min(1, Math.max(0, (x + y) / 2));
   let c = A.map((a, i) => a + (B[i] - a) * t);
-  const stem = roundRect(x, y, 0.3, 0.22, 0.45, 0.78, 0.07);
-  const foot = roundRect(x, y, 0.3, 0.63, 0.72, 0.78, 0.07);
-  const dot = circle(x, y, 0.68, 0.32, 0.085);
+  const stem = roundRect(x, y, 0.425, 0.24, 0.575, 0.78, 0.07);
+  const foot = roundRect(x, y, 0.22, 0.24, 0.78, 0.39, 0.07); // the T's top bar
+  const dot = circle(x, y, 0.74, 0.72, 0.075);
   if (stem || foot || dot) c = [255, 255, 255];
   return c;
 }
@@ -55,5 +55,5 @@ function png(size) {
 }
 
 for (const size of [16, 32, 48, 128]) writeFileSync(`${out}icon-${size}.png`, png(size));
-writeFileSync(`${out}logo.svg`, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6D5DFC"/><stop offset="1" stop-color="#FF5FA2"/></linearGradient></defs><rect width="100" height="100" rx="24" fill="url(#g)"/><rect x="30" y="22" width="15" height="56" rx="7" fill="#fff"/><rect x="30" y="63" width="42" height="15" rx="7" fill="#fff"/><circle cx="68" cy="32" r="8.5" fill="#fff"/></svg>\n`);
+writeFileSync(`${out}logo.svg`, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6D5DFC"/><stop offset="1" stop-color="#FF5FA2"/></linearGradient></defs><rect width="100" height="100" rx="24" fill="url(#g)"/><rect x="42.5" y="24" width="15" height="54" rx="7" fill="#fff"/><rect x="22" y="24" width="56" height="15" rx="7" fill="#fff"/><circle cx="74" cy="72" r="7.5" fill="#fff"/></svg>\n`);
 console.log("icons written to", out);

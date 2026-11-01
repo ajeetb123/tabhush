@@ -2,7 +2,7 @@
 // Q-61), always-allowed tools and music (Q-63), incognito status (EXT-11), credits (Q-08).
 // Locked during a session (LOCK-01).
 
-import { CATEGORY_LIST, LLM, OWNER_RULES, type Tier3Request } from "@lockin/core";
+import { BRAND, CATEGORY_LIST, LLM, OWNER_RULES, type Tier3Request } from "@lockin/core";
 import { call, getSnapshot, h, onStateChange, setTitle, topbar } from "./common";
 
 setTitle("Settings");
@@ -10,7 +10,7 @@ const main = document.querySelector("main")!;
 
 async function tier3Log(): Promise<{ at: number; request: Tier3Request }[]> {
   return new Promise((resolve) => {
-    const open = indexedDB.open("lockin");
+    const open = indexedDB.open(BRAND.ID);
     open.onsuccess = () => {
       const db = open.result;
       if (!db.objectStoreNames.contains("tier3log")) return resolve([]);

@@ -6,8 +6,9 @@ Priority: **P0** blocks beta 1 · **P1** blocks beta 2 / v1 · **P2** blocks a l
 
 ## Product and naming
 
-**Q-01 App name** · P0
+**Q-01 App name** · P0 · **Name chosen 2026-11-01 (owner): Tabhush**; trademark search still to do
 Name, trademark search, domain. Needed this week for Gate 0. Code uses `lockin` until then.
+Answer: **Tabhush**. Chosen over the working name because LockIn MCP (lockinmcp.com) sells a task-aware blocker under the same name (`docs/competitive-sweep-2026-11.md`). `tabhush.com` showed as unregistered in an RDAP lookup on 2026-11-01, and a web search found no app or extension with the name. Before buying the domain: a USPTO trademark search (owner). `BRAND` in the constants module now says Tabhush; internal package and repo names stay `lockin`.
 
 **Q-30 Mac app gap wording** · P2 · **Owner: not blocking for code (2026-10-31)**
 Scope says the Mac app follows "about a month" after the extension, but weeks 4 → 10 is six weeks. Non-blocking; fix copy.

@@ -3,7 +3,7 @@
 // Also the active view with the goal ring and the summary with the reopen list (LOOP-07).
 // The preview cap is TODO_Q17, so every group is shown.
 
-import { defaultGoal, goalNote, goalReached, isTodo, MS, OWNER_RULES, SESSION, SWEEP, typicalMinutes } from "@lockin/core";
+import { BRAND, defaultGoal, goalNote, goalReached, isTodo, MS, OWNER_RULES, SESSION, SWEEP, typicalMinutes } from "@lockin/core";
 import type { ActiveSession, PreviewItem } from "../background/session";
 import { avatar, blockedCount, call, formatDuration, getSnapshot, goalRing, h, onStateChange, setTitle, stat, topbar } from "./common";
 import { listenOnce, onDeviceVoice } from "./voice";
@@ -183,7 +183,7 @@ function activeView(s: ActiveSession): Node[] {
     hero(s.state === "END_COUNTDOWN" ? { text: "Ending", tone: "warn" } : { text: "Locked in", tone: "live" }, "You’re locked in", s.taskLabel ?? undefined),
     h("div", { className: "card" }, ring.el),
     h("div", { className: "stats" }, stat(String(blockedCount(s)), "blocked so far")),
-    h("p", { className: "muted small", textContent: "Before your goal, End lives in the Lock-in button in your toolbar." }),
+    h("p", { className: "muted small", textContent: `Before your goal, End lives in the ${BRAND.NAME} button in your toolbar.` }),
   ];
 }
 
@@ -218,7 +218,7 @@ async function render(): Promise<void> {
   let nodes: Node[];
   if (!s || s.state === "IDLE") {
     setFooter();
-    nodes = [hero(undefined, "No session running", "Press Start in the Lock-in toolbar button.")];
+    nodes = [hero(undefined, "No session running", `Press Start in the ${BRAND.NAME} toolbar button.`)];
   } else if (s.state === "INFERRING") {
     setFooter();
     nodes = [hero({ text: "Starting" }, "Reading your tabs…", "Working out what you’re focused on.")];

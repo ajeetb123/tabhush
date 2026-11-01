@@ -29,7 +29,7 @@ describe("INV-17 overlays keep page state", () => {
     input.value = "half-written answer";
     const href = location.href;
     listener!({ type: "overlay:show", taskLabel: "Lab report", canOverride: true }, {}, () => undefined);
-    expect(document.getElementById("lockin-root")).not.toBeNull();
+    expect(document.getElementById("tabhush-root")).not.toBeNull();
     expect((document.getElementById("draft") as HTMLInputElement).value).toBe("half-written answer");
     expect(document.getElementById("quiz")!.textContent).toBe("Question 3 of 10");
     expect(location.href).toBe(href);
