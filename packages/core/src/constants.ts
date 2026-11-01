@@ -196,6 +196,11 @@ export const LLM = {
   VERDICTS: ["related", "unrelated", "unsure"],
   BILLED_ACCESS_ONLY: true,
   FALLBACK_IF_TOO_SLOW: "TODO_Q37" as Todo | string,
+  // Verified 2026-10-31 in openai@7.47.0 types and OpenAI's model page: "gpt-5-nano" exists but is
+  // deprecated with shutdown 2026-12-11 (OPEN Q-60). Its lowest effort value is not documented.
+  API_MODEL_ID: "gpt-5-nano",
+  API_REASONING_EFFORT: "TODO_Q60" as Todo | "none" | "minimal",
+  STORE_RESPONSES: false, // Responses API stores by default; "processed, not stored by us" (PRIV-20)
 } as const;
 
 export type Category = (typeof LLM.CATEGORIES)[number];
@@ -217,6 +222,8 @@ export const API = {
 export const POW = {
   ALGORITHM: "SHA-256",
   DIFFICULTY_BITS: 18, // Q-06
+  CHALLENGE_BYTES: 16, // [DERIVED] random challenge size
+  INSTALL_TOKEN_BYTES: 32, // [DERIVED] random install token size
 } as const;
 
 export const AI_CAPS = {

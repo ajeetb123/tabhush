@@ -195,6 +195,12 @@ Exactly which desktop features are in the Mac app's free mode beyond the classif
 **Q-57 Platform name → domain mapping** · P0
 The scope names learning platforms, meetings, webmail, web chat and distraction sites, not their domains. The code ships a `[DERIVED]` domain list for each named platform (`CONSTANTS.md` "Domain mapping"). Owner to verify the list; over-inclusion on the never-locked list is the safe direction.
 
+**Q-59 "Same as X?" word overlap measure** · P0
+`05` CLS-31 fires when labels "overlap by ≥ 60% of their words", but not 60% of what (the shorter label, the longer, or the union). The rule is not applied until decided; the similarity and course-code rules work.
+
+**Q-60 GPT-5 nano shutdown and reasoning setting** · P0
+Verified 2026-10-31: OpenAI's deprecations page lists `gpt-5-nano` for removal on **Dec 11, 2026** (recommended replacement `gpt-5.6-luna`), inside beta 1. Its model page does not list which `reasoning.effort` values it accepts, so "lowest reasoning setting" (`minimal` or `none`) is unconfirmed. Owner decides the model for beta 1 and later (check its terms allow minors, as with Q-37), and the effort value after measuring in setup week.
+
 **Q-58 Tier 3 cap day boundary** · P1
 `AI_CAPS` are "per install per day" but the backend cannot see local time. The backend counts per UTC day [DERIVED]. Confirm, or decide how the client's day (4am local) should apply.
 

@@ -184,6 +184,9 @@ export const LLM = {
   VERDICTS: ["related", "unrelated", "unsure"],
   BILLED_ACCESS_ONLY: true,             // never a free tier
   FALLBACK_IF_TOO_SLOW: "TODO_Q37",
+  API_MODEL_ID: "gpt-5-nano",           // verified in the OpenAI SDK 2026-10-31; deprecated, shutdown 2026-12-11 (Q-60)
+  API_REASONING_EFFORT: "TODO_Q60",     // lowest value gpt-5-nano accepts is undocumented
+  STORE_RESPONSES: false,               // Responses API stores for 30+ days unless store: false (PRIV-20)
 };
 
 export const API = {                    // Q-03: /v1/ prefix, JSON errors {"error":{"code","message"}}
@@ -202,6 +205,8 @@ export const API = {                    // Q-03: /v1/ prefix, JSON errors {"erro
 export const POW = {                    // Q-06: SHA-256 hashcash; same cost for install tokens and contribution IDs
   ALGORITHM: "SHA-256",
   DIFFICULTY_BITS: 18,
+  CHALLENGE_BYTES: 16,                  // [DERIVED] random challenge size
+  INSTALL_TOKEN_BYTES: 32,              // [DERIVED] random install token size
 };
 
 export const AI_CAPS = {                // tier 3 calls per install per day [START][RC]
@@ -214,14 +219,28 @@ export const AI_CAPS = {                // tier 3 calls per install per day [STA
 export const REDACTION = {
   PATTERNS: ["email", "phone", "long_number", "url"],
   LONG_NUMBER_MIN_DIGITS: "TODO_Q15",
+  PHONE_FORMATS: "TODO_Q15",
   NAME_RULE: "capitalized word NOT in 50,000-word English dictionary, OR in first-name list -> [NAME]",
   DICTIONARY_SIZE: 50000,               // source TODO_Q14
+  DICTIONARY_SOURCE: "TODO_Q14",
+  FIRST_NAME_LIST_SOURCE: "TODO_Q14",
   NAME_TOKEN: "[NAME]",
   TEST_SET_TITLES: 500,
   TARGET_NAME_RECALL: 0.95,             // over-redacting is fine
 };
 
 // ───────────────────────── Shared domain prior (docs/05, docs/06) ─────────────────────────
+export const REVIEW = {                 // docs/14, docs/06 PRIV-50
+  SAMPLED_CHECK_RATE: "TODO_Q42",       // "Was this park right?" sample rate
+  EXPORT_FORMAT: "TODO_Q28",
+};
+
+export const PROCTORING = { DETECTION: "TODO_Q20" };            // LOCK-03
+export const COURSEWARE = { SCHOOL_MAPPING_SOURCE: "TODO_Q10", PAGE_FINGERPRINT: "TODO_Q10" };
+
+// CLS-04 reference order, behind config so it can flip [RC][OPEN Q-52]
+export const DECISION_ORDER = { LOW_S_TO_TIER3: true, TIER3_BEFORE_ASK: true };
+
 export const SHARED_PRIOR = {
   MIN_DISTINCT_CONTRIBUTION_IDS: 25,
   MIN_CATEGORY_AGREEMENT: 0.80,
@@ -305,6 +324,11 @@ export const LICENSE = {
 export const AGE = {
   MIN_AGE: 13,                          // or higher where local law requires
   DIGITAL_CONSENT_RANGE: [13, 16],      // by country; table source TODO_Q40
+  COUNTRY_TABLE: "TODO_Q40",
+};
+
+export const PROVIDER = {
+  ZDR_APPROVED: false,                  // requested, not confirmed (docs/06 PRIV-20)
 };
 
 // ───────────────────────── Gates (docs/14) ─────────────────────────

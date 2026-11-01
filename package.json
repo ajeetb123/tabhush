@@ -2,7 +2,11 @@
   "name": "lockin",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/core", "apps/extension", "apps/backend"],
+  "workspaces": [
+    "packages/core",
+    "apps/extension",
+    "apps/backend"
+  ],
   "scripts": {
     "build": "npm run build -w @lockin/extension",
     "test": "vitest run",
@@ -10,6 +14,7 @@
     "check:ship": "node scripts/check-ship.mjs"
   },
   "devDependencies": {
+    "@types/node": "^26.6.6",
     "typescript": "5.9.3",
     "vitest": "5.0.5"
   }

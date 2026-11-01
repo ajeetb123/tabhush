@@ -1,0 +1,23 @@
+# Cloudflare Worker (docs/08 BE-00). Worker name follows the working name (Q-01).
+name = "lockin-backend"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+# INV-18: request-body logging is off. Workers Logs / observability stay disabled, and no
+# Logpush job may be attached to this Worker. The code never logs requests.
+[observability]
+enabled = false
+redact_query_string = true
+
+[observability.logs]
+enabled = false
+invocation_logs = false
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lockin"
+# Set from `wrangler d1 create lockin` before the first deploy.
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+# Secrets (never in this file): OPENAI_API_KEY via `wrangler secret put OPENAI_API_KEY`.
