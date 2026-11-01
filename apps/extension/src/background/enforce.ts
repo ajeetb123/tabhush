@@ -30,7 +30,7 @@ export async function sendToTab(tabId: number, msg: ToContent): Promise<boolean>
   return send(tabId, msg);
 }
 
-export async function parkTab(tab: chrome.tabs.Tab, taskLabel: string, canOverride: boolean): Promise<ParkOutcome> {
+export async function parkTab(tab: chrome.tabs.Tab, taskLabel: string, canOverride: boolean, sampledCheck = false): Promise<ParkOutcome> {
   const id = tab.id!;
   const parsed = tab.url ? parseUrl(tab.url) : null;
   if (parsed && isKnownUnreachable(parsed)) {
@@ -38,7 +38,7 @@ export async function parkTab(tab: chrome.tabs.Tab, taskLabel: string, canOverri
     return "closed";
   }
   await chrome.tabs.update(id, { muted: true });
-  const ok = await sendToTab(id, { type: "overlay:show", taskLabel, canOverride });
+  const ok = await sendToTab(id, { type: "overlay:show", taskLabel, canOverride, sampledCheck });
   if (!ok) {
     await chrome.tabs.remove(id);
     return "closed";

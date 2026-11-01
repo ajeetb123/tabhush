@@ -94,3 +94,14 @@ describe("QA-30 accessible overlay", () => {
     document.removeEventListener("keydown", seen);
   });
 });
+
+describe("sampled park check (docs/14)", () => {
+  it("asks 'Was this park right?' only when the park was sampled and reports the answer", () => {
+    listener!({ type: "overlay:show", taskLabel: "Lab report", canOverride: false }, {}, () => undefined);
+    expect(content.shadowRootForTests()!.querySelector('[aria-label="Was this park right?"]')).toBeNull();
+    listener!({ type: "overlay:show", taskLabel: "Lab report", canOverride: false, sampledCheck: true }, {}, () => undefined);
+    const group = content.shadowRootForTests()!.querySelector('[aria-label="Was this park right?"]')!;
+    (group.querySelectorAll("button")[1] as HTMLButtonElement).click();
+    expect(sent).toContainEqual({ type: "check:answer", right: false });
+  });
+});

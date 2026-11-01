@@ -1,7 +1,7 @@
 // Messages between the service worker, content scripts, the offscreen document and UI pages.
 
 export type ToContent =
-  | { type: "overlay:show"; taskLabel: string; canOverride: boolean; overrideNote?: string }
+  | { type: "overlay:show"; taskLabel: string; canOverride: boolean; overrideNote?: string; sampledCheck?: boolean }
   | { type: "overlay:hide" }
   | { type: "ask:show"; taskLabel: string }
   | { type: "ask:hide" };
@@ -11,6 +11,7 @@ export type FromContent =
   | { type: "input:counts"; minuteStart: number; count: number }
   | { type: "ask:answer"; related: boolean }
   | { type: "override:submit"; sentence: string }
+  | { type: "check:answer"; right: boolean }
   | { type: "open:session" };
 
 export type ToOffscreen = { target: "offscreen"; type: "embed"; texts: string[] };

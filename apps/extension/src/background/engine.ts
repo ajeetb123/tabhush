@@ -34,6 +34,7 @@ import {
   recentTasks,
   relatedness,
   sameAsCandidates,
+  shouldSampleParkCheck,
   tier1,
   tier3Available,
   undoOpen,
@@ -443,7 +444,8 @@ export async function confirm(): Promise<void> {
 }
 
 async function recordPark(s: ActiveSession, tab: chrome.tabs.Tab, itemKey: string, source: string, bySweep: boolean, canOverride: boolean): Promise<void> {
-  const outcome = await parkTab(tab, s.taskLabel ?? "", canOverride);
+  // The sampled "Was this park right?" check (docs/14). Rate is TODO_Q42, so nothing is sampled yet.
+  const outcome = await parkTab(tab, s.taskLabel ?? "", canOverride, shouldSampleParkCheck());
   const now = Date.now();
   if (outcome === "closed") s.restoreList.push({ url: tab.url ?? "", title: tab.title ?? "", reason: "closed" });
   else s.parked[String(tab.id)] = { tabId: tab.id!, url: tab.url ?? "", title: tab.title ?? "", itemKey, at: now, bySweep, source };
@@ -693,6 +695,25 @@ export async function overrideBlocked(url: string, sentence: string): Promise<"a
       return "refused";
     }
     return "unavailable";
+  });
+}
+
+/**
+ * Answer to the sampled check. Kept as a review record (exported with review records, Q-28),
+ * never a label. [DERIVED] A "wrong" answer does not unlock the page; the exit ladder does.
+ */
+export async function answerParkCheck(tab: chrome.tabs.Tab, right: boolean): Promise<void> {
+  await withSession(async (s) => {
+    if (!s?.taskLabel || !tab.id || !tab.url || !s.parked[String(tab.id)] || !redactor) return;
+    const rec = buildReviewRecord(redactor, {
+      kind: "sampled_check",
+      taskLabel: s.taskLabel,
+      url: tab.url,
+      title: tab.title ?? "",
+      verdict: right ? "park_right" : "park_wrong",
+      domainOnlySetting: (await getSettings()).domainOnly,
+    });
+    if (rec) await review.add(rec);
   });
 }
 

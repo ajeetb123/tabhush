@@ -104,7 +104,7 @@ function trapFocus(container: HTMLElement): void {
   });
 }
 
-export function showOverlay(taskLabel: string, canOverride: boolean, overrideNote?: string): void {
+export function showOverlay(taskLabel: string, canOverride: boolean, overrideNote?: string, sampledCheck = false): void {
   parked = true;
   pauseAll();
   const root = ensureHost();
@@ -130,6 +130,26 @@ export function showOverlay(taskLabel: string, canOverride: boolean, overrideNot
     note.setAttribute("role", "status");
     note.textContent = overrideNote;
     card.append(note);
+  }
+
+  if (sampledCheck) {
+    const check = document.createElement("div");
+    check.setAttribute("role", "group");
+    check.setAttribute("aria-label", "Was this park right?");
+    const q = document.createElement("p");
+    q.textContent = "Was this park right?";
+    check.append(q);
+    for (const [label, right] of [["Yes", true], ["No", false]] as const) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = label;
+      b.addEventListener("click", () => {
+        send({ type: "check:answer", right });
+        check.remove();
+      });
+      check.append(b);
+    }
+    card.append(check);
   }
 
   const form = document.createElement("form");
@@ -230,7 +250,7 @@ if (!window.__lockinContentLoaded) {
   chrome.runtime.onMessage.addListener((msg: ToContent, _sender, sendResponse) => {
     switch (msg.type) {
       case "overlay:show":
-        showOverlay(msg.taskLabel, msg.canOverride, msg.overrideNote);
+        showOverlay(msg.taskLabel, msg.canOverride, msg.overrideNote, msg.sampledCheck);
         break;
       case "overlay:hide":
         hideOverlay();

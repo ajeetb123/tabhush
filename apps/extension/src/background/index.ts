@@ -5,6 +5,7 @@ import type { FromContent, FromUi } from "../shared/messages";
 import { removePreBlocks } from "./enforce";
 import {
   answerAsk,
+  answerParkCheck,
   answerSeparate,
   clarify,
   confirm,
@@ -96,6 +97,8 @@ chrome.runtime.onMessage.addListener((msg: FromUi | FromContent | { target?: str
       return tab ? done(onInputCounts(tab, m.minuteStart, m.count)) : false;
     case "ask:answer":
       return tab ? done(answerAsk(tab, m.related)) : false;
+    case "check:answer":
+      return tab ? done(answerParkCheck(tab, m.right)) : false;
     case "override:submit":
       return tab ? done(override(tab, m.sentence)) : false;
     case "open:session":

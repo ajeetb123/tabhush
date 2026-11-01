@@ -17,7 +17,7 @@ Current phase: **beta 1** (`docs/13-release-scope.md`). Nothing from beta 2 or l
 | Consent before the first tier 3 call | Built | PRIV-60, INV-10. |
 | Privacy policy | Draft | `docs/privacy-policy-draft.md`, OpenAI retention terms checked 2026-10-31. Legal name, contact, lawful basis and telemetry retention (Q-25) are for the owner. |
 | Basic telemetry | Built, not sent | PRIV-30 allowlist on both ends. The client has no backend host (Q-26). Retention Q-25. |
-| Sampled "Was this park right?" check | Gated | Rate is Q-42. |
+| Sampled "Was this park right?" check | Built, gated | Overlay question and review record are in place; the sample rate is Q-42, so nothing is sampled yet. |
 | Exit ladder: override, End | Built | Override outcome when tier 3 is unsure/unavailable is Q-38: the item stays parked. |
 | Review export, refused-override logging | Logging built, export gated | Format Q-28. |
 
