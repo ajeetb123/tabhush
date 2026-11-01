@@ -58,5 +58,6 @@ export default defineConfig({
       },
     },
   },
+  define: { __BUILD_ID__: JSON.stringify(new Date().toISOString()) },
   plugins: [stripRemoteDefaults(), writeManifest()],
 });

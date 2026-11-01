@@ -12,6 +12,8 @@ export interface Snapshot {
   internal: InternalState;
   /** Actual lengths of past sessions in minutes, oldest first (Q-64 time goal). */
   history: number[];
+  /** Build of the running service worker; differs from the page's after an unreloaded rebuild. */
+  buildId?: string;
 }
 
 export async function call<T = unknown>(msg: FromUi): Promise<T> {

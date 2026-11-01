@@ -33,6 +33,7 @@ import { loadSession } from "./session";
 import { getInternal, getSettings, setInternal, setSettings } from "./settings";
 import { sendTelemetry, TELEMETRY_ALARM, TELEMETRY_PERIOD_MIN } from "./telemetry";
 import { onUpdateAvailable } from "./updates";
+import { BUILD_ID } from "../shared/build";
 
 const START_COMMAND = "start-session";
 const SESSION_PAGE = "ui/session.html";
@@ -126,6 +127,7 @@ chrome.runtime.onMessage.addListener((msg: FromUi | FromContent | { target?: str
           settings: await getSettings(),
           internal: await getInternal(),
           history: await sessionHistoryMinutes(),
+          buildId: BUILD_ID,
         }))(),
       );
     case "ui:setTasks":

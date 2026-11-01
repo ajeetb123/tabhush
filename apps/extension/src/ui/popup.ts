@@ -3,6 +3,7 @@
 // countdown and a one-line reason (Q-63).
 
 import { EXITS, goalReached, MS } from "@lockin/core";
+import { BUILD_ID } from "../shared/build";
 import { blockedCount, call, formatDuration, getSnapshot, goalRing, h, onStateChange, setTitle, stat, topbar } from "./common";
 
 const main = document.querySelector("main")!;
@@ -28,17 +29,51 @@ async function incognitoNotice(): Promise<HTMLElement | null> {
   return h("div", { className: "card small spread" }, h("span", { className: "muted", textContent: "Incognito isn’t covered yet." }), fix);
 }
 
+/** Start, reporting a failure instead of doing nothing. */
+function startButton(text: string): HTMLElement {
+  const start = h("button", { className: "btn primary block", textContent: text });
+  const err = h("p", { className: "error", attrs: { role: "alert" } });
+  start.addEventListener("click", () => {
+    start.disabled = true;
+    void call({ type: "ui:start" })
+      .then(getSnapshot)
+      .then((snap) => {
+        if (snap.session && snap.session.state !== "IDLE" && snap.session.state !== "ENDED") return window.close();
+        err.textContent = "Couldn’t start. Reload Tabhush on chrome://extensions and try again.";
+        start.disabled = false;
+      })
+      .catch((e: Error) => {
+        err.textContent = `Couldn’t start: ${e.message}`;
+        start.disabled = false;
+      });
+  });
+  return h("div", {}, start, err);
+}
+
+/** The service worker is still running an older build than this popup (unpacked rebuild, no reload). */
+function staleNotice(): HTMLElement {
+  const reload = h("button", { className: "btn primary block", textContent: "Finish update" });
+  reload.addEventListener("click", () => chrome.runtime.reload());
+  return h("div", { className: "stack" }, h("p", { className: "note", textContent: "Tabhush was updated. Finish the update to keep going." }), reload);
+}
+
 async function render(): Promise<void> {
-  const { session: s } = await getSnapshot();
+  const snap = await getSnapshot();
+  const { session: s } = snap;
   window.clearInterval(timer);
   setTitle("");
 
+  // INV-14: never reload mid-session; only offer it when nothing is running.
+  const idle = !s || s.state === "IDLE" || s.state === "ENDED";
+  if (idle && snap.buildId !== BUILD_ID) {
+    main.replaceChildren(hero({ text: "Update" }, "Almost ready", "One click and you’re on the new version."), staleNotice());
+    return;
+  }
+
   if (!s || s.state === "IDLE") {
-    const start = h("button", { className: "btn primary block", textContent: "Start" });
-    start.addEventListener("click", () => void call({ type: "ui:start" }).then(() => window.close()));
     main.replaceChildren(
       hero({ text: "Ready" }, "Time to lock in", "It reads your tabs, picks the task, and blocks the rest."),
-      start,
+      startButton("Start"),
       h("div", { className: "row", attrs: { style: "margin-top:10px" } }, reportLink()),
       ...[await incognitoNotice()].filter((n): n is HTMLElement => n !== null),
     );
@@ -53,8 +88,7 @@ async function render(): Promise<void> {
   }
 
   if (s.state === "ENDED") {
-    const start = h("button", { className: "btn primary block", textContent: "Start a new session" });
-    start.addEventListener("click", () => void call({ type: "ui:start" }).then(() => window.close()));
+    const start = startButton("Start a new session");
     const open = h("button", { className: "btn block", textContent: "See last session’s summary" });
     open.addEventListener("click", openSessionPage);
     const won = s.endKind === "normal";
