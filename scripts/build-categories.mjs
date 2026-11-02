@@ -1,4 +1,4 @@
-// Build-time step (Q-08, Q-48): writes the shipped domain-category lists into the extension
+// Build-time step (Q-08, Q-48): writes the shipped domain-category lists into the app
 // package. Source: the UT1 web blacklists (Université Toulouse Capitole), CC BY-SA 4.0, taken
 // from the olbat/ut1-blacklists mirror at a pinned commit. Nothing is fetched at runtime (INV-05).
 //
@@ -8,6 +8,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CATEGORY_LIST, OWNER_RULES } from "../packages/core/src/constants.ts";
+import { fileURLToPath } from "node:url";
 
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`);
@@ -15,7 +16,7 @@ function arg(name) {
 }
 
 const from = arg("from");
-const outDir = arg("out") ?? new URL("../apps/desktop/public/categories/", import.meta.url).pathname;
+const outDir = arg("out") ?? fileURLToPath(new URL("../apps/desktop/public/categories/", import.meta.url));
 const base = `https://raw.githubusercontent.com/${CATEGORY_LIST.MIRROR_REPO}/${CATEGORY_LIST.MIRROR_COMMIT}/blacklists`;
 
 async function domainsOf(ut1Category) {

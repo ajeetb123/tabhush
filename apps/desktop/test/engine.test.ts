@@ -77,6 +77,17 @@ describe("apps (DSK-10, Q-70)", () => {
     expect(appKind(app("LockDown Browser", "com.respondus.x"))).toBe("proctoring");
     expect(appKind(app("Some Tool", "a.b"))).toBe("other");
   });
+
+  it("knows Windows programs by their .exe name (Q-71)", () => {
+    expect(appKind(app("Steam", "steam.exe"))).toBe("distraction");
+    expect(appKind(app("Roblox", "robloxplayerbeta.exe"))).toBe("distraction");
+    expect(appKind(app("Google Chrome", "chrome.exe"))).toBe("browser");
+    expect(appKind(app("Visual Studio Code", "code.exe"))).toBe("tool");
+    expect(appKind(app("Microsoft Word", "winword.exe"))).toBe("tool");
+    expect(appKind(app("Spotify", "spotify.exe"))).toBe("music");
+    expect(appKind(app("Windows Explorer", "explorer.exe"))).toBe("system");
+    expect(appKind(app("Tabhush", "tabhush.exe"))).toBe("system");
+  });
 });
 
 describe("Start and Lock in", () => {

@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { build as viteBuild } from "vite";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const out = join(root, "build");
@@ -30,5 +31,5 @@ await build({ ...common, entryPoints: [join(root, "src/preload.ts")], outfile: j
 console.log("main    dist/main.js, dist/preload.cjs");
 
 // 3. Pages and the classifier window.
-execFileSync("npx", ["vite", "build", "--logLevel", "warn"], { cwd: root, stdio: "inherit" });
+await viteBuild({ configFile: join(root, "vite.config.ts"), logLevel: "warn" });
 console.log("pages   dist/renderer");

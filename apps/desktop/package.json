@@ -14,7 +14,8 @@
     "fetch-model": "node ../../scripts/fetch-model.mjs",
     "build-categories": "node ../../scripts/build-categories.mjs",
     "build-lexicons": "node ../../scripts/build-lexicons.mjs",
-    "icons": "node ../../scripts/make-icons.mjs"
+    "icons": "node ../../scripts/make-icons.mjs",
+    "dist:win": "npm run build && electron-builder --win --publish never"
   },
   "devDependencies": {
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
@@ -39,12 +40,6 @@
       "dist/**/*",
       "package.json"
     ],
-    "extraResources": [
-      {
-        "from": "build/tabhush-helper",
-        "to": "tabhush-helper"
-      }
-    ],
     "asar": true,
     "npmRebuild": false,
     "mac": {
@@ -66,11 +61,41 @@
       "extendInfo": {
         "NSAppleEventsUsageDescription": "Tabhush reads which tab is open in your browser and closes distracting tabs during a focus session. Nothing leaves this Mac.",
         "NSAccessibilityUsageDescription": "Tabhush reads window titles for your focus report and closes distracting tabs in browsers without tab access."
-      }
+      },
+      "extraResources": [
+        {
+          "from": "build/tabhush-helper",
+          "to": "tabhush-helper"
+        }
+      ]
     },
     "dmg": {
       "title": "Tabhush ${version}",
       "artifactName": "Tabhush-${version}-${arch}.${ext}"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build-res/icon.png",
+      "extraResources": [
+        {
+          "from": "native/helper-win.ps1",
+          "to": "tabhush-helper.ps1"
+        }
+      ],
+      "artifactName": "Tabhush-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "shortcutName": "Tabhush"
     }
   }
 }

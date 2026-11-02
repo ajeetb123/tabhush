@@ -159,7 +159,7 @@ async function todayActivity(now: number): Promise<Node[]> {
     void render();
   });
   return [
-    h("h2", { textContent: `Your day on this Mac · ${formatHm(totals.activeMs)}` }),
+    h("h2", { textContent: `Your day on this computer · ${formatHm(totals.activeMs)}` }),
     ...appsCard(segments, from, now, 6),
     h("div", { className: "row" }, more),
   ];

@@ -14,7 +14,8 @@ function section(title: string, ...children: (Node | null)[]): Node[] {
 }
 
 async function render(): Promise<void> {
-  const { settings, session, permissions } = await getSnapshot();
+  const { settings, session, permissions, platform, helperError } = await getSnapshot();
+  const isWin = platform === "win32";
   const locked = session !== null && session.state !== "IDLE" && session.state !== "ENDED";
   const err = h("p", { className: "error", attrs: { role: "alert" } });
   const saved = h("p", { className: "muted small", attrs: { role: "status" } });
@@ -65,14 +66,20 @@ async function render(): Promise<void> {
   const nodes: Node[] = [
     topbar(locked ? { text: "Locked in", tone: "live" } : undefined),
     h("h1", { textContent: settings.onboarded ? "Settings" : `Set up ${BRAND.NAME}` }),
-    h("p", { className: "lead", textContent: locked ? "Settings are locked until the session ends." : "Everything here stays on this Mac." }),
-    ...section(
-      "Permissions",
-      h("p", { textContent: permissions.accessibility ? "Accessibility: on. Window titles are read for your report." : "Accessibility: off. Your report will only show app names." }),
-      permissions.accessibility ? null : h("div", { className: "row" }, allowAx),
-      h("p", { className: "muted small", textContent: `The first time ${BRAND.NAME} reads or closes a browser tab, macOS asks to let it control that browser (Chrome, Safari, Brave, Edge, Arc…). Allow it, or blocked tabs can’t be closed. Firefox only shares its window title.` }),
-      h("div", { className: "row" }, openAuto),
-    ),
+    h("p", { className: "lead", textContent: locked ? "Settings are locked until the session ends." : "Everything here stays on this computer." }),
+    ...(isWin
+      ? section(
+          "Permissions",
+          h("p", { textContent: "Windows needs no permissions. Tabhush reads the window in front and the address bar of Chrome, Edge, Brave, Opera, Vivaldi and Firefox." }),
+          h("p", { className: "muted small", textContent: "To close a blocked tab it brings that browser window to the front for a moment and presses Ctrl+W." }),
+        )
+      : section(
+          "Permissions",
+          h("p", { textContent: permissions.accessibility ? "Accessibility: on. Window titles are read for your report." : "Accessibility: off. Your report will only show app names." }),
+          permissions.accessibility ? null : h("div", { className: "row" }, allowAx),
+          h("p", { className: "muted small", textContent: `The first time ${BRAND.NAME} reads or closes a browser tab, macOS asks to let it control that browser (Chrome, Safari, Brave, Edge, Arc…). Allow it, or blocked tabs can’t be closed. Firefox only shares its window title.` }),
+          h("div", { className: "row" }, openAuto),
+        )),
     ...section(
       "Tracking",
       toggle("Track all day", "trackAllDay", "Log which app, site and window is in front whenever the app runs, not only during sessions. This is what the Activity report shows."),
@@ -95,14 +102,19 @@ async function render(): Promise<void> {
       "Always allowed",
       h("p", { className: "muted small", textContent: "Never blocked: these sites, the apps Claude, ChatGPT and Blender, work apps (developer tools, productivity, education, design), and your school sites." }),
       chips(OWNER_RULES.ALWAYS_ALLOWED_TOOLS),
-      h("p", { className: "muted small", textContent: `Music is always allowed and turned down to ${Math.round(OWNER_RULES.MUSIC_VOLUME * 100)}%: Spotify and Music apps, and music on YouTube.` }),
+      h("p", { className: "muted small", textContent: isWin ? "Music is always allowed: Spotify and music on YouTube." : `Music is always allowed and turned down to ${Math.round(OWNER_RULES.MUSIC_VOLUME * 100)}%: Spotify and Music apps, and music on YouTube.` }),
     ),
     ...section(
       "Blocked during a session",
       h("p", { className: "muted small", textContent: "Games, social apps and streaming apps are quit; distracting tabs are closed in every browser." }),
       chips(DESKTOP.DISTRACTION_APP_NAMES),
     ),
-    ...section("Privacy", h("p", { textContent: "Everything is decided and stored on this Mac. No titles, addresses, app names or task names are sent anywhere." })),
+    ...section("Privacy", h("p", { textContent: "Everything is decided and stored on this computer. No titles, addresses, app names or task names are sent anywhere." })),
+    ...section(
+      "Diagnostics",
+      h("p", { className: "muted small", textContent: "For testers: if tracking or blocking doesn’t work, send this to whoever gave you the app." }),
+      h("code", { className: "diag", textContent: `${platform ?? "?"} · helper: ${helperError ?? "ok"}` }),
+    ),
   ];
 
   nodes.push(

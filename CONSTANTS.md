@@ -446,6 +446,13 @@ Music apps (allowed at MUSIC_VOLUME): Spotify, Music
 Meeting apps (no-input time counts as watching): Zoom, Teams, FaceTime, Webex
 Excluded apps (titles never stored, DSK-30): Messages, Mail, Slack, Discord, Passwords, 1Password
 Proctoring (DSK-10, suspends enforcement): LockDown Browser
+Windows (Q-71): the same lists also hold .exe names. Browsers chrome, msedge, brave, opera, vivaldi, arc,
+  chromium, firefox, zen; system explorer, Task Manager, Start/Search hosts, Settings, terminals, Tabhush;
+  always allowed claude, chatgpt, blender; work apps (TOOL_APPS): VS Code, Cursor, Visual Studio,
+  JetBrains IDEs, Android Studio, Word, Excel, PowerPoint, OneNote, Notion, Obsidian, Acrobat, Notepad,
+  Notepad++, Figma, MATLAB, RStudio, Anki, GoodNotes; blocked Steam, Epic, Battle.net, Discord, WhatsApp,
+  Telegram, Roblox, Minecraft, League of Legends, Riot Client, Valorant, Fortnite; music Spotify;
+  meetings Zoom, Teams, Webex; excluded Outlook, Slack, Discord, WhatsApp, 1Password, KeePassXC, Bitwarden
 EMERGENCY_PASSAGE: "I am choosing to stop this session before my goal. My work will still be here when
   I come back, and this stop will show in my report."     retyped exactly, no paste (Q-70)
 ```

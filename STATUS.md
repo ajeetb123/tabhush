@@ -20,6 +20,10 @@ The Chrome extension is gone; the product is a macOS app in `apps/desktop` (Elec
 | DMG for Apple Silicon and Intel | Built | Ad-hoc signed, not notarized (no $99 Apple account yet). Right-click → Open the first time. |
 | Telemetry, licensing, auto-update, Safari/extension link | Not built | Q-26, DSK-02, DSK-11, DSK-03/12. |
 
+## Windows (Q-71, 2026-11-02)
+
+Same app and engine; the OS layer is `apps/desktop/native/helper-win.ps1` (PowerShell 5.1 + C#). The installer is built on GitHub Actions (`windows.yml`) and downloaded from the run's artifacts. Not verified on a real desktop yet (the CI runner has no user session): a tester's first run is the real check. Not on Windows: music volume, reopening quit apps, background tabs at Start.
+
 ## Extension-era items (history)
 
 The rows below describe the removed extension; most of the engine carried over to the app.

@@ -1,0 +1,45 @@
+# Windows build (Q-71): compiles and smoke-tests the PowerShell helper on a real Windows machine,
+# then builds the installer (Tabhush-Setup-<version>.exe) and keeps it as a downloadable artifact.
+name: windows
+on:
+  push:
+    branches: [main]
+    paths: ["apps/desktop/**", "packages/core/**", "scripts/**", ".github/workflows/windows.yml"]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Helper smoke test (compiles the C# and answers every command)
+        shell: powershell
+        run: |
+          $in = @(
+            '{"id":1,"cmd":"trust"}',
+            '{"id":2,"cmd":"front"}',
+            '{"id":3,"cmd":"apps"}',
+            '{"id":4,"cmd":"tabs"}',
+            '{"id":5,"cmd":"hide","bundleId":"notepad.exe"}',
+            '{"id":6,"cmd":"closeFrontTab","bundleId":"chrome.exe","title":"x"}',
+            '{"id":7,"cmd":"volume","bundleId":"spotify.exe","level":30}',
+            '{"id":8,"cmd":"relaunch","on":false}'
+          ) -join "`n"
+          $out = $in | powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File apps/desktop/native/helper-win.ps1
+          $out
+          $lines = @($out | Where-Object { $_ -match '^\{' })
+          if ($lines.Count -ne 8) { throw "expected 8 replies, got $($lines.Count)" }
+          foreach ($l in $lines) { $r = $l | ConvertFrom-Json; if (-not $r.ok) { throw "command failed: $l" } }
+      - run: npx vitest run apps/desktop/test/engine.test.ts
+      - run: npm run fetch-model -w @lockin/desktop
+      - run: npm run build-categories -w @lockin/desktop
+      - run: npm run dist:win -w @lockin/desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tabhush-Windows
+          path: apps/desktop/release/*.exe
+          retention-days: 30

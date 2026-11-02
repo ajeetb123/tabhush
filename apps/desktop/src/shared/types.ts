@@ -118,6 +118,9 @@ export interface Snapshot {
   endAccess: EndAccess;
   permissions: Permissions;
   front: FrontItem | null;
+  /** Added by the main process: "darwin" or "win32", and the OS helper's last error (for testers). */
+  platform?: string;
+  helperError?: string | null;
 }
 
 export type UiMessage =

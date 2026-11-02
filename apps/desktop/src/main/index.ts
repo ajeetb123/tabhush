@@ -23,10 +23,21 @@ import { HelperSystem } from "./system";
 const here = dirname(fileURLToPath(import.meta.url)); // dist/
 const RENDERER = join(here, "renderer");
 const DEV = !app.isPackaged;
-const SELF_BUNDLE_ID = "com.tabhush.app";
-const HELPER = DEV ? join(here, "..", "build", "tabhush-helper") : join(process.resourcesPath, "tabhush-helper");
-// …/Tabhush.app/Contents/MacOS/Tabhush → …/Tabhush.app (for the relaunch guard).
-const APP_BUNDLE = resolve(process.execPath, "..", "..", "..");
+const IS_WIN = process.platform === "win32";
+const SELF_BUNDLE_ID = IS_WIN ? (DEV ? "electron.exe" : "tabhush.exe") : DEV ? "com.github.Electron" : "com.tabhush.app";
+
+/** The OS layer: the Swift helper on macOS, a PowerShell script on Windows (Q-71). */
+function helperCommand(): { binary: string; args: string[] } {
+  if (IS_WIN) {
+    const script = DEV ? join(here, "..", "native", "helper-win.ps1") : join(process.resourcesPath, "tabhush-helper.ps1");
+    const args = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script];
+    // The relaunch guard reopens Tabhush.exe if it is killed mid-session (packaged builds only).
+    return { binary: "powershell.exe", args: DEV ? args : [...args, "-App", process.execPath] };
+  }
+  const binary = DEV ? join(here, "..", "build", "tabhush-helper") : join(process.resourcesPath, "tabhush-helper");
+  // …/Tabhush.app/Contents/MacOS/Tabhush → …/Tabhush.app (for the relaunch guard).
+  return { binary, args: DEV ? [] : ["--app", resolve(process.execPath, "..", "..", "..")] };
+}
 
 protocol.registerSchemesAsPrivileged([{ scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 
@@ -62,6 +73,7 @@ function showWindow(page: "session" | "report" | "settings" = "session"): void {
       }
     });
     main.once("ready-to-show", () => main?.show());
+    main.on("session-end", allowSessionEnd);
     void main.loadURL(pageUrl(page));
   } else {
     const current = main.webContents.getURL();
@@ -85,6 +97,7 @@ function ensureEmbedder(): Promise<void> {
     webPreferences: { preload: join(here, "preload.cjs"), contextIsolation: true, sandbox: true, backgroundThrottling: false },
   });
   embedReady = embedder.loadURL(pageUrl("embedder"));
+  embedder.on("session-end", allowSessionEnd); // Windows shutdown or sign-out
   embedder.on("closed", () => {
     embedReady = null;
     for (const w of embedWaiting.values()) w.reject(new Error("classifier window closed"));
@@ -173,6 +186,12 @@ function rebuildMenu(): void {
   tray.setContextMenu(Menu.buildFromTemplate(items));
 }
 
+/** Shutting down or signing out always works; the session resumes at the next login. */
+function allowSessionEnd(): void {
+  allowQuit = true;
+  system?.setRelaunchFlag(false);
+}
+
 function quitNow(): void {
   allowQuit = true;
   system.setRelaunchFlag(false);
@@ -196,7 +215,7 @@ function broadcast(): void {
 async function route(m: UiMessage): Promise<unknown> {
   switch (m.type) {
     case "get":
-      return engine.snapshot();
+      return { ...(await engine.snapshot()), platform: process.platform, helperError: system.lastError };
     case "start":
       return engine.start();
     case "setTasks":
@@ -233,11 +252,12 @@ async function route(m: UiMessage): Promise<unknown> {
     case "requestAccessibility":
       return system.accessibilityTrusted(true);
     case "openPrivacyPane":
+      if (IS_WIN) return null;
       return shell.openExternal(`x-apple.systempreferences:com.apple.preference.security?Privacy_${m.pane === "accessibility" ? "Accessibility" : "Automation"}`);
     case "reopen": {
       const r = engine.session?.restoreList[m.index];
       if (r?.url) return shell.openExternal(r.url);
-      if (r?.bundleId) execFile("/usr/bin/open", ["-b", r.bundleId], () => undefined);
+      if (r?.bundleId && !IS_WIN) execFile("/usr/bin/open", ["-b", r.bundleId], () => undefined);
       return null;
     }
     case "open":
@@ -264,7 +284,9 @@ app.whenReady().then(() => {
   const store = new JsonStore(app.getPath("userData"));
   const categories = new Categories(join(RENDERER, "categories"));
   activity = new ActivityLog(store);
-  system = new HelperSystem(HELPER, DEV ? [] : ["--app", APP_BUNDLE], {
+  if (IS_WIN) app.setAppUserModelId(SELF_BUNDLE_ID); // notifications need it on Windows
+  const helper = helperCommand();
+  system = new HelperSystem(helper.binary, helper.args, {
     idleSeconds: () => powerMonitor.getSystemIdleTime(),
     notify: (title, body) => new Notification({ title, body, silent: true }).show(),
   });
@@ -273,7 +295,7 @@ app.whenReady().then(() => {
     categories,
     essentials: () => engine.settings.essentials,
     schoolSites: () => engine.settings.schoolSites,
-    selfBundleId: DEV ? "com.github.Electron" : SELF_BUNDLE_ID,
+    selfBundleId: SELF_BUNDLE_ID,
   });
   engine = new Engine({
     store,
@@ -283,7 +305,7 @@ app.whenReady().then(() => {
     activity,
     categories,
     dev: DEV,
-    selfBundleId: DEV ? "com.github.Electron" : SELF_BUNDLE_ID,
+    selfBundleId: SELF_BUNDLE_ID,
     openWindow: showWindow,
     onChange: broadcast,
     setRelaunch: (on) => system.setRelaunchFlag(on),
@@ -291,12 +313,18 @@ app.whenReady().then(() => {
 
   if (!DEV) app.setLoginItemSettings({ openAtLogin: engine.settings.openAtLogin });
 
-  const icon = nativeImage.createFromPath(join(RENDERER, "icons", "trayTemplate.png"));
-  icon.setTemplateImage(true);
+  // macOS: a template glyph with the timer beside it. Windows: the color icon, timer in the tooltip.
+  const icon = nativeImage.createFromPath(join(RENDERER, "icons", IS_WIN ? "icon-32.png" : "trayTemplate.png"));
+  if (!IS_WIN) icon.setTemplateImage(true);
   tray = new Tray(icon);
   tray.setToolTip(BRAND.NAME);
+  if (IS_WIN) tray.on("click", () => showWindow("session"));
   rebuildMenu();
-  setInterval(() => tray?.setTitle(trayTitle(), { fontType: "monospacedDigit" }), MS.SECOND);
+  setInterval(() => {
+    const t = trayTitle();
+    if (IS_WIN) tray?.setToolTip(t ? `${BRAND.NAME} ·${t}` : BRAND.NAME);
+    else tray?.setTitle(t, { fontType: "monospacedDigit" });
+  }, MS.SECOND);
 
   // The lock screen and sleep count as away (TIME-01).
   powerMonitor.on("lock-screen", () => engine.setLocked(true));

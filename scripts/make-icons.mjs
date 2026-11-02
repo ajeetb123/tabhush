@@ -3,8 +3,9 @@
 // supersampling and encoded with zlib, so no image tools are needed.
 import { writeFileSync, mkdirSync } from "node:fs";
 import { deflateSync } from "node:zlib";
+import { fileURLToPath } from "node:url";
 
-const out = new URL("../apps/desktop/public/icons/", import.meta.url).pathname;
+const out = fileURLToPath(new URL("../apps/desktop/public/icons/", import.meta.url));
 mkdirSync(out, { recursive: true });
 const INK = [29, 33, 37]; // #1D2125
 const SAGE = [134, 181, 166]; // #86B5A6
@@ -59,7 +60,7 @@ writeFileSync(`${out}logo.svg`, `<svg xmlns="http://www.w3.org/2000/svg" viewBox
 
 // Desktop app (Q-70): the app icon on Apple's grid (artwork inset ~10%), and a menu-bar template
 // image (black glyph on transparent; macOS tints it for light and dark menu bars).
-const res = new URL("../apps/desktop/build-res/", import.meta.url).pathname;
+const res = fileURLToPath(new URL("../apps/desktop/build-res/", import.meta.url));
 mkdirSync(res, { recursive: true });
 const inset = (x, y) => {
   const m = 0.1;

@@ -47,6 +47,8 @@ npm run dist
 npm run check:bundle
 ```
 
+**Windows (Q-71):** the Windows installer is built by GitHub Actions on every push that touches the app (`.github/workflows/windows.yml`), or by hand from the Actions tab ("windows" → Run workflow). Download `Tabhush-Windows` from the run's artifacts. On a Windows PC, `npm run dist:win -w @lockin/desktop` builds it locally.
+
 ```bash
 npm run check:ship
 ```

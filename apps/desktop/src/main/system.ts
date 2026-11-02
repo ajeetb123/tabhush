@@ -52,6 +52,9 @@ export class HelperSystem implements System {
   private proc: ChildProcessWithoutNullStreams | null = null;
   private nextId = 1;
   private pending = new Map<number, (r: Reply | null) => void>();
+  private retryAfter = 0;
+  /** The helper's last failure (start error, compile error, stderr), shown in Settings for testers. */
+  lastError: string | null = null;
 
   constructor(
     private readonly binary: string,
@@ -59,20 +62,26 @@ export class HelperSystem implements System {
     private readonly env: { idleSeconds: () => number; notify: (title: string, body: string) => void },
   ) {}
 
-  private ensure(): ChildProcessWithoutNullStreams {
-    if (this.proc && this.proc.exitCode === null) return this.proc;
-    const proc = spawn(this.binary, this.args, { stdio: ["pipe", "pipe", "pipe"] });
+  private ensure(): ChildProcessWithoutNullStreams | null {
+    if (this.proc && this.proc.exitCode === null && !this.proc.killed) return this.proc;
+    // A helper that keeps failing is retried every 30 s, not on every poll.
+    if (Date.now() < this.retryAfter) return null;
+    const started = Date.now();
+    const proc = spawn(this.binary, this.args, { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
     createInterface({ input: proc.stdout }).on("line", (line) => {
       try {
-        const r = JSON.parse(line) as Reply;
+        const r = JSON.parse(line.replace(/^\uFEFF/, "")) as Reply;
+        if (!r.ok && typeof r.error === "string") this.lastError = r.error;
         this.pending.get(r.id)?.(r);
         this.pending.delete(r.id);
       } catch {
         // not a reply line
       }
     });
-    proc.stderr.on("data", () => undefined);
-    proc.on("exit", () => {
+    proc.stderr.on("data", (d: Buffer) => (this.lastError = String(d).trim().slice(0, 500) || this.lastError));
+    proc.on("error", (e) => (this.lastError = `helper didn't start: ${e.message}`));
+    proc.on("exit", (code) => {
+      if (code && Date.now() - started < 30_000) this.retryAfter = Date.now() + 30_000;
       for (const done of this.pending.values()) done(null);
       this.pending.clear();
     });
@@ -92,7 +101,9 @@ export class HelperSystem implements System {
         resolve(r);
       });
       try {
-        this.ensure().stdin.write(JSON.stringify({ id, cmd, ...extra }) + "\n");
+        const proc = this.ensure();
+        if (!proc) throw new Error("helper unavailable");
+        proc.stdin.write(JSON.stringify({ id, cmd, ...extra }) + "\n");
       } catch {
         clearTimeout(timer);
         this.pending.delete(id);

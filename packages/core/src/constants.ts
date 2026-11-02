@@ -403,9 +403,10 @@ export const PERF_EXTENSION = {
 } as const;
 
 // ───────────────────────── Desktop app (docs/11, Q-70) ─────────────────────────
-// Owner, 2026-11-02: the product is a macOS app now (Electron), replacing the extension. App lists
-// below are the agent's first cut from the owner's rules (Q-63: block games, social, streaming,
-// sports; always allow Claude, ChatGPT, Blender); owner to review (Q-70).
+// Owner, 2026-11-02: the product is a desktop app now (Electron), replacing the extension: macOS
+// (Q-70) and Windows (Q-71). Apps are identified by bundle ID on macOS and by .exe name on Windows,
+// so each list holds both. App lists are the agent's first cut from the owner's rules (Q-63: block
+// games, social, streaming, sports; always allow Claude, ChatGPT, Blender); owner to review.
 export const DESKTOP = {
   POLL_MS: 1000, // front app / window / tab, once a second
   ACTIVITY_FLUSH_SEC: 15, // activity log written to disk at least this often
@@ -422,15 +423,26 @@ export const DESKTOP = {
     "com.apple.Safari": "safari", "com.apple.SafariTechnologyPreview": "safari",
     "org.mozilla.firefox": "other", "org.mozilla.firefoxdeveloperedition": "other", "app.zen-browser.zen": "other",
     "com.duckduckgo.macos.browser": "other", "com.kagi.kagimacOS": "other",
+    // Windows (Q-71): the address bar is read with UI Automation, so these behave like "chrome".
+    "chrome.exe": "chrome", "msedge.exe": "chrome", "brave.exe": "chrome", "opera.exe": "chrome",
+    "vivaldi.exe": "chrome", "arc.exe": "chrome", "chromium.exe": "chrome", "firefox.exe": "chrome", "zen.exe": "chrome",
   } as Readonly<Record<string, "chrome" | "safari" | "other">>,
   // Never judged or blocked: the OS and Tabhush itself.
   SYSTEM_APPS: [
     "com.apple.finder", "com.apple.systempreferences", "com.apple.Settings", "com.apple.ActivityMonitor",
     "com.apple.Terminal", "com.apple.loginwindow", "com.apple.dock", "com.apple.Spotlight", "com.tabhush.app",
     "com.github.Electron",
+    "explorer.exe", "tabhush.exe", "electron.exe", "taskmgr.exe", "searchhost.exe", "startmenuexperiencehost.exe",
+    "shellexperiencehost.exe", "lockapp.exe", "systemsettings.exe", "windowsterminal.exe", "cmd.exe", "powershell.exe",
   ],
   // Q-63 always allowed, as apps.
-  ALWAYS_ALLOWED_APPS: ["com.anthropic.claudefordesktop", "com.openai.chat", "org.blenderfoundation.blender"],
+  ALWAYS_ALLOWED_APPS: ["com.anthropic.claudefordesktop", "com.openai.chat", "org.blenderfoundation.blender", "claude.exe", "chatgpt.exe", "blender.exe"],
+  // Work apps on Windows, which has no app categories (allowed).
+  TOOL_APPS: [
+    "code.exe", "cursor.exe", "devenv.exe", "idea64.exe", "pycharm64.exe", "webstorm64.exe", "clion64.exe", "rider64.exe",
+    "studio64.exe", "winword.exe", "excel.exe", "powerpnt.exe", "onenote.exe", "notion.exe", "obsidian.exe", "acrobat.exe",
+    "acrord32.exe", "notepad.exe", "notepad++.exe", "figma.exe", "matlab.exe", "rstudio.exe", "anki.exe", "goodnotes.exe",
+  ],
   // App Store categories of work apps (LSApplicationCategoryType), allowed.
   TOOL_CATEGORIES: [
     "public.app-category.developer-tools", "public.app-category.productivity", "public.app-category.education",
@@ -443,14 +455,20 @@ export const DESKTOP = {
   DISTRACTION_APPS: [
     "com.valvesoftware.steam", "com.hnc.Discord", "net.whatsapp.WhatsApp", "ru.keepcoder.Telegram",
     "com.roblox.RobloxPlayer", "com.mojang.minecraftlauncher", "com.apple.TV",
+    "steam.exe", "steamwebhelper.exe", "epicgameslauncher.exe", "battle.net.exe", "discord.exe", "whatsapp.exe",
+    "telegram.exe", "robloxplayerbeta.exe", "minecraftlauncher.exe", "minecraft.windows.exe", "leagueclient.exe",
+    "leagueclientux.exe", "riotclientservices.exe", "riotclientux.exe", "valorant.exe", "fortniteclient-win64-shipping.exe",
   ],
   DISTRACTION_APP_NAMES: ["Steam", "Epic Games Launcher", "Battle.net", "Discord", "WhatsApp", "Telegram", "Messenger", "Roblox", "Minecraft", "League of Legends", "Riot Client", "Netflix", "Prime Video"],
   // Q-63 music: allowed, at OWNER_RULES.MUSIC_VOLUME during the session.
-  MUSIC_APPS: ["com.spotify.client", "com.apple.Music"],
+  MUSIC_APPS: ["com.spotify.client", "com.apple.Music", "spotify.exe"],
   // Meeting and call apps: allowed; no-input time here counts as watching (TIME-03 video grace).
-  MEETING_APPS: ["us.zoom.xos", "com.microsoft.teams2", "com.apple.FaceTime", "com.cisco.webexmeetingsapp"],
+  MEETING_APPS: ["us.zoom.xos", "com.microsoft.teams2", "com.apple.FaceTime", "com.cisco.webexmeetingsapp", "zoom.exe", "ms-teams.exe", "teams.exe", "webex.exe"],
   // DSK-30 excluded apps: never store titles. Plus password managers.
-  EXCLUDED_APPS: ["com.apple.MobileSMS", "com.apple.mail", "com.tinyspeck.slackmacgap", "com.hnc.Discord", "com.apple.Passwords", "com.1password.1password"],
+  EXCLUDED_APPS: [
+    "com.apple.MobileSMS", "com.apple.mail", "com.tinyspeck.slackmacgap", "com.hnc.Discord", "com.apple.Passwords", "com.1password.1password",
+    "outlook.exe", "olk.exe", "hxoutlook.exe", "slack.exe", "discord.exe", "whatsapp.exe", "1password.exe", "keepassxc.exe", "bitwarden.exe",
+  ],
   // DSK-10: proctoring starts → enforcement suspends.
   PROCTORING_APP_NAMES: ["LockDown Browser"],
   // Q-70 emergency stop task: retype this exactly (no paste) before the 60 s countdown.

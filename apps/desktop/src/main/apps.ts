@@ -24,7 +24,7 @@ export function appKind(app: Pick<AppInfo, "bundleId" | "name" | "category">, se
   if (has(DESKTOP.MEETING_APPS, bundleId)) return "meeting";
   if (has(DESKTOP.DISTRACTION_APPS, bundleId) || has(DESKTOP.DISTRACTION_APP_NAMES, name)) return "distraction";
   if (has(DESKTOP.DISTRACTION_CATEGORIES, category) || category.endsWith("-games")) return "distraction";
-  if (has(DESKTOP.TOOL_CATEGORIES, category)) return "tool";
+  if (has(DESKTOP.TOOL_CATEGORIES, category) || has(DESKTOP.TOOL_APPS, bundleId)) return "tool";
   return "other";
 }
 
@@ -39,5 +39,5 @@ export function stripBrowserSuffix(title: string, appName: string): string {
   for (const sep of [" - ", " — ", " – "]) {
     if (t.endsWith(`${sep}${appName}`)) return t.slice(0, -(sep.length + appName.length)).trim();
   }
-  return t.replace(/\s[-—–]\s(Mozilla Firefox|Google Chrome|Safari)$/, "").trim();
+  return t.replace(/\s[-—–]\s(Mozilla Firefox|Google Chrome|Safari|Microsoft\u200B? Edge|Brave|Opera|Vivaldi)$/, "").trim();
 }

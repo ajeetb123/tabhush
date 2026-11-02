@@ -2,8 +2,9 @@
 // hosts, page CSP not loosened. Run after `npm run build`.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const dist = new URL("../apps/desktop/dist/", import.meta.url).pathname;
+const dist = fileURLToPath(new URL("../apps/desktop/dist/", import.meta.url));
 const REMOTE = [/cdn\.jsdelivr\.net/, /unpkg\.com/, /cdnjs\.cloudflare\.com/, /huggingface\.co\/[^"'`\s]*\/resolve\//];
 const CODE = [/\bnew Function\s*\(/, /(^|[^.\w])eval\s*\(/];
 const problems = [];

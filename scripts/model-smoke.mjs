@@ -4,6 +4,7 @@
 // Node uses native ONNX Runtime, so timings here are not the browser's (QA-50 is measured in Chrome).
 import { env, pipeline } from "@huggingface/transformers";
 import { EMBEDDING } from "../packages/core/src/constants.ts";
+import { fileURLToPath } from "node:url";
 
 const [label, ...items] = process.argv.slice(2);
 if (!label || items.length === 0) {
@@ -12,7 +13,7 @@ if (!label || items.length === 0) {
 }
 env.allowRemoteModels = false;
 env.allowLocalModels = true;
-env.localModelPath = new URL("../apps/desktop/public/models/", import.meta.url).pathname;
+env.localModelPath = fileURLToPath(new URL("../apps/desktop/public/models/", import.meta.url));
 const fe = await pipeline("feature-extraction", EMBEDDING.HF_REPO, { dtype: EMBEDDING.TRANSFORMERS_DTYPE });
 const [l, ...v] = (await fe([label, ...items], { pooling: "mean", normalize: true })).tolist();
 const cos = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
