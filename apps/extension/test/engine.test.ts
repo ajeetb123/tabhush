@@ -170,29 +170,157 @@ describe("Lock in, Stop, End", () => {
     expect(fake.created.length).toBe(created); // nothing reopened
   });
 
-  it("End: needs a reason, counts down 30 seconds (Q-63), marks ended early, lifts everything", async () => {
-    await confirmWith();
+  it("Q-69: a store install can't End before the goal", async () => {
+    await confirmWith(45);
+    expect(await engine.requestEnd("done for today")).toBe(false);
+    expect((await session.loadSession())!.state).toBe("ACTIVE");
+    expect((await engine.endAccess(await session.loadSession())).canEnd).toBe(false);
+  });
+
+  it("End past the goal: needs a reason, counts down 30 seconds (Q-63), a normal end, lifts everything", async () => {
+    await confirmWith(25);
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now + 26 * 60_000);
     expect(await engine.requestEnd("  ")).toBe(false);
     expect(await engine.requestEnd("done for today")).toBe(true);
     let s = (await session.loadSession())!;
     expect(s.state).toBe("END_COUNTDOWN");
     expect(fake.alarms.get(engine.END_ALARM)! - s.endCountdown!.startedAt).toBe(30_000);
-    expect(s.bail).toBe(true); // within 2 minutes of a park
     await engine.finishEnd();
+    vi.restoreAllMocks();
     s = (await session.loadSession())!;
+    expect(s.state).toBe("ENDED");
+    expect(s.endKind).toBe("normal");
+    expect(fake.rules()).toEqual([]);
+  });
+
+  it("INV-14: an update that arrived mid-session is applied at End", async () => {
+    await confirmWith(25);
+    const { setInternal } = await import("../src/background/settings");
+    await setInternal({ pendingUpdate: true });
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now + 26 * 60_000);
+    await engine.requestEnd("done");
+    expect(fake.chrome.runtime.reload).not.toHaveBeenCalled();
+    await engine.finishEnd();
+    vi.restoreAllMocks();
+    expect(fake.chrome.runtime.reload).toHaveBeenCalled();
+  });
+});
+
+describe("ending rules and fail-safes (Q-69)", () => {
+  async function lockedIn() {
+    await engine.start();
+    await engine.confirm(45);
+  }
+
+  it("the owner's dev install ends any time, at once, as ended early", async () => {
+    fake = makeChrome(TABS, { focusedWindow: W1, installType: "development" });
+    vi.stubGlobal("chrome", fake.chrome);
+    await lockedIn();
+    expect((await engine.endAccess(await session.loadSession())).dev).toBe(true);
+    expect(await engine.requestEnd("testing a build")).toBe(true);
+    const s = (await session.loadSession())!;
     expect(s.state).toBe("ENDED");
     expect(s.endKind).toBe("early");
     expect(fake.rules()).toEqual([]);
   });
 
-  it("INV-14: an update that arrived mid-session is applied at End", async () => {
-    await confirmWith();
-    const { setInternal } = await import("../src/background/settings");
-    await setInternal({ pendingUpdate: true });
-    await engine.requestEnd("done");
-    expect(fake.chrome.runtime.reload).not.toHaveBeenCalled();
+  it("Emergency stop: needs a reason, 60 s countdown, shows as an emergency, once a day", async () => {
+    await lockedIn();
+    expect(await engine.emergencyStop(" ")).toBe(false);
+    expect(await engine.emergencyStop("family emergency")).toBe(true);
+    let s = (await session.loadSession())!;
+    expect(s.state).toBe("END_COUNTDOWN");
+    expect(fake.alarms.get(engine.END_ALARM)! - s.endCountdown!.startedAt).toBe(60_000);
+    expect(fake.rules().length).toBeGreaterThan(0); // blocks hold during the countdown
     await engine.finishEnd();
-    expect(fake.chrome.runtime.reload).toHaveBeenCalled();
+    s = (await session.loadSession())!;
+    expect(s.endKind).toBe("emergency");
+    expect(s.emergency?.reason).toBe("family emergency");
+    expect(await engine.emergencyStopsLeft()).toBe(0);
+    await lockedIn();
+    expect(await engine.emergencyStop("again")).toBe(false);
+    expect((await session.loadSession())!.state).toBe("ACTIVE");
+  });
+
+  it("Step away: the clock stops, blocks stay on, and I'm back resumes", async () => {
+    await lockedIn();
+    const t0 = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(t0 + 20 * 60_000);
+    expect(await engine.stepAway()).toBe(true);
+    let s = (await session.loadSession())!;
+    expect(s.state).toBe("IDLE_PAUSED");
+    expect(fake.rules().length).toBeGreaterThan(0);
+    expect(fake.alarms.get(engine.PAUSE_END_ALARM)).toBe(t0 + 140 * 60_000); // 2 h away ends it
+    // A distraction opened while away is still blocked.
+    const tab = { id: 200, windowId: W1, groupId: -1, url: "https://www.netflix.com/title/7", title: "Netflix", active: true };
+    fake.tabs.set(200, { ...tab, lastAccessed: Date.now() });
+    await engine.onTabChanged(asTab(tab));
+    expect(fake.removed).toContain(200);
+    vi.spyOn(Date, "now").mockReturnValue(t0 + 50 * 60_000);
+    expect(await engine.resume()).toBe(true);
+    s = (await session.loadSession())!;
+    expect(s.state).toBe("ACTIVE");
+    // 50 min elapsed, 30 of them away: the 45-minute goal is not reached
+    expect(await engine.stop()).toBe(false);
+    vi.spyOn(Date, "now").mockReturnValue(t0 + 76 * 60_000);
+    expect(await engine.stop()).toBe(true);
+    vi.restoreAllMocks();
+  });
+
+  it("idle: no input counts as away from when it stopped; 30 min pauses, input resumes", async () => {
+    await lockedIn();
+    const t0 = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(t0 + 10 * 60_000);
+    await engine.onIdleState("idle");
+    let s = (await session.loadSession())!;
+    expect(s.idleSince).toBe(t0 + 7 * 60_000);
+    expect(s.focusLog[s.focusLog.length - 1]).toMatchObject({ state: "away", at: t0 + 7 * 60_000 });
+    expect(fake.alarms.get(engine.IDLE_PAUSE_ALARM)).toBe(t0 + 37 * 60_000);
+    vi.spyOn(Date, "now").mockReturnValue(t0 + 37 * 60_000);
+    await engine.idlePause();
+    s = (await session.loadSession())!;
+    expect(s.state).toBe("IDLE_PAUSED");
+    expect(s.pauses[0]).toMatchObject({ startedAt: t0 + 7 * 60_000, auto: true });
+    vi.spyOn(Date, "now").mockReturnValue(t0 + 40 * 60_000);
+    await engine.onIdleState("active");
+    s = (await session.loadSession())!;
+    vi.restoreAllMocks();
+    expect(s.state).toBe("ACTIVE");
+    expect(s.pauses[0]!.endedAt).toBe(t0 + 40 * 60_000);
+  });
+
+  it("idle: an on-task video playing in front is watching, not away", async () => {
+    fake.tabs.get(1)!.audible = true;
+    await lockedIn();
+    await engine.onIdleState("idle");
+    const s = (await session.loadSession())!;
+    expect(s.idleSince).toBeNull();
+    expect(s.focusLog[s.focusLog.length - 1]!.state).toBe("on");
+  });
+
+  it("two hours away ends the session; before the goal it shows as ended while away", async () => {
+    await lockedIn();
+    await engine.stepAway();
+    await engine.pauseTimedOut();
+    const s = (await session.loadSession())!;
+    expect(s.state).toBe("ENDED");
+    expect(s.endKind).toBe("idle");
+    expect(fake.rules()).toEqual([]);
+  });
+
+  it("the report records the site and page in front; mail keeps the site only", async () => {
+    await lockedIn();
+    let s = (await session.loadSession())!;
+    expect(s.focusLog[s.focusLog.length - 1]).toMatchObject({ state: "on", domain: "docs.google.com", title: "Lab report draft chemistry" });
+    const mail = { id: 210, windowId: W1, groupId: -1, url: "https://mail.google.com/mail/u/0/#inbox", title: "Inbox (3) - me@example.com", active: true };
+    fake.tabs.set(210, { ...mail, lastAccessed: Date.now() });
+    await engine.onTabChanged(asTab(mail));
+    s = (await session.loadSession())!;
+    const last = s.focusLog[s.focusLog.length - 1]!;
+    expect(last.domain).toBe("mail.google.com");
+    expect(last.title).toBeUndefined();
   });
 });
 
@@ -428,8 +556,10 @@ describe("after a session ends", () => {
   it("Start works right away, without clicking Done first", async () => {
     await engine.start();
     await engine.confirm(25);
-    await engine.requestEnd("done");
-    await engine.finishEnd();
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now + 26 * 60_000);
+    await engine.stop();
+    vi.restoreAllMocks();
     expect((await session.loadSession())!.state).toBe("ENDED");
     const ended = (await session.loadSession())!.id;
     await engine.start();

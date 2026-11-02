@@ -266,6 +266,11 @@ export const OWNER_RULES = {
     "(feat", "feat.", " ft.", "remix", "lofi", "lo-fi", "ncs", "music video", "dnb", "edm", "playlist", "mix)"], // Q-67
   MUSIC_CHANNEL_MARKERS: [" - topic", "vevo", "ncs"],                                                       // Q-67
   CLOSE_BLOCKED_TABS: true,             // Q-67: blocked tabs are closed (to the reopen list), not covered
+  DEV_INSTALL_ENDS_ANYTIME: true,       // Q-69: the owner's unpacked install can end any time
+  EMERGENCY_HOLD_MS: 3000,              // Q-69: everyone else, before the goal: hold 3 s + reason,
+  EMERGENCY_COUNTDOWN_SEC: 60,          //   then a 60 s countdown,
+  EMERGENCY_STOPS_PER_DAY: 1,           //   once per day; shown as "Emergency stop" in the report
+  REPORT_TITLE_MAX_CHARS: 120,          // Q-69: page titles kept for the full report, on this device only
   UNDERGROUND_LIST: "warez",            // UT1 category, blocked for the session
   UNDERGROUND_HOST_KEYWORDS: ["streameast"],
   MULTI_TASK_MIN_SCORE: 0.60,           // = INFERENCE.AUTOFILL_MIN_SCORE: two recent tasks this strong → both pre-selected

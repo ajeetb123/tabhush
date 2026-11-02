@@ -11,6 +11,15 @@ import {
   dismiss,
   END_ALARM,
   BREAK_ALARM,
+  IDLE_PAUSE_ALARM,
+  PAUSE_END_ALARM,
+  emergencyStop,
+  endAccess,
+  idlePause,
+  onIdleState,
+  pauseTimedOut,
+  resume,
+  stepAway,
   startBreak,
   endBreak,
   finishEnd,
@@ -38,6 +47,7 @@ import { getInternal, getSettings, setInternal, setSettings } from "./settings";
 import { sendTelemetry, TELEMETRY_ALARM, TELEMETRY_PERIOD_MIN } from "./telemetry";
 import { onUpdateAvailable } from "./updates";
 import { BUILD_ID } from "../shared/build";
+import { ACTIVE_TIME } from "@lockin/core";
 
 const START_COMMAND = "start-session";
 const SESSION_PAGE = "ui/session.html";
@@ -64,9 +74,15 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
   void chrome.tabs.query({ active: true, windowId }).then(([t]) => onFocusChange(t?.id ?? null), () => undefined);
 });
 
+// Q-69: no input for a few minutes counts as away; 30 min pauses the session, 2 h ends it.
+chrome.idle.setDetectionInterval(ACTIVE_TIME.NO_INPUT_STOP_MIN * 60);
+chrome.idle.onStateChanged.addListener((state) => void onIdleState(state));
+
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === END_ALARM) void finishEnd();
   if (alarm.name === BREAK_ALARM) void endBreak();
+  if (alarm.name === IDLE_PAUSE_ALARM) void idlePause();
+  if (alarm.name === PAUSE_END_ALARM) void pauseTimedOut();
   if (alarm.name === TELEMETRY_ALARM) void sendTelemetry();
 });
 
@@ -147,6 +163,7 @@ chrome.runtime.onMessage.addListener((msg: FromUi | FromContent | { target?: str
       return done(
         (async () => ({
           session: await loadSession(),
+          endAccess: await endAccess(await loadSession()),
           settings: await getSettings(),
           internal: await getInternal(),
           history: await sessionHistoryMinutes(),
@@ -169,6 +186,12 @@ chrome.runtime.onMessage.addListener((msg: FromUi | FromContent | { target?: str
       return done(undo());
     case "ui:end":
       return done(requestEnd(m.reason));
+    case "ui:emergency":
+      return done(emergencyStop(m.reason));
+    case "ui:stepAway":
+      return done(stepAway());
+    case "ui:resume":
+      return done(resume());
     case "ui:dismiss":
       return done(dismiss());
     case "ui:consent":

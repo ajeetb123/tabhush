@@ -2,6 +2,7 @@
 // system font, dark mode, no badges or confetti.
 
 import { BRAND, MS } from "@lockin/core";
+import type { EndAccess } from "../background/engine";
 import type { ActiveSession } from "../background/session";
 import type { InternalState, UserSettings } from "../background/settings";
 import type { FromUi } from "../shared/messages";
@@ -14,6 +15,8 @@ export interface Snapshot {
   history: number[];
   /** Build of the running service worker; differs from the page's after an unreloaded rebuild. */
   buildId?: string;
+  /** Who may end now, and how (Q-69). Missing from a stale worker. */
+  endAccess?: EndAccess;
 }
 
 export async function call<T = unknown>(msg: FromUi): Promise<T> {

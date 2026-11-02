@@ -1,6 +1,6 @@
 // Report math (UI-02, UI-04; Q-65).
 import { describe, expect, it } from "vitest";
-import { dayReport, dayStart, focusSplit, formatHm, weekReport, type SessionLike } from "../src/ui/reportData";
+import { dayReport, dayStart, focusSplit, formatHm, offClockMs, sessionTimeline, siteBreakdown, weekReport, type SessionLike } from "../src/ui/reportData";
 
 const H = 3_600_000;
 const M = 60_000;
@@ -57,5 +57,42 @@ describe("report", () => {
 
   it("an empty day says so", () => {
     expect(dayReport([], at(12)).insight).toBe("No sessions yet today. Hit Start when you’re ready.");
+  });
+
+  it("Q-69: time per site and page, on task and off, most time first", () => {
+    const s = sess("x", "CS 2114", at(14), at(15), {
+      focusLog: [
+        { at: at(14), state: "on", domain: "docs.google.com", title: "HW3 draft" },
+        { at: at(14, 20), state: "on", domain: "stackoverflow.com", title: "Java generics" },
+        { at: at(14, 30), state: "on", domain: "docs.google.com", title: "HW3 draft" },
+        { at: at(14, 40), state: "off", domain: "reddit.com", title: "r/nba" },
+        { at: at(14, 45), state: "away" },
+        { at: at(14, 50), state: "on", domain: "docs.google.com", title: "HW3 notes" },
+        { at: at(15), state: "away" },
+      ],
+    });
+    const sites = siteBreakdown(s, at(16));
+    expect(sites.map((x) => [x.domain, x.onTask, x.ms / M])).toEqual([
+      ["docs.google.com", true, 40],
+      ["stackoverflow.com", true, 10],
+      ["reddit.com", false, 5],
+    ]);
+    expect(sites[0]!.pages).toEqual([
+      { title: "HW3 draft", ms: 30 * M },
+      { title: "HW3 notes", ms: 10 * M },
+    ]);
+    const tl = sessionTimeline(s, at(16));
+    expect(tl.map((t) => [t.state, t.domain, (t.to - t.from) / M])).toEqual([
+      ["on", "docs.google.com", 20],
+      ["on", "stackoverflow.com", 10],
+      ["on", "docs.google.com", 10],
+      ["off", "reddit.com", 5],
+      ["away", null, 5],
+      ["on", "docs.google.com", 10],
+    ]);
+  });
+
+  it("Q-69: breaks and pauses are off the clock; a running one counts up to now", () => {
+    expect(offClockMs({ breaks: [{ startedAt: at(14), endedAt: at(14, 5) }], pauses: [{ startedAt: at(15), endedAt: null }] }, at(15, 10))).toBe(15 * M);
   });
 });

@@ -19,7 +19,8 @@ To decide whether a tab belongs to what you're working on, Tabhush looks at, **o
 - the address and title of your open tabs;
 - a short summary of a page: its title, description and top headings;
 - for YouTube videos, YouTube's own category label, the video title and channel name;
-- how many keys, clicks and scrolls happen on a page, as counts only. Tabhush never reads what you type.
+- how many keys, clicks and scrolls happen on a page, as counts only. Tabhush never reads what you type;
+- whether your computer is in use, idle or locked (Chrome's "idle" signal), so time away from the computer isn't counted as work.
 
 It compares these with your task using rules, site lists and a small model that ships inside the extension. Nothing is sent anywhere to make that decision. Tabhush never takes screenshots.
 
@@ -28,7 +29,7 @@ It compares these with your task using rules, site lists and a small model that 
 Stored in your browser, on your computer:
 
 - your tasks and the courses it has noticed (like "CS 2114"), so it can name your next session for you;
-- your sessions: when they ran, your time goal, which sites were blocked and when, breaks, and how much time was on task;
+- your sessions: when they ran, your time goal, which sites were blocked and when, breaks and pauses, and how long each site and page was in front (its address and title; for mail, chat, banking and incognito tabs, the site only);
 - your settings: school sites, essentials, and similar.
 
 It never learns from incognito tabs or from email, chat or banking sites. Uninstalling Tabhush deletes all of this.

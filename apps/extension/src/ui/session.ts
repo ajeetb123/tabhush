@@ -5,7 +5,10 @@
 
 import { BRAND, defaultGoal, goalNote, goalReached, isTodo, MS, OWNER_RULES, SESSION, SWEEP, typicalMinutes } from "@lockin/core";
 import type { ActiveSession, PreviewItem } from "../background/session";
-import { avatar, blockedCount, call, formatDuration, getSnapshot, goalRing, h, onStateChange, setTitle, stat, topbar } from "./common";
+import { avatar, blockedCount, call, formatDuration, getSnapshot, goalRing, h, onStateChange, setTitle, stat, topbar, type Snapshot } from "./common";
+import { exitActions, stopButton } from "./exits";
+import { asSessionLike, offClockMs } from "./reportData";
+import { endLabel, sessionDetail } from "./sessionDetail";
 import { listenOnce, onDeviceVoice } from "./voice";
 
 const main = document.querySelector("main")!;
@@ -168,27 +171,41 @@ function startView(s: ActiveSession, history: number[]): Node[] {
 
 let tick: number | undefined;
 
-function activeView(s: ActiveSession): Node[] {
+function activeView(s: ActiveSession, snap: Snapshot): Node[] {
   setTitle(s.taskLabel ?? "");
   const ring = goalRing();
-  const stopBtn = h("button", { className: "btn primary", textContent: "Stop, I’m done" });
-  stopBtn.addEventListener("click", () => void call({ type: "ui:stop" }));
-  const breakTotal = () => (s.breaks ?? []).reduce((sum, b) => sum + ((b.endedAt ?? Date.now()) - b.startedAt), 0);
+  const paused = s.state === "IDLE_PAUSED";
+  const actions = h("div", { className: "card stack" });
+  let shownReached: boolean | null = null;
   const update = () => {
-    const elapsed = Date.now() - (s.committedAt ?? s.startedAt) - breakTotal();
-    const reached = goalReached(s.committedAt, s.goalMin, Date.now(), breakTotal());
-    ring.update(elapsed, s.goalMin, reached ? "goal reached" : s.goalMin ? `of ${s.goalMin} min` : "");
-    setFooter(...(reached ? [h("span", { className: "muted small", textContent: "You hit your goal. Keep going or stop now." }), stopBtn] : []));
+    const now = Date.now();
+    const elapsed = now - (s.committedAt ?? s.startedAt) - offClockMs(s, now);
+    const reached = goalReached(s.committedAt, s.goalMin, now, offClockMs(s, now));
+    ring.update(elapsed, s.goalMin, paused ? "paused" : reached ? "goal reached" : s.goalMin ? `of ${s.goalMin} min` : "");
+    setFooter(...(reached && !paused ? [h("span", { className: "muted small", textContent: "You hit your goal. Keep going or stop now." }), stopButton(false)] : []));
+    if (reached !== shownReached && s.state === "ACTIVE") {
+      shownReached = reached;
+      actions.replaceChildren(exitActions(snap.endAccess, reached));
+    }
   };
   update();
-  tick = window.setInterval(update, MS.SECOND);
+  if (!paused) tick = window.setInterval(update, MS.SECOND);
+  if (paused) {
+    const back = h("button", { className: "btn primary block", textContent: "I’m back" });
+    back.addEventListener("click", () => void call({ type: "ui:resume" }));
+    actions.replaceChildren(back);
+  }
+  const pill = s.state === "END_COUNTDOWN" ? { text: s.emergency ? "Emergency stop" : "Ending", tone: "warn" as const } : paused ? { text: "Stepped away" } : { text: "Locked in", tone: "live" as const };
   return [
     s.state === "ON_BREAK"
       ? hero({ text: "On a break" }, "Take a breather", "Everything’s unlocked for now. It locks again on its own.")
-      : hero(s.state === "END_COUNTDOWN" ? { text: "Ending", tone: "warn" } : { text: "Locked in", tone: "live" }, "You’re locked in", s.taskLabel ?? undefined),
+      : paused
+        ? hero(pill, "Go do your thing", "Your clock is stopped and blocks stay on. Press “I’m back” when you return.")
+        : hero(pill, "You’re locked in", s.taskLabel ?? undefined),
     h("div", { className: "card" }, ring.el),
     h("div", { className: "stats" }, stat(String(blockedCount(s)), "blocked so far")),
-    h("p", { className: "muted small", textContent: `Before your goal, End lives in the ${BRAND.NAME} button in your toolbar.` }),
+    ...(s.state === "ACTIVE" || paused ? [actions] : []),
+    h("p", { className: "muted small", textContent: `The ${BRAND.NAME} button in your toolbar has the same controls.` }),
   ];
 }
 
@@ -203,9 +220,11 @@ function endedView(s: ActiveSession): Node[] {
   setFooter(h("div", { className: "row" }, report, done), again);
   const duration = (s.endedAt ?? Date.now()) - (s.committedAt ?? s.startedAt);
   const won = s.endKind === "normal";
+  const label = endLabel(asSessionLike(s));
   const out: Node[] = [
-    hero({ text: won ? "Goal reached" : "Ended early" }, won ? "Session complete" : "Session over", s.taskLabel ?? undefined),
-    h("div", { className: "stats" }, stat(formatDuration(duration), "locked in"), stat(s.goalMin ? `${s.goalMin} min` : "–", "goal"), stat(String(blockedCount(s)), "blocked")),
+    hero({ text: label.charAt(0).toUpperCase() + label.slice(1) }, won ? "Session complete" : "Session over", s.taskLabel ?? undefined),
+    h("div", { className: "stats" }, stat(formatDuration(duration), "locked in"), stat(s.goalMin ? `${s.goalMin} min` : "–", "goal")),
+    sessionDetail(asSessionLike(s)),
   ];
   const byDomain = new Map<string, number>();
   for (const e of s.blockEvents ?? []) if (e.domain) byDomain.set(e.domain, (byDomain.get(e.domain) ?? 0) + 1);
@@ -233,7 +252,8 @@ function endedView(s: ActiveSession): Node[] {
 
 async function render(): Promise<void> {
   window.clearInterval(tick);
-  const { session: s, history } = await getSnapshot();
+  const snap = await getSnapshot();
+  const { session: s, history } = snap;
   let nodes: Node[];
   if (!s || s.state === "IDLE") {
     setFooter();
@@ -243,7 +263,7 @@ async function render(): Promise<void> {
     nodes = [hero({ text: "Starting" }, "Reading your tabs…", "Working out what you’re focused on.")];
   } else if (s.state === "SWEEP_PREVIEW") nodes = startView(s, history);
   else if (s.state === "ENDED") nodes = endedView(s);
-  else nodes = activeView(s);
+  else nodes = activeView(s, snap);
   const focused = document.activeElement?.getAttribute("aria-label");
   main.replaceChildren(...nodes);
   if (focused) main.querySelector<HTMLElement>(`[aria-label="${CSS.escape(focused)}"]`)?.focus();

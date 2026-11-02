@@ -253,6 +253,13 @@ The owner found the UI "looks like AI" and asked for clean and smooth, a nice no
 1. The owner could still watch a blocked piracy site after a refresh (muted). Blocked tabs are now **closed** and put on the reopen list instead of covered (amends INV-17 and LOCK-05). The last tab in a window becomes the blocked page, so the window never closes.
 2. Music on YouTube: YouTube only writes its genre label on a full page load, so a song reached by clicking from another video was judged as an ordinary video. Videos are now also allowed as music when the title or channel shows clear markers (`OWNER_RULES.MUSIC_TITLE_MARKERS`, `MUSIC_CHANNEL_MARKERS`: "official audio", "lyrics", "feat.", "- Topic", VEVO, NCS…), which errs toward allowing. A YouTube video is judged only after the content script reports its genre, title and channel, so a song is never closed in the moment before its label arrives.
 
+**Q-69 Ending rules, fail-safes, full session report** · **Resolved 2026-11-02 (owner; details by the agent)**
+1. **Who can end early:** the owner (a development install, i.e. `chrome.management.getSelf().installType === "development"`) can end any time, at once. Everyone else can't end before their time goal; past it, Stop works as before.
+2. **Fail-safes for everyone else** (the owner asked for one for dire moments, "they have to get up from their chair"):
+   - **Step away**: pauses the session. Blocks stay on, the clock and the goal stop; "I'm back" resumes. It also pauses on its own after 30 min without input (`SESSION.IDLE_PAUSE_AFTER_MIN`) and ends normally after 2 h idle (`IDLE_END_AFTER_MIN`), as LOOP-11 specifies.
+   - **Emergency stop**: hold the button 3 s, give a one-line reason, then a 60 s countdown; **once per day**; shown as "Emergency stop" in the report. LOCK-04's principle stands: there is always a way out, it is just costly and visible.
+3. **Full session report:** time per site and per page (title), on task and off, from the front tab while the browser is in front. Time with no input for 3 min (`ACTIVE_TIME.NO_INPUT_STOP_MIN`, via `chrome.idle`) counts as away. Titles stay on the device (PRIV-01); mail, chat, banking and incognito tabs keep the site only. A video or call playing in an on-task front tab counts as watching, not away (a simplified TIME-03; the 20-minute video grace isn't built).
+
 **Q-58 Tier 3 cap day boundary** · P1
 `AI_CAPS` are "per install per day" but the backend cannot see local time. The backend counts per UTC day [DERIVED]. Confirm, or decide how the client's day (4am local) should apply.
 

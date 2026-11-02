@@ -33,6 +33,9 @@ export type FromUi =
   | { type: "ui:breakEnd" }
   | { type: "ui:undo" }
   | { type: "ui:end"; reason: string }
+  | { type: "ui:emergency"; reason: string }
+  | { type: "ui:stepAway" }
+  | { type: "ui:resume" }
   | { type: "ui:dismiss" }
   | { type: "ui:consent"; granted: boolean }
   | { type: "ui:settings"; patch: Partial<import("../background/settings").UserSettings> }

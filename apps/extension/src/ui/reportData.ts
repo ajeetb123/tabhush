@@ -7,7 +7,7 @@
 //   Insight: the most-blocked site and when, plus when the longest session ran (Q-21, Q-65).
 
 import { ACTIVE_TIME, MS, REPORT } from "@lockin/core";
-import type { ActiveSession } from "../background/session";
+import type { ActiveSession, EndKind, FocusEntry } from "../background/session";
 
 // Muted task colors: sage, clay, slate blue, ochre, plum, teal.
 export const TASK_COLORS = ["#6f9a8b", "#c48a64", "#7487ad", "#bfa35a", "#9a7aa6", "#5f97a3"] as const;
@@ -19,9 +19,12 @@ export interface SessionLike {
   committedAt: number | null;
   endedAt: number | null;
   goalMin: number | null;
-  endKind: "normal" | "early" | null;
+  endKind: EndKind | null;
   blockEvents: { at: number; domain: string }[];
-  focusLog: { at: number; state: "on" | "off" | "away" }[];
+  focusLog: FocusEntry[];
+  breaks?: { startedAt: number; endedAt: number | null }[];
+  pauses?: { startedAt: number; endedAt: number | null }[];
+  emergencyReason?: string | null;
 }
 
 export function asSessionLike(s: ActiveSession): SessionLike {
@@ -35,7 +38,72 @@ export function asSessionLike(s: ActiveSession): SessionLike {
     endKind: s.endKind,
     blockEvents: s.blockEvents ?? [],
     focusLog: s.focusLog ?? [],
+    breaks: s.breaks ?? [],
+    pauses: s.pauses ?? [],
+    emergencyReason: s.emergency?.reason ?? null,
   };
+}
+
+/** Break and pause time so far; neither counts toward the goal (Q-34, Q-69). */
+export function offClockMs(s: { breaks?: { startedAt: number; endedAt: number | null }[]; pauses?: { startedAt: number; endedAt: number | null }[] }, now: number): number {
+  const sum = (list: { startedAt: number; endedAt: number | null }[] = []) => list.reduce((a, b) => a + Math.max(0, (b.endedAt ?? now) - b.startedAt), 0);
+  return sum(s.breaks) + sum(s.pauses);
+}
+
+export interface PageTime {
+  title: string;
+  ms: number;
+}
+
+export interface SiteTime {
+  domain: string;
+  onTask: boolean;
+  ms: number;
+  pages: PageTime[];
+}
+
+export interface TimelineItem {
+  from: number;
+  to: number;
+  state: "on" | "off" | "away";
+  domain: string | null;
+  title: string | null;
+}
+
+/** Each stretch of the session in order, with the site and page in front (Q-69 full report). */
+export function sessionTimeline(s: SessionLike, now: number): TimelineItem[] {
+  if (s.committedAt === null) return [];
+  const end = s.endedAt ?? now;
+  const out: TimelineItem[] = [];
+  const log = s.focusLog.length ? s.focusLog : [{ at: s.committedAt, state: "on" as const }];
+  for (let i = 0; i < log.length; i++) {
+    const e = log[i]!;
+    const from = Math.max(e.at, s.committedAt);
+    const to = Math.min(log[i + 1]?.at ?? end, end);
+    if (to <= from) continue;
+    const item: TimelineItem = { from, to, state: e.state, domain: e.state === "away" ? null : (e.domain ?? null), title: e.state === "away" ? null : (e.title ?? null) };
+    const last = out[out.length - 1];
+    if (last && last.to === from && last.state === item.state && last.domain === item.domain && last.title === item.title) last.to = to;
+    else out.push(item);
+  }
+  return out;
+}
+
+/** Time per site, and per page within it, most time first (Q-69 full report). */
+export function siteBreakdown(s: SessionLike, now: number): SiteTime[] {
+  const sites = new Map<string, SiteTime & { byTitle: Map<string, number> }>();
+  for (const t of sessionTimeline(s, now)) {
+    if (t.state === "away") continue;
+    const domain = t.domain ?? "Other";
+    const key = `${t.state}|${domain}`;
+    const site = sites.get(key) ?? { domain, onTask: t.state === "on", ms: 0, pages: [], byTitle: new Map() };
+    site.ms += t.to - t.from;
+    if (t.title) site.byTitle.set(t.title, (site.byTitle.get(t.title) ?? 0) + t.to - t.from);
+    sites.set(key, site);
+  }
+  return [...sites.values()]
+    .map(({ byTitle, ...site }) => ({ ...site, pages: [...byTitle.entries()].map(([title, ms]) => ({ title, ms })).sort((a, b) => b.ms - a.ms) }))
+    .sort((a, b) => b.ms - a.ms);
 }
 
 /** Start of the "day" (4am local) that contains t. */

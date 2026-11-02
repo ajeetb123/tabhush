@@ -1,9 +1,10 @@
-// Toolbar popup (UI-05): Start, the current task(s) and the goal ring, then Stop or End.
-// Q-64: past the time goal, Stop ends at once (normal end); before it, End keeps the 30-second
-// countdown and a one-line reason (Q-63).
+// Toolbar popup (UI-05): Start, the current task(s) and the goal ring, then Stop or the exits.
+// Q-64: past the time goal, Stop ends at once (normal end). Q-69: before it, only the owner's dev
+// install can End; everyone else has Step away and the once-a-day Emergency stop.
 
-import { BREAKS, breakMinutesAvailable, EXITS, goalReached, MS } from "@lockin/core";
-import { asSessionLike, focusSplit } from "./reportData";
+import { BREAKS, breakMinutesAvailable, EXITS, goalReached, MS, OWNER_RULES } from "@lockin/core";
+import { asSessionLike, focusSplit, offClockMs } from "./reportData";
+import { exitActions, stopButton } from "./exits";
 import { BUILD_ID } from "../shared/build";
 import { blockedCount, call, formatDuration, getSnapshot, goalRing, h, onStateChange, setTitle, stat, topbar } from "./common";
 
@@ -113,7 +114,7 @@ async function render(): Promise<void> {
     open.addEventListener("click", openSessionPage);
     const won = s.endKind === "normal";
     main.replaceChildren(
-      hero({ text: won ? "Goal reached" : "Ended" }, won ? "Session complete" : "Session over", s.taskLabel ?? ""),
+      hero({ text: won ? "Goal reached" : s.endKind === "emergency" ? "Emergency stop" : "Ended" }, won ? "Session complete" : "Session over", s.taskLabel ?? ""),
       start,
       h("div", { className: "stack", attrs: { style: "margin-top:10px" } }, open, reportLink()),
     );
@@ -121,7 +122,23 @@ async function render(): Promise<void> {
   }
 
   const breaks = s.breaks ?? [];
-  const breakTotal = (now: number) => breaks.reduce((sum, b) => sum + ((b.endedAt ?? now) - b.startedAt), 0);
+  const breakTotal = (now: number) => offClockMs(s, now);
+
+  if (s.state === "IDLE_PAUSED") {
+    const pause = (s.pauses ?? [])[(s.pauses ?? []).length - 1];
+    const back = h("button", { className: "btn primary block", textContent: "I’m back" });
+    back.addEventListener("click", () => void call({ type: "ui:resume" }));
+    const ring = goalRing();
+    const reached = goalReached(s.committedAt, s.goalMin, Date.now(), breakTotal(Date.now()));
+    ring.update(Date.now() - (s.committedAt ?? s.startedAt) - breakTotal(Date.now()), s.goalMin, "paused");
+    main.replaceChildren(
+      hero({ text: "Stepped away" }, pause?.auto ? "Paused while you were away" : "Go do your thing", "Your clock is stopped. Blocks stay on. It ends on its own after 2 hours away."),
+      ring.el,
+      back,
+      ...(reached ? [h("div", { attrs: { style: "margin-top:10px" } }, stopButton())] : []),
+    );
+    return;
+  }
 
   if (s.state === "ON_BREAK") {
     const current = breaks[breaks.length - 1]!;
@@ -147,24 +164,12 @@ async function render(): Promise<void> {
   const actions = h("div", { className: "stack" });
   let shownReached: boolean | null = null;
 
+  const countdownSec = s.emergency ? OWNER_RULES.EMERGENCY_COUNTDOWN_SEC : EXITS.END_COUNTDOWN_SEC;
   const renderActions = (reached: boolean) => {
     if (ending) {
       actions.replaceChildren(h("p", { className: "muted small", attrs: { role: "status" }, textContent: "Blocks stay on until the countdown finishes." }));
-    } else if (reached) {
-      const stop = h("button", { className: "btn primary block", textContent: "Stop, I’m done" });
-      stop.addEventListener("click", () => void call({ type: "ui:stop" }));
-      actions.replaceChildren(h("p", { className: "note", textContent: "You hit your goal. You’re locked in, so stop whenever you like." }), stop);
     } else {
-      const reason = h("input", { type: "text", placeholder: "Why end early? (one line)", attrs: { "aria-label": "Reason for ending" } });
-      const end = h("button", { className: "btn danger", textContent: `End early (${EXITS.END_COUNTDOWN_SEC}s)` });
-      const err = h("p", { className: "error", attrs: { role: "alert" } });
-      const submit = () =>
-        void call<boolean>({ type: "ui:end", reason: reason.value }).then((ok) => {
-          if (!ok) err.textContent = "Add a one-line reason to end early.";
-        });
-      end.addEventListener("click", submit);
-      reason.addEventListener("keydown", (e) => e.key === "Enter" && submit());
-      actions.replaceChildren(reason, h("div", { className: "row" }, end), err);
+      actions.replaceChildren(exitActions(snap.endAccess, reached));
     }
   };
 
@@ -173,7 +178,7 @@ async function render(): Promise<void> {
     const elapsed = Date.now() - (s.committedAt ?? s.startedAt);
     soFar.querySelector(".num")!.textContent = formatDuration(elapsed);
     if (ending) {
-      const left = Math.max(0, s.endCountdown!.startedAt + EXITS.END_COUNTDOWN_SEC * MS.SECOND - Date.now());
+      const left = Math.max(0, s.endCountdown!.startedAt + countdownSec * MS.SECOND - Date.now());
       ring.update(left, null, "until it ends");
       return;
     }
@@ -189,7 +194,7 @@ async function render(): Promise<void> {
   timer = window.setInterval(tick, MS.SECOND);
 
   main.replaceChildren(
-    hero(ending ? { text: "Ending", tone: "warn" } : { text: "Locked in", tone: "live" }, s.taskLabel ?? "Locked in"),
+    hero(ending ? { text: s.emergency ? "Emergency stop" : "Ending", tone: "warn" } : { text: "Locked in", tone: "live" }, s.taskLabel ?? "Locked in"),
     ring.el,
     h("div", { className: "stats" }, stat(String(blockedCount(s)), "blocked"), soFar),
     ...(ending ? [] : [breakCard(s)]),

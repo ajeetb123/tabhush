@@ -14,6 +14,8 @@ import {
   canAutoCommit,
   cosine,
   EXITS,
+  ACTIVE_TIME,
+  SESSION,
   findExact,
   inferTask,
   taskScore,
@@ -70,14 +72,16 @@ import { db, idbCacheStore, labels, review, tasks } from "./db";
 import { embed } from "./embedder";
 import { getBankingDomains, getCategoryTable, getUndergroundDomains } from "./categories";
 import { getRedactor } from "./lexicon";
-import { asSessionLike, focusSplit } from "../ui/reportData";
+import { asSessionLike, dayStart, focusSplit, offClockMs } from "../ui/reportData";
 import { closeBlockedTab, installPreBlocks, parkTab, removePreBlocks, sendToTab, unparkTab } from "./enforce";
-import { apply, loadSession, newSession, saveSession, withSession, type ActiveSession } from "./session";
+import { apply, loadSession, newSession, saveSession, withSession, type ActiveSession, type EndKind, type FocusEntry } from "./session";
 import { bump, getInternal, getSettings, setInternal } from "./settings";
 import { backendConfigured, BackendUnavailable, CapReached, inferLabelRemote, judgeRemote, utcDay } from "./tier3Client";
 
 export const END_ALARM = "end-countdown";
 export const BREAK_ALARM = "break-end";
+export const IDLE_PAUSE_ALARM = "idle-pause";
+export const PAUSE_END_ALARM = "pause-end";
 const SESSION_PAGE = "ui/session.html";
 const CONSENT_PAGE = "ui/consent.html";
 
@@ -578,8 +582,9 @@ export async function confirm(goalMin: number): Promise<void> {
 /** Past the goal, Stop ends at once as a normal end: no countdown, no reason (Q-64). */
 export async function stop(): Promise<boolean> {
   return withSession(async (s) => {
-    if (!s || (s.state !== "ACTIVE" && s.state !== "END_COUNTDOWN" && s.state !== "ON_BREAK") || !goalReached(s.committedAt, s.goalMin, Date.now(), breakMs(s))) return false;
-    if (s.state === "ACTIVE") apply(s, { type: "END_REQUESTED" });
+    if (!s || !["ACTIVE", "END_COUNTDOWN", "ON_BREAK", "IDLE_PAUSED"].includes(s.state) || !goalReached(s.committedAt, s.goalMin, Date.now(), offClockMs(s, Date.now()))) return false;
+    await closeOffClock(s, Date.now());
+    if (s.state !== "END_COUNTDOWN") apply(s, { type: "END_REQUESTED" });
     s.endCountdown = { startedAt: Date.now(), reason: "goal reached" };
     await chrome.alarms.clear(END_ALARM);
     await saveSession(s);
@@ -625,7 +630,7 @@ async function commit(s: ActiveSession, how: "CONFIRM" | "AUTO_COMMIT"): Promise
   }
   s.committedAt = Date.now();
   apply(s, { type: how });
-  logFocus(s, "on");
+  await logFront(s);
   await setInternal({ committedSessions: internal.committedSessions + 1 });
   await bump("sessions");
   await saveSession(s);
@@ -675,7 +680,7 @@ export async function onTabChanged(tab: chrome.tabs.Tab): Promise<void> {
   if (lastJudged.get(tab.id) === fingerprint) return;
   lastJudged.set(tab.id, fingerprint);
   await withSession(async (s) => {
-    if (s?.state !== "ACTIVE" || !s.taskId) return;
+    if ((s?.state !== "ACTIVE" && s?.state !== "IDLE_PAUSED") || !s.taskId) return;
     const task = await sessionTask(s);
     if (!task) return;
     const { decision, key } = await judgeItem(s, task, tab.url!, tab.title ?? "", tab.id);
@@ -694,7 +699,7 @@ export async function onTabChanged(tab: chrome.tabs.Tab): Promise<void> {
 
     if (decision.action !== "park") await rememberCourses([tab]);
     s.tabOnTask[String(tab.id)] = decision.action === "allow";
-    if (tab.active) logFocus(s, decision.action === "allow" ? "on" : "off");
+    if (tab.active && browserFocused && !userIdle) logFocus(s, decision.action === "allow" ? "on" : "off", await whereFor(tab));
 
     if (decision.action === "park") {
       if (parked?.itemKey === k) {
@@ -745,7 +750,7 @@ export async function startBreak(min: number): Promise<boolean> {
     const now = Date.now();
     s.breaks.push({ startedAt: now, plannedMin: min, endedAt: null });
     apply(s, { type: "BREAK_START" });
-    s.focusLog.push({ at: now, state: "away" }); // breaks are not focused time (TIME-06)
+    logFocus(s, "away"); // breaks are not focused time (TIME-06)
     await removePreBlocks();
     await saveSession(s);
     await chrome.alarms.create(BREAK_ALARM, { when: now + min * MS.MINUTE });
@@ -762,8 +767,8 @@ export async function endBreak(): Promise<void> {
     apply(s, { type: "BREAK_END" });
     await chrome.alarms.clear(BREAK_ALARM);
     await installPreBlocks(s.liftedDomains);
-    logFocus(s, "on");
     await relock(s);
+    await logFront(s);
     await saveSession(s);
   });
 }
@@ -782,20 +787,153 @@ async function relock(s: ActiveSession): Promise<void> {
 
 // ───────────────────────── Focus time for the report (Q-65, TIME-01) ─────────────────────────
 
-function logFocus(s: ActiveSession, state: "on" | "off" | "away"): void {
-  if (s.state !== "ACTIVE") return;
-  if (s.focusLog[s.focusLog.length - 1]?.state === state) return;
-  s.focusLog.push({ at: Date.now(), state });
+// Whether a browser window is in front, and whether chrome.idle says input stopped. Module state
+// is lost when the worker sleeps; the defaults (focused, not idle) are right for any wake-up event.
+let browserFocused = true;
+let userIdle = false;
+
+/** Appends a focus entry. Away is always logged (it closes the last stretch); on/off only while ACTIVE. */
+function logFocus(s: ActiveSession, state: FocusEntry["state"], where: { domain?: string; title?: string } = {}, at = Date.now()): void {
+  if (state !== "away" && s.state !== "ACTIVE") return;
+  const last = s.focusLog[s.focusLog.length - 1];
+  if (last && last.state === state && (state === "away" || (last.domain === where.domain && last.title === where.title))) return;
+  s.focusLog.push(state === "away" ? { at: Math.max(at, last?.at ?? at), state } : { at: Math.max(at, last?.at ?? at), state, ...where });
+}
+
+/** Site and page for the report. Mail, chat, banking and incognito tabs keep the site only (PRIV-01). */
+async function whereFor(tab: chrome.tabs.Tab): Promise<{ domain?: string; title?: string }> {
+  const url = tab.url ?? "";
+  const parsed = parseUrl(url);
+  const domain = itemDomain(url) ?? parsed?.host ?? undefined;
+  if (!domain) return {};
+  const title = (tab.title ?? "").trim().slice(0, OWNER_RULES.REPORT_TITLE_MAX_CHARS);
+  if (!title || tab.incognito || (parsed && isDomainOnly(parsed, await getBankingDomains()))) return { domain };
+  return { domain, title };
+}
+
+/** Logs the tab now in front, or away when no browser window is (after commit, a break, a pause). */
+async function logFront(s: ActiveSession): Promise<void> {
+  if (!browserFocused || userIdle) return logFocus(s, "away");
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true }).catch(() => [] as chrome.tabs.Tab[]);
+  if (!tab?.id) return logFocus(s, "on");
+  logFocus(s, s.tabOnTask[String(tab.id)] === false ? "off" : "on", await whereFor(tab));
 }
 
 /** The front tab changed, or the browser lost or regained focus. */
 export async function onFocusChange(activeTabId: number | null): Promise<void> {
+  browserFocused = activeTabId !== null;
   await withSession(async (s) => {
     if (s?.state !== "ACTIVE") return;
-    if (activeTabId === null) logFocus(s, "away");
-    else logFocus(s, s.tabOnTask[String(activeTabId)] === false ? "off" : "on");
+    if (activeTabId === null || userIdle) logFocus(s, "away");
+    else {
+      const tab = await chrome.tabs.get(activeTabId).catch(() => null);
+      logFocus(s, s.tabOnTask[String(activeTabId)] === false ? "off" : "on", tab ? await whereFor(tab) : {});
+    }
     await saveSession(s);
   });
+}
+
+// ───────────────────────── Step away and idle (Q-69, LOOP-11) ─────────────────────────
+
+function pauseMs(s: ActiveSession, now = Date.now()): number {
+  return (s.pauses ?? []).reduce((sum, p) => sum + ((p.endedAt ?? now) - p.startedAt), 0);
+}
+
+/** Closes a running break or pause, as when the session ends from one. */
+async function closeOffClock(s: ActiveSession, now: number): Promise<void> {
+  if (s.state === "ON_BREAK") {
+    const current = s.breaks[s.breaks.length - 1];
+    if (current && current.endedAt === null) current.endedAt = now;
+    await chrome.alarms.clear(BREAK_ALARM);
+  }
+  if (s.state === "IDLE_PAUSED") {
+    const current = s.pauses[s.pauses.length - 1];
+    if (current && current.endedAt === null) current.endedAt = now;
+    await chrome.alarms.clear(PAUSE_END_ALARM);
+  }
+}
+
+/**
+ * Step away: the clock and the goal stop, every block stays on. "I'm back" resumes. A pause that
+ * lasts 2 hours ends the session (SESSION.IDLE_END_AFTER_MIN). `since` backdates an idle pause.
+ */
+export async function stepAway(auto = false, since = Date.now()): Promise<boolean> {
+  return withSession(async (s) => {
+    if (s?.state !== "ACTIVE") return false;
+    s.pauses ??= [];
+    s.pauses.push({ startedAt: since, endedAt: null, auto });
+    logFocus(s, "away", {}, since);
+    apply(s, { type: "PAUSE" });
+    await chrome.alarms.clear(IDLE_PAUSE_ALARM);
+    await chrome.alarms.create(PAUSE_END_ALARM, { when: since + SESSION.IDLE_END_AFTER_MIN * MS.MINUTE });
+    await saveSession(s);
+    return true;
+  });
+}
+
+export async function resume(): Promise<boolean> {
+  return withSession(async (s) => {
+    if (s?.state !== "IDLE_PAUSED") return false;
+    await closeOffClock(s, Date.now());
+    apply(s, { type: "RESUME" });
+    s.idleSince = null;
+    await logFront(s);
+    await saveSession(s);
+    return true;
+  });
+}
+
+/** Two hours away: the session ends on its own; past the goal that is a normal end. */
+export async function pauseTimedOut(): Promise<void> {
+  await withSession(async (s) => {
+    if (s?.state !== "IDLE_PAUSED") return;
+    await closeOffClock(s, Date.now());
+    apply(s, { type: "END_REQUESTED" });
+    s.endCountdown = { startedAt: Date.now(), reason: "away too long" };
+    await finishSession(s, goalReached(s.committedAt, s.goalMin, Date.now(), offClockMs(s, Date.now())) ? "normal" : "idle");
+  });
+}
+
+/**
+ * chrome.idle: "idle" comes ACTIVE_TIME.NO_INPUT_STOP_MIN after the last input, "locked" when the
+ * screen locks. That time counts as away. A video or call playing in an on-task front tab is
+ * watching, not away (TIME-03, simplified). After 30 min idle the session pauses itself, and
+ * input again resumes a pause that idle started.
+ */
+export async function onIdleState(state: "active" | "idle" | "locked"): Promise<void> {
+  const now = Date.now();
+  if (state === "active") {
+    userIdle = false;
+    await chrome.alarms.clear(IDLE_PAUSE_ALARM);
+    const auto = await withSession(async (s) => {
+      if (!s) return false;
+      s.idleSince = null;
+      if (s.state === "ACTIVE") await logFront(s);
+      await saveSession(s);
+      return s.state === "IDLE_PAUSED" && s.pauses[s.pauses.length - 1]?.auto === true;
+    });
+    if (auto) await resume();
+    return;
+  }
+  await withSession(async (s) => {
+    if (s?.state !== "ACTIVE") return;
+    if (state === "idle") {
+      const [front] = await chrome.tabs.query({ active: true, lastFocusedWindow: true }).catch(() => [] as chrome.tabs.Tab[]);
+      if (browserFocused && front?.audible && front.id !== undefined && s.tabOnTask[String(front.id)] !== false) return;
+    }
+    userIdle = true;
+    const since = state === "locked" ? now : now - ACTIVE_TIME.NO_INPUT_STOP_MIN * MS.MINUTE;
+    s.idleSince = since;
+    logFocus(s, "away", {}, since);
+    await chrome.alarms.create(IDLE_PAUSE_ALARM, { when: since + SESSION.IDLE_PAUSE_AFTER_MIN * MS.MINUTE });
+    await saveSession(s);
+  });
+}
+
+/** 30 minutes without input: pause, backdated to when input stopped. */
+export async function idlePause(): Promise<void> {
+  const s = await loadSession();
+  if (s?.state === "ACTIVE" && s.idleSince !== null) await stepAway(true, s.idleSince);
 }
 
 /**
@@ -1005,7 +1143,7 @@ export async function answerParkCheck(tab: chrome.tabs.Tab, right: boolean): Pro
 
 export async function onBlockedVisit(url: string): Promise<boolean> {
   return withSession(async (s) => {
-    if (!s || (s.state !== "ACTIVE" && s.state !== "END_COUNTDOWN")) return false;
+    if (!s || !isEnforcing(s.state)) return false;
     s.restoreList.push({ url, title: itemDomain(url) ?? url, reason: "blocked" });
     s.blockEvents.push({ at: Date.now(), domain: itemDomain(url) ?? "" });
     s.lastParkAt = Date.now();
@@ -1017,21 +1155,92 @@ export async function onBlockedVisit(url: string): Promise<boolean> {
 
 // ───────────────────────── Exit ladder step 3: End (LOCK-04, LOOP-07) ─────────────────────────
 
+let devInstallCached: Promise<boolean> | null = null;
+
+/** The owner's own copy: an unpacked ("development") install (Q-69). Store installs are "normal". */
+export function isDevInstall(): Promise<boolean> {
+  devInstallCached ??= Promise.resolve()
+    .then(() => chrome.management.getSelf())
+    .then((me) => OWNER_RULES.DEV_INSTALL_ENDS_ANYTIME && me.installType === "development")
+    .catch(() => false);
+  return devInstallCached;
+}
+
+/** For tests: forget the cached install type. */
+export function resetDevInstallCache(): void {
+  devInstallCached = null;
+}
+
+const COMMITTED: readonly string[] = ["ACTIVE", "ON_BREAK", "IDLE_PAUSED"];
+
+/** Emergency stops still allowed today (4am to 4am), counting ended sessions only. */
+export async function emergencyStopsLeft(now = Date.now()): Promise<number> {
+  const from = dayStart(now);
+  const used = (await db.all<ActiveSession>("sessions")).filter((p) => p.endKind === "emergency" && (p.endedAt ?? 0) >= from).length;
+  return Math.max(0, OWNER_RULES.EMERGENCY_STOPS_PER_DAY - used);
+}
+
+export interface EndAccess {
+  /** The owner's dev install: End works any time, at once. */
+  dev: boolean;
+  /** Past the time goal (breaks and pauses don't count). */
+  goalReached: boolean;
+  /** End is open now: before commit, while suspended, past the goal, or on a dev install. */
+  canEnd: boolean;
+  emergencyLeft: number;
+}
+
+export async function endAccess(s: ActiveSession | null, now = Date.now()): Promise<EndAccess> {
+  const dev = await isDevInstall();
+  const reached = s !== null && goalReached(s.committedAt, s.goalMin, now, offClockMs(s, now));
+  const committed = s !== null && COMMITTED.includes(s.state);
+  return { dev, goalReached: reached, canEnd: s !== null && (!committed || dev || reached), emergencyLeft: await emergencyStopsLeft(now) };
+}
+
+/**
+ * End (LOCK-04, Q-69). Before commit, or past the goal, a one-line reason starts the 30 s
+ * countdown. A committed session before its goal can't be ended here, except on the owner's dev
+ * install, which ends at once. Everyone else uses Step away or the Emergency stop.
+ */
 export async function requestEnd(reason: string): Promise<boolean> {
   return withSession(async (s) => {
-    if (!s || !validEndReason(reason)) return false;
+    if (!s || !validEndReason(reason) || s.state === "END_COUNTDOWN" || s.state === "ENDED" || s.state === "IDLE") return false;
     const now = Date.now();
+    const access = await endAccess(s, now);
+    if (!access.canEnd) return false;
     s.bail = isBail("end", now, s.lastParkAt);
     s.endCountdown = { startedAt: now, reason: reason.trim() };
-    if (s.state === "ON_BREAK") {
-      // Ending from a break closes the break; the countdown runs unlocked, as the break was.
-      const current = s.breaks[s.breaks.length - 1];
-      if (current && current.endedAt === null) current.endedAt = now;
-      await chrome.alarms.clear(BREAK_ALARM);
-    }
+    const committed = COMMITTED.includes(s.state);
+    // Ending from a break or pause closes it; a break's countdown runs unlocked, as the break was.
+    await closeOffClock(s, now);
     apply(s, { type: "END_REQUESTED" });
+    if (access.dev && committed && !access.goalReached) {
+      await finishSession(s, "early");
+      return true;
+    }
     await saveSession(s);
     await chrome.alarms.create(END_ALARM, { when: now + EXITS.END_COUNTDOWN_SEC * MS.SECOND });
+    return true;
+  });
+}
+
+/**
+ * The fail-safe for a real emergency (Q-69): a held button and a reason (the UI), a 60 s
+ * countdown, once a day, and it shows as "Emergency stop" in the report. Blocks stay on until the
+ * countdown ends, except during a break.
+ */
+export async function emergencyStop(reason: string): Promise<boolean> {
+  return withSession(async (s) => {
+    if (!s || !COMMITTED.includes(s.state) || !validEndReason(reason)) return false;
+    const now = Date.now();
+    if ((await emergencyStopsLeft(now)) < 1) return false;
+    s.emergency = { at: now, reason: reason.trim() };
+    s.bail = isBail("end", now, s.lastParkAt);
+    s.endCountdown = { startedAt: now, reason: reason.trim() };
+    await closeOffClock(s, now);
+    apply(s, { type: "END_REQUESTED" });
+    await saveSession(s);
+    await chrome.alarms.create(END_ALARM, { when: now + OWNER_RULES.EMERGENCY_COUNTDOWN_SEC * MS.SECOND });
     return true;
   });
 }
@@ -1039,12 +1248,13 @@ export async function requestEnd(reason: string): Promise<boolean> {
 export async function finishEnd(): Promise<void> {
   await withSession(async (s) => {
     if (s?.state !== "END_COUNTDOWN") return;
-    // Ending after the goal is a normal end (Q-64); before it, "ended early".
-    await finishSession(s, goalReached(s.committedAt, s.goalMin, Date.now(), breakMs(s)) ? "normal" : "early");
+    // Ending after the goal is a normal end (Q-64); before it, "ended early" or an emergency stop.
+    const reached = goalReached(s.committedAt, s.goalMin, Date.now(), offClockMs(s, Date.now()));
+    await finishSession(s, s.emergency ? "emergency" : reached ? "normal" : "early");
   });
 }
 
-async function finishSession(s: ActiveSession, kind: "normal" | "early"): Promise<void> {
+async function finishSession(s: ActiveSession, kind: EndKind): Promise<void> {
   {
     for (const p of Object.values(s.parked)) await unparkTab(p.tabId, true);
     for (const tabId of Object.keys(s.pendingAsk)) await sendToTab(Number(tabId), { type: "ask:hide" });
@@ -1052,7 +1262,9 @@ async function finishSession(s: ActiveSession, kind: "normal" | "early"): Promis
     await writeUncontestedLabels(s);
     s.parked = {};
     s.pendingAsk = {};
-    s.focusLog.push({ at: Date.now(), state: "away" });
+    logFocus(s, "away");
+    await chrome.alarms.clear(IDLE_PAUSE_ALARM);
+    await chrome.alarms.clear(PAUSE_END_ALARM);
     s.endedAt = Date.now();
     s.endKind = kind;
     if (kind === "normal") s.bail = false;

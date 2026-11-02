@@ -248,3 +248,30 @@ main.report { max-width: 860px; }
 }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* Q-69: exits (Step away, hold-to-stop) and the full session report. */
+.linkish { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font: inherit; align-self: flex-start; }
+.linkish:hover { color: var(--text); }
+.emergency { border-color: var(--danger-soft); }
+.btn.hold { position: relative; overflow: hidden; user-select: none; touch-action: none; }
+.btn.hold .hold-fill { position: absolute; inset: 0 auto 0 0; width: 0%; background: var(--danger-soft); }
+.btn.hold .hold-text { position: relative; }
+.note.warn { background: var(--danger-soft); color: var(--danger); }
+.stack.tight { gap: 6px; }
+.detail .stats { margin-top: 4px; }
+.sites > li { padding: 12px 0; }
+.bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.bar > span { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+.bar.off > span { background: var(--danger); opacity: .55; }
+.pages { list-style: none; margin: 2px 0 0; padding: 0 0 0 30px; display: grid; gap: 4px; font-size: 13px; }
+.pages .title, .timeline .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 13px; }
+.tl { display: grid; grid-template-columns: 9.5em minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 0 6px 10px; border-left: 3px solid var(--accent); }
+.tl.off { border-left-color: var(--danger); }
+.tl.away { border-left-color: var(--surface-2); color: var(--muted); }
+.tl .when { color: var(--muted); font-variant-numeric: tabular-nums; }
+.sess-box > summary { list-style: none; cursor: pointer; }
+.sess-box > summary::-webkit-details-marker { display: none; }
+.sess-box[open] > summary { border-bottom-color: transparent; }
+.sess-box > .detail { padding: 4px 0 18px; }
+@media (max-width: 480px) { .tl { grid-template-columns: 1fr auto; } .tl .when { grid-column: 1 / -1; } }

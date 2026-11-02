@@ -70,8 +70,18 @@ export interface ActiveSession {
   breaks: { startedAt: number; plannedMin: number; endedAt: number | null }[];
   /** Every block, for the report (domains stay on this device; telemetry has no domains, INV-19). */
   blockEvents: { at: number; domain: string }[];
-  /** Front-tab state over time: on task, off task, or browser not in front (Q-65 report). */
-  focusLog: { at: number; state: "on" | "off" | "away" }[];
+  /**
+   * Front-tab state over time: on task, off task, or away (browser not in front, no input, a
+   * break or a pause). On and off entries name the site and page for the full report (Q-69);
+   * the title is left out for mail, chat, banking and incognito tabs. Stays on this device.
+   */
+  focusLog: FocusEntry[];
+  /** Step away / idle pauses (Q-69, LOOP-11): time stops, locks stay on. */
+  pauses: { startedAt: number; endedAt: number | null; auto: boolean }[];
+  /** When chrome.idle last reported no input, while it lasts. */
+  idleSince: number | null;
+  /** The once-a-day Emergency stop, if this session used it (Q-69). */
+  emergency: { at: number; reason: string } | null;
   /** Last verdict per tab: true when allowed. */
   tabOnTask: Record<string, boolean>;
   /** Named-site lifts and overrides, shown on the session card (LOOP-09). */
@@ -82,8 +92,18 @@ export interface ActiveSession {
   limited: boolean;
   endCountdown: { startedAt: number; reason: string } | null;
   endedAt: number | null;
-  endKind: "normal" | "early" | null;
+  endKind: EndKind | null;
   bail: boolean;
+}
+
+/** normal: past the goal. early: the owner's dev install, or before commit. idle: 2 h away. */
+export type EndKind = "normal" | "early" | "emergency" | "idle";
+
+export interface FocusEntry {
+  at: number;
+  state: "on" | "off" | "away";
+  domain?: string;
+  title?: string;
 }
 
 export function newSession(now: number): ActiveSession {
@@ -110,6 +130,9 @@ export function newSession(now: number): ActiveSession {
     breaks: [],
     blockEvents: [],
     focusLog: [],
+    pauses: [],
+    idleSince: null,
+    emergency: null,
     tabOnTask: {},
     suspensions: [],
     restoreList: [],

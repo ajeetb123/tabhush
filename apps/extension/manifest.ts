@@ -23,7 +23,7 @@ export const manifest = {
     // No suggested key: the shortcut is undecided, so users assign it in the browser.
     "start-session": { description: `Start a ${BRAND.NAME} session` },
   },
-  permissions: ["tabs", "tabGroups", "webNavigation", "declarativeNetRequest", "offscreen", "storage", "scripting", "alarms"],
+  permissions: ["tabs", "tabGroups", "webNavigation", "declarativeNetRequest", "offscreen", "storage", "scripting", "alarms", "idle"],
   host_permissions: ["<all_urls>"],
   // all_frames: embedded players on a blocked page are paused too (Q-65).
   // document_start: a blocked page is covered before it shows, so a refresh can't get around it.

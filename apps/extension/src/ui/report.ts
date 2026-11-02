@@ -5,6 +5,7 @@ import { BRAND, MS } from "@lockin/core";
 import type { ActiveSession } from "../background/session";
 import { formatDuration, getSnapshot, h, onStateChange, setTitle, topbar } from "./common";
 import { asSessionLike, colorFor, dayReport, formatHm, taskKey, weekReport, type SessionLike } from "./reportData";
+import { endLabel, sessionDetail } from "./sessionDetail";
 
 setTitle("Your focus");
 document.querySelector("main")!.classList.add("report");
@@ -96,20 +97,35 @@ function weekView(sessions: SessionLike[], now: number): Node[] {
   ];
 }
 
+const openIds = new Set<string>(); // expanded sessions survive a re-render
+
 function sessionsView(sessions: SessionLike[], now: number): Node[] {
   const list = [...sessions].filter((s) => s.committedAt !== null).sort((a, b) => b.committedAt! - a.committedAt!);
   if (!list.length) return [h("div", { className: "empty", textContent: "Your sessions will show up here." })];
   return list.map((s) => {
     const len = (s.endedAt ?? now) - s.committedAt!;
     const when = new Date(s.committedAt!).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
-    const status = s.endedAt === null ? h("span", { className: "tag win", textContent: "now" }) : s.endKind === "normal" ? h("span", { className: "tag win", textContent: "goal reached" }) : h("span", { className: "tag", textContent: "ended early" });
-    return h(
-      "div",
+    const won = s.endedAt === null || s.endKind === "normal";
+    const status = h("span", { className: `tag${won ? " win" : ""}`, textContent: endLabel(s) });
+    const row = h(
+      "summary",
       { className: "sess" },
       h("span", { className: "dot", attrs: { style: `background:${colorFor(taskKey(s))}` } }),
       h("div", {}, h("div", { textContent: s.taskLabel ?? "Untitled" }), h("div", { className: "meta" }, `${when} · ${s.blockEvents.length} blocked `, status)),
       h("div", { className: "right" }, h("div", { textContent: formatHm(len) }), h("div", { className: "meta", textContent: s.goalMin ? `goal ${s.goalMin}m` : "" })),
     );
+    // Q-69: open a session for its full report (sites, pages, timeline), built on first open.
+    const box = h("details", { className: "sess-box", open: openIds.has(s.id) }, row);
+    const fill = () => {
+      if (box.open && box.childElementCount === 1) box.append(sessionDetail(s, now));
+    };
+    box.addEventListener("toggle", () => {
+      if (box.open) openIds.add(s.id);
+      else openIds.delete(s.id);
+      fill();
+    });
+    fill();
+    return box;
   });
 }
 

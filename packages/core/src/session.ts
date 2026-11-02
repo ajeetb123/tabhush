@@ -13,7 +13,8 @@ export type SessionState =
   | "END_COUNTDOWN"
   | "ENDED"
   | "SUSPENDED"
-  | "ON_BREAK";
+  | "ON_BREAK"
+  | "IDLE_PAUSED";
 
 export type SessionEvent =
   | { type: "START" }
@@ -27,6 +28,8 @@ export type SessionEvent =
   | { type: "PROCTORING_DETECTED" }
   | { type: "BREAK_START" }
   | { type: "BREAK_END" }
+  | { type: "PAUSE" }
+  | { type: "RESUME" }
   | { type: "DISMISS" };
 
 const TRANSITIONS: Record<SessionState, Partial<Record<SessionEvent["type"], SessionState>>> = {
@@ -34,7 +37,9 @@ const TRANSITIONS: Record<SessionState, Partial<Record<SessionEvent["type"], Ses
   INFERRING: { INFER_CONFIDENT: "SWEEP_PREVIEW", INFER_UNSURE: "CLARIFY", END_REQUESTED: "END_COUNTDOWN" },
   CLARIFY: { CLARIFY_ANSWERED: "SWEEP_PREVIEW", END_REQUESTED: "END_COUNTDOWN" },
   SWEEP_PREVIEW: { CONFIRM: "ACTIVE", AUTO_COMMIT: "ACTIVE", END_REQUESTED: "END_COUNTDOWN" },
-  ACTIVE: { END_REQUESTED: "END_COUNTDOWN", PROCTORING_DETECTED: "SUSPENDED", BREAK_START: "ON_BREAK" },
+  ACTIVE: { END_REQUESTED: "END_COUNTDOWN", PROCTORING_DETECTED: "SUSPENDED", BREAK_START: "ON_BREAK", PAUSE: "IDLE_PAUSED" },
+  // LOOP-11 / Q-69: Step away (or 30 min idle). Locks stay on, time stops; 2 h idle ends normally.
+  IDLE_PAUSED: { RESUME: "ACTIVE", END_REQUESTED: "END_COUNTDOWN" },
   // LOOP-08: a break unlocks everything, then re-locks on its own (or early, by choice).
   ON_BREAK: { BREAK_END: "ACTIVE", END_REQUESTED: "END_COUNTDOWN" },
   // End is always available (LOCK-04 step 3). What SUSPENDED resumes to is OPEN Q-20.
@@ -49,7 +54,7 @@ export function nextState(state: SessionState, event: SessionEvent): SessionStat
 
 /** States in which parks are enforced. */
 export function isEnforcing(state: SessionState): boolean {
-  return state === "ACTIVE" || state === "END_COUNTDOWN";
+  return state === "ACTIVE" || state === "END_COUNTDOWN" || state === "IDLE_PAUSED";
 }
 
 /** Sessions 1-5 always wait for Confirm (LOOP-04). */

@@ -278,6 +278,13 @@ export const OWNER_RULES = {
   ],
   MUSIC_CHANNEL_MARKERS: [" - topic", "vevo", "ncs"],
   CLOSE_BLOCKED_TABS: true as boolean, // Q-67: blocked tabs are closed (to the reopen list), not covered
+  // Q-69: ending rules. A development install (the owner) ends any time; others only past the goal,
+  // with Step away (pause) and a costly, visible Emergency stop as fail-safes.
+  DEV_INSTALL_ENDS_ANYTIME: true as boolean,
+  EMERGENCY_HOLD_MS: 3000,
+  EMERGENCY_COUNTDOWN_SEC: 60,
+  EMERGENCY_STOPS_PER_DAY: 1,
+  REPORT_TITLE_MAX_CHARS: 120, // page titles kept for the full report, on this device only
   UNDERGROUND_LIST: "warez", // UT1 category, blocked for the session
   UNDERGROUND_HOST_KEYWORDS: ["streameast"],
   MULTI_TASK_MIN_SCORE: 0.6, // two recent tasks this strong → both pre-selected

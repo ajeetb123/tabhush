@@ -12,9 +12,11 @@ export interface FakeTab {
   active: boolean;
   lastAccessed: number;
   mutedInfo?: { muted: boolean };
+  audible?: boolean;
+  incognito?: boolean;
 }
 
-export function makeChrome(initialTabs: Omit<FakeTab, "groupId" | "lastAccessed">[], opts: { focusedWindow: number; unreachable?: number[] }) {
+export function makeChrome(initialTabs: Omit<FakeTab, "groupId" | "lastAccessed">[], opts: { focusedWindow: number; unreachable?: number[]; installType?: string }) {
   let nextId = 1000;
   const tabs = new Map<number, FakeTab>();
   initialTabs.forEach((t, i) => tabs.set(t.id, { groupId: -1, lastAccessed: 1_000 + (initialTabs.length - i), ...t }));
@@ -43,10 +45,12 @@ export function makeChrome(initialTabs: Omit<FakeTab, "groupId" | "lastAccessed"
         remove: async (key: string) => void delete storage[key],
       },
     },
+    // Q-69: a Web Store copy by default; tests pass installType "development" for the owner's copy.
+    management: { getSelf: async () => ({ installType: opts.installType ?? "normal" }) },
     tabs: {
-      query: async (q: { windowId?: number; active?: boolean } = {}) =>
+      query: async (q: { windowId?: number; active?: boolean; lastFocusedWindow?: boolean } = {}) =>
         [...tabs.values()]
-          .filter((t) => (q.windowId === undefined || t.windowId === q.windowId) && (q.active === undefined || t.active === q.active))
+          .filter((t) => (q.windowId === undefined || t.windowId === q.windowId) && (!q.lastFocusedWindow || t.windowId === opts.focusedWindow) && (q.active === undefined || t.active === q.active))
           .map((t) => ({ ...t })),
       get: async (id: number) => {
         const t = tabs.get(id);
