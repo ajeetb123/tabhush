@@ -372,6 +372,10 @@ $relaunch = $false
 while ($true) {
   $line = [Console]::In.ReadLine()
   if ($null -eq $line) { break }
+  # Skip anything before the JSON (a byte-order mark some pipes add to the first line).
+  $start = $line.IndexOf('{')
+  if ($start -lt 0) { continue }
+  if ($start -gt 0) { $line = $line.Substring($start) }
   $id = 0
   try {
     $m = $line | ConvertFrom-Json
