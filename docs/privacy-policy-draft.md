@@ -1,6 +1,6 @@
 # Tabhush privacy policy (DRAFT)
 
-> Draft for the owner, matching `docs/06-privacy-data-contract.md` and the build as of 2026-11-01 (no LLM, Q-61). Any change to what the extension collects needs a change here first. Not legal advice. Items marked **[OWNER]** need a decision or legal review before publishing.
+> Draft for the owner, matching `docs/06-privacy-data-contract.md` and the macOS app as of 2026-11-02 (no LLM, Q-61; desktop app, Q-70). Any change to what the extension collects needs a change here first. Not legal advice. Items marked **[OWNER]** need a decision or legal review before publishing.
 
 Last updated: [OWNER: date of publication]
 
@@ -10,29 +10,28 @@ Tabhush decides everything on your computer. Your browsing, your tasks and what 
 
 ## Who we are
 
-Tabhush is a browser extension that blocks sites unrelated to your current work session and tracks time spent on it. It is run by [OWNER: legal name or LLC, country]. Contact: [OWNER: privacy contact email].
+Tabhush is a Mac app that blocks apps and sites unrelated to your current work session and reports how you spend your time on the computer. It is run by [OWNER: legal name or LLC, country]. Contact: [OWNER: privacy contact email].
 
 ## What Tabhush looks at, and where
 
-To decide whether a tab belongs to what you're working on, Tabhush looks at, **on your computer only**:
+While it runs, Tabhush looks at, **on your Mac only**:
 
-- the address and title of your open tabs;
-- a short summary of a page: its title, description and top headings;
-- for YouTube videos, YouTube's own category label, the video title and channel name;
-- how many keys, clicks and scrolls happen on a page, as counts only. Tabhush never reads what you type;
-- whether your computer is in use, idle or locked (Chrome's "idle" signal), so time away from the computer isn't counted as work.
+- which app is in front, and the title of its front window (with the Accessibility permission you grant);
+- in Chrome, Safari, Brave, Edge, Arc and similar browsers, the address and title of the tab in front, and at Start the addresses and titles of your open tabs (with the permission macOS asks for per browser);
+- whether you are using the computer, or it is idle or locked.
 
-It compares these with your task using rules, site lists and a small model that ships inside the extension. Nothing is sent anywhere to make that decision. Tabhush never takes screenshots.
+It compares these with your task using rules, site and app lists and a small model that ships inside the app. Nothing is sent anywhere to make that decision. Tabhush never takes screenshots, never records the screen and never reads what you type.
 
 ## What Tabhush stores, and where
 
-Stored in your browser, on your computer:
+Stored in the app's folder on your Mac:
 
+- a log of which app, site and window was in front and for how long, for your report (switch off "Track all day" to log only during sessions);
 - your tasks and the courses it has noticed (like "CS 2114"), so it can name your next session for you;
-- your sessions: when they ran, your time goal, which sites were blocked and when, breaks and pauses, and how long each site and page was in front (its address and title; for mail, chat, banking and incognito tabs, the site only);
-- your settings: school sites, essentials, and similar.
+- your sessions: when they ran, your time goal, what was blocked and when, breaks and pauses, and time per app, site and page;
+- your settings.
 
-It never learns from incognito tabs or from email, chat or banking sites. Uninstalling Tabhush deletes all of this.
+For Messages, Mail, Slack, Discord, password managers, webmail, web chat and banking sites, only the app or site name is kept, never titles. Deleting the app's folder (`~/Library/Application Support/Tabhush`) deletes all of this.
 
 ## What leaves your computer
 
@@ -40,9 +39,9 @@ Once a day Tabhush sends **counts only**: an install ID, your browser and operat
 
 Tabhush does not use advertising, analytics or tracking services, and it does not sell or share data.
 
-## Why Chrome warns about "all your data"
+## Why macOS asks for Accessibility and Automation
 
-To see which tab you're on and to block the ones that aren't part of your work, Tabhush needs access to all websites. Chrome describes that access as being able to "read and change all your data on all websites". Tabhush uses it only for the decisions described above, on your computer.
+Accessibility lets Tabhush read window titles and close a tab in browsers that don't share their tabs. Automation lets it read and close tabs in your browsers. Tabhush uses them only for the decisions described above, on your Mac.
 
 ## Children
 

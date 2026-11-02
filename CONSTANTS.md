@@ -422,6 +422,34 @@ export const REPORT = {
 };
 ```
 
+## Desktop app (Q-70, owner 2026-11-02)
+
+The product is a macOS app (Electron) instead of a Chrome extension. Values below are in `DESKTOP` in the constants module; the app lists are the agent's first cut from the owner's rules (Q-63) and wait for owner review.
+
+```
+POLL_MS: 1000                   front app, window title and browser tab, once a second
+ACTIVITY_FLUSH_SEC: 15          activity log written at least this often
+SEGMENT_MERGE_GAP_SEC: 5        same thing again within 5 s continues the stretch
+GAP_MIN_SEC: 120                app not running this long mid-session = a gap (time stops)
+REHIDE_AFTER_QUIT_SEC: 5        a blocked app that ignores quit is hidden every time it shows
+APP_TITLE_MAX_CHARS: 120
+Browsers read and closed with Apple Events: Chrome, Chromium, Brave, Edge, Vivaldi, Opera, Arc, Safari
+Browsers with titles only: Firefox, Zen, DuckDuckGo, Orion (blocked tab closed with Cmd+W after re-checking the title)
+System apps (never judged): Finder, System Settings, Activity Monitor, Terminal, Dock, Spotlight, Tabhush
+Always allowed apps (Q-63): Claude, ChatGPT, Blender
+Work app categories (allowed): developer tools, productivity, education, reference, graphics & design,
+  business, utilities, finance, medical
+Blocked app categories (Q-63): games (and every *-games), social networking, entertainment, sports
+Blocked apps without a category: Steam, Discord, WhatsApp, Telegram, Roblox, Minecraft, Apple TV;
+  by name: Epic Games Launcher, Battle.net, Messenger, League of Legends, Riot Client, Netflix, Prime Video
+Music apps (allowed at MUSIC_VOLUME): Spotify, Music
+Meeting apps (no-input time counts as watching): Zoom, Teams, FaceTime, Webex
+Excluded apps (titles never stored, DSK-30): Messages, Mail, Slack, Discord, Passwords, 1Password
+Proctoring (DSK-10, suspends enforcement): LockDown Browser
+EMERGENCY_PASSAGE: "I am choosing to stop this session before my goal. My work will still be here when
+  I come back, and this stop will show in my report."     retyped exactly, no paste (Q-70)
+```
+
 ## Lists that are partially defined
 
 Members given in the scope are normative. Extend only after the owner resolves the listed question.

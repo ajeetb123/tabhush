@@ -1,0 +1,76 @@
+{
+  "name": "@lockin/desktop",
+  "productName": "Tabhush",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tabhush: lock in on your work across every app and browser.",
+  "author": "Tabhush",
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "npm run build && electron .",
+    "dist": "npm run build && electron-builder --mac --publish never",
+    "fetch-model": "node ../../scripts/fetch-model.mjs",
+    "build-categories": "node ../../scripts/build-categories.mjs",
+    "build-lexicons": "node ../../scripts/build-lexicons.mjs",
+    "icons": "node ../../scripts/make-icons.mjs"
+  },
+  "devDependencies": {
+    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
+    "@huggingface/transformers": "4.3.2",
+    "@lockin/core": "*",
+    "electron": "44.9.3",
+    "electron-builder": "26.17.0",
+    "esbuild": "0.28.2",
+    "happy-dom": "21.0.4",
+    "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0",
+    "vite": "8.3.5"
+  },
+  "build": {
+    "appId": "com.tabhush.app",
+    "productName": "Tabhush",
+    "copyright": "Tabhush",
+    "directories": {
+      "output": "release",
+      "buildResources": "build-res"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/tabhush-helper",
+        "to": "tabhush-helper"
+      }
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build-res/icon.png",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "minimumSystemVersion": "13.0",
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "Tabhush reads which tab is open in your browser and closes distracting tabs during a focus session. Nothing leaves this Mac.",
+        "NSAccessibilityUsageDescription": "Tabhush reads window titles for your focus report and closes distracting tabs in browsers without tab access."
+      }
+    },
+    "dmg": {
+      "title": "Tabhush ${version}",
+      "artifactName": "Tabhush-${version}-${arch}.${ext}"
+    }
+  }
+}

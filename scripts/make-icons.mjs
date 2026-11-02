@@ -4,7 +4,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 
-const out = new URL("../apps/extension/public/icons/", import.meta.url).pathname;
+const out = new URL("../apps/desktop/public/icons/", import.meta.url).pathname;
 mkdirSync(out, { recursive: true });
 const INK = [29, 33, 37]; // #1D2125
 const SAGE = [134, 181, 166]; // #86B5A6
@@ -27,7 +27,7 @@ function sample(x, y) {
   return c;
 }
 
-function png(size) {
+function png(size, sampler = sample) {
   const ss = 4;
   const raw = Buffer.alloc(size * (size * 4 + 1));
   for (let py = 0; py < size; py++) {
@@ -35,7 +35,7 @@ function png(size) {
     for (let px = 0; px < size; px++) {
       let r = 0, g = 0, b = 0, a = 0;
       for (let sy = 0; sy < ss; sy++) for (let sx = 0; sx < ss; sx++) {
-        const c = sample((px + (sx + 0.5) / ss) / size, (py + (sy + 0.5) / ss) / size);
+        const c = sampler((px + (sx + 0.5) / ss) / size, (py + (sy + 0.5) / ss) / size);
         if (c) { r += c[0]; g += c[1]; b += c[2]; a++; }
       }
       const o = py * (size * 4 + 1) + 1 + px * 4;
@@ -56,4 +56,23 @@ function png(size) {
 
 for (const size of [16, 32, 48, 128]) writeFileSync(`${out}icon-${size}.png`, png(size));
 writeFileSync(`${out}logo.svg`, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="24" fill="#1D2125"/><rect x="42.5" y="24" width="15" height="54" rx="7" fill="#fff"/><rect x="22" y="24" width="56" height="15" rx="7" fill="#fff"/><circle cx="74" cy="72" r="7.5" fill="#86B5A6"/></svg>\n`);
-console.log("icons written to", out);
+
+// Desktop app (Q-70): the app icon on Apple's grid (artwork inset ~10%), and a menu-bar template
+// image (black glyph on transparent; macOS tints it for light and dark menu bars).
+const res = new URL("../apps/desktop/build-res/", import.meta.url).pathname;
+mkdirSync(res, { recursive: true });
+const inset = (x, y) => {
+  const m = 0.1;
+  const u = (x - m) / (1 - 2 * m), v = (y - m) / (1 - 2 * m);
+  return u < 0 || u > 1 || v < 0 || v > 1 ? null : sample(u, v);
+};
+writeFileSync(`${res}icon.png`, png(1024, inset));
+const tray = (x, y) => {
+  const stem = roundRect(x, y, 0.43, 0.14, 0.57, 0.86, 0.06);
+  const bar = roundRect(x, y, 0.16, 0.14, 0.84, 0.29, 0.06);
+  const dot = circle(x, y, 0.8, 0.78, 0.09);
+  return stem || bar || dot ? [0, 0, 0] : null;
+};
+writeFileSync(`${out}trayTemplate.png`, png(18, tray));
+writeFileSync(`${out}trayTemplate@2x.png`, png(36, tray));
+console.log("icons written to", out, "and", res);

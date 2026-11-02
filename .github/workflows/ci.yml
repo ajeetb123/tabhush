@@ -16,7 +16,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - run: npm run check:bundle -w @lockin/extension
+      - run: npm run check:bundle
       # Release guard: fails while any TODO_Q placeholder remains. Informational until beta 1 ships.
       - run: npm run check:ship
         continue-on-error: true

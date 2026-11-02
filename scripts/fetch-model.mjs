@@ -1,8 +1,8 @@
-// Build-time step: puts the tier 2 model inside the extension package (CLS-23, INV-05). The
-// ONNX Runtime WASM binary is emitted by Vite from node_modules. Nothing is downloaded at runtime; the Chrome Web Store bans remote code.
+// Build-time step: puts the tier 2 model inside the app package (CLS-23, INV-05). The
+// ONNX Runtime WASM binary is emitted by Vite from node_modules. Nothing is downloaded at runtime (no remote code).
 //
 // Model: Xenova/all-MiniLM-L6-v2 at a pinned revision (CONSTANTS.md EMBEDDING), int8 ONNX ~23 MB.
-// Run: npm run fetch-model -w @lockin/extension
+// Run: npm run fetch-model -w @lockin/desktop
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -14,7 +14,7 @@ const FILES = ["config.json", "tokenizer.json", "tokenizer_config.json", "onnx/m
 const EXPECTED_ONNX_BYTES = 22972370;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const ext = join(root, "apps/extension/public");
+const ext = join(root, "apps/desktop/public");
 const modelDir = join(ext, "models", REPO);
 
 for (const f of FILES) {

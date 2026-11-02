@@ -23,7 +23,7 @@ function arg(name) {
 
 const namesZip = arg("names");
 const scowlSrc = arg("scowl") ?? SCOWL_URL;
-const outDir = arg("out") ?? new URL("../apps/extension/public/lexicon/", import.meta.url).pathname;
+const outDir = arg("out") ?? new URL("../apps/desktop/public/lexicon/", import.meta.url).pathname;
 if (!namesZip || !existsSync(namesZip)) {
   console.error("Pass --names <path to SSA names.zip> (download it by hand from ssa.gov).");
   process.exit(1);

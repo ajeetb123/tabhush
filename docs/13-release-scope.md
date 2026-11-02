@@ -1,5 +1,7 @@
 # 13 Release scope and timeline
 
+> **Owner change 2026-11-02 (Q-70):** the client is a macOS desktop app now; the Chrome extension was removed. The phases below still describe scope order, with "extension" read as "the app" for beta 1, until the owner rewrites the timeline.
+
 Owner of: what ships in each phase, the timeline, Later, Out. **Agents build only the current phase.** If a phase runs behind, its launch slips; **scope doesn't grow**.
 
 ## Time budget

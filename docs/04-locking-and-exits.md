@@ -107,7 +107,7 @@ All durations and counts are starting points to tune in the betas.
 - **Reader mode and embeds** of a parked site on other pages are judged **as that site**.
 - **DevTools / mirror domains:** handled by re-adding overlays and normalizing domains; every escape logged. Detection is enough (accountability, not prevention).
 - **Incognito:** onboarding asks for incognito access and shows its status. Without it, incognito is unprotected in v1.
-- **Quitting the desktop app:** always possible, logged as a gap, **never followed by a relaunch** (INV-15).
+- **Quitting the desktop app:** always possible, logged as a gap, **never followed by a relaunch** (INV-15). **Q-70:** during a locked session, Quit is refused and a force quit relaunches the app, except on the owner's development build; shutdown and logout always work.
 
 ## LOCK-07 Notifications
 - **v1 does not touch notifications.**

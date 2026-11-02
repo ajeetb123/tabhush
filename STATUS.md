@@ -2,6 +2,28 @@
 
 Current phase: **beta 1** (`docs/13-release-scope.md`). Nothing from beta 2 or later is built, with the small exceptions listed at the end.
 
+## Desktop app (Q-70, 2026-11-02)
+
+The Chrome extension is gone; the product is a macOS app in `apps/desktop` (Electron + a Swift helper).
+
+| Item | State | Notes |
+|---|---|---|
+| Menu-bar app, launch at login, window with Session / Report / Settings | Built | DSK-30. |
+| Tracking: front app, window title, browser site and page, idle | Built | All day by default ("Track all day"); stays on the Mac. Titles need Accessibility. |
+| Start: task named from open tabs and windows, start screen, Lock in | Built | Same inference and registry as before (CLS-30..50, Q-64). |
+| Blocking: tabs closed in Chrome-family and Safari, title-only browsers via Cmd+W, distraction apps quit | Built | Apple Events consent per browser. App lists in `DESKTOP` await owner review. |
+| Music at 30% (Spotify, Music), restored at the end | Built | Q-63. |
+| Ending rules: dev build ends any time; others Stop past the goal, Step away, Emergency stop with retyped passage | Built | Q-69, Q-70. |
+| No quitting a locked session; force quit relaunches; gaps logged | Built | INV-15 changed by the owner (Q-70). |
+| Report: Today, Activity (every app, site, window; timeline; day by day), Week, Sessions | Built | |
+| Proctoring (LockDown Browser) suspends blocking | Built | DSK-10. |
+| DMG for Apple Silicon and Intel | Built | Ad-hoc signed, not notarized (no $99 Apple account yet). Right-click → Open the first time. |
+| Telemetry, licensing, auto-update, Safari/extension link | Not built | Q-26, DSK-02, DSK-11, DSK-03/12. |
+
+## Extension-era items (history)
+
+The rows below describe the removed extension; most of the engine carried over to the app.
+
 ## Beta 1 items
 
 | Scope item | State | Notes |

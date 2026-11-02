@@ -4,18 +4,28 @@
   "type": "module",
   "workspaces": [
     "packages/core",
-    "apps/extension",
+    "apps/desktop",
     "apps/backend"
   ],
   "scripts": {
-    "build": "npm run build -w @lockin/extension",
+    "build": "npm run build -w @lockin/desktop",
     "test": "vitest run",
-    "typecheck": "tsc -p packages/core && tsc -p apps/extension && tsc -p apps/backend",
-    "check:ship": "node scripts/check-ship.mjs"
+    "typecheck": "tsc -p packages/core && tsc -p apps/desktop && tsc -p apps/backend",
+    "check:ship": "node scripts/check-ship.mjs",
+    "start": "npm start -w @lockin/desktop",
+    "dist": "npm run dist -w @lockin/desktop",
+    "check:bundle": "node scripts/check-bundle.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
     "typescript": "5.9.3",
     "vitest": "5.0.5"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "onnxruntime-node": false,
+    "protobufjs": false,
+    "electron-winstaller": false,
+    "fsevents": false
   }
 }

@@ -1,5 +1,7 @@
 # 11 Desktop app: v1.5 macOS, v2 Windows
 
+> **Owner change 2026-11-02 (Q-70):** the macOS app is the product now, replacing the extension, built with **Electron** (not Tauri) and a Swift helper for the macOS layer. Tracking of apps, window titles and browser pages for the report, Accessibility asked at setup, blocked apps quit, no quitting during a locked session (force quit relaunches), and a retype-the-passage emergency task. Where this file disagrees, Q-70 wins. Built: DSK-10 front app, idle, proctoring watch, excluded apps; DSK-30 menu-bar pill, launch at login. Not built yet: DSK-02 licensing, DSK-03/12 extension link and Safari, DSK-11 notarization and auto-update, the "Lock in?" suggestion.
+
 Owner of: the Tauri desktop app, shared core, OS layers, distribution, free mode, desktop-specific enforcement.
 Do not start v2 (Windows) unless Gate C has passed. Behavior shared with the extension lives in `03`, `04`, `05`.
 

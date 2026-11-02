@@ -7,7 +7,8 @@ Read `AGENTS.md` first. The spec pack (`README.md`, `CONSTANTS.md`, `docs/`) is 
 ```
 packages/core      Shared TypeScript: constants module (mirrors CONSTANTS.md), tier 1 lists, classifier
                    decision procedure, cache keys, registry, inference, labels, redaction, wire schemas, PoW
-apps/extension     Chrome MV3 extension (Vite): service worker, offscreen tier 2 model, content script, UI pages
+apps/desktop       macOS app (Electron, Q-70): main process (engine, tracker, classifier wiring), Swift helper
+                   (native/helper.swift: front app, window titles, browser tabs, quit/hide), pages (Vite)
 apps/backend       Cloudflare Worker: install tokens, tier 3 proxy, telemetry, delete-my-data (D1)
 scripts/           check-ship (TODO_Q guard), check-bundle (INV-05 guard), fetch-model (build-time model download)
 ```
@@ -31,7 +32,19 @@ npm run build
 ```
 
 ```bash
-npm run check:bundle -w @lockin/extension
+npm start
+```
+
+`npm start` builds and opens the app in development mode. A development build can always end a session and quit (Q-69, Q-70); a packaged build can't while a session is locked.
+
+```bash
+npm run dist
+```
+
+`npm run dist` makes `apps/desktop/release/Tabhush-<version>-arm64.dmg` (Apple Silicon) and `-x64.dmg` (Intel). They are ad-hoc signed, not notarized: open the app the first time with right-click → Open. It needs Xcode's command line tools (`swiftc`) for the helper.
+
+```bash
+npm run check:bundle
 ```
 
 ```bash
@@ -42,10 +55,10 @@ npm run check:ship
 
 ## The on-device model
 
-The model is bundled in the package, never fetched at runtime (INV-05). Before loading the extension, put it in place once (~23 MB, `Xenova/all-MiniLM-L6-v2` at a pinned revision, size-checked):
+The model is bundled in the package, never fetched at runtime (INV-05). Before building the app, put it in place once (~23 MB, `Xenova/all-MiniLM-L6-v2` at a pinned revision, size-checked):
 
 ```bash
-npm run fetch-model -w @lockin/extension
+npm run fetch-model -w @lockin/desktop
 ```
 
 To see the model's label scores for your own examples (useful for Gate A):
@@ -57,16 +70,16 @@ node scripts/model-smoke.mjs "Lab report chemistry" "Titration lab report draft 
 The redaction lists (Q-14) are built into the package too. Download the SSA national baby-names file `names.zip` by hand from ssa.gov (it refuses scripted downloads); the script fetches SCOWL from SourceForge:
 
 ```bash
-npm run build-lexicons -w @lockin/extension -- --names ~/Downloads/names.zip
+npm run build-lexicons -w @lockin/desktop -- --names ~/Downloads/names.zip
 ```
 
 The site-category and banking lists (Q-08, Q-48) come from the UT1 blacklists mirror at a pinned commit (about 1.3 MB):
 
 ```bash
-npm run build-categories -w @lockin/extension
+npm run build-categories -w @lockin/desktop
 ```
 
-Then `npm run build` and load `apps/extension/dist` as an unpacked extension in Chrome, Edge or Brave (120+). Without the model, tier 2 is unavailable and every undecided page is allowed and flagged (INV-06).
+Then `npm start`. Without the model, tier 2 is unavailable and every undecided page is allowed and flagged (INV-06).
 
 ## Backend
 

@@ -402,6 +402,62 @@ export const PERF_EXTENSION = {
   MAX_STORAGE_PER_USER_MB: 50,
 } as const;
 
+// ───────────────────────── Desktop app (docs/11, Q-70) ─────────────────────────
+// Owner, 2026-11-02: the product is a macOS app now (Electron), replacing the extension. App lists
+// below are the agent's first cut from the owner's rules (Q-63: block games, social, streaming,
+// sports; always allow Claude, ChatGPT, Blender); owner to review (Q-70).
+export const DESKTOP = {
+  POLL_MS: 1000, // front app / window / tab, once a second
+  ACTIVITY_FLUSH_SEC: 15, // activity log written to disk at least this often
+  SEGMENT_MERGE_GAP_SEC: 5, // the same thing again within this gap continues the stretch
+  GAP_MIN_SEC: 120, // the app not running for this long mid-session is a gap (INV-15 wording)
+  REHIDE_AFTER_QUIT_SEC: 5, // a blocked app still running this long after quit is hidden each time it shows
+  APP_TITLE_MAX_CHARS: 120,
+  // Browsers: "chrome" and "safari" kinds are read and closed with Apple Events; "other" gives a title only.
+  BROWSERS: {
+    "com.google.Chrome": "chrome", "com.google.Chrome.beta": "chrome", "com.google.Chrome.dev": "chrome",
+    "com.google.Chrome.canary": "chrome", "org.chromium.Chromium": "chrome", "com.brave.Browser": "chrome",
+    "com.brave.Browser.beta": "chrome", "com.microsoft.edgemac": "chrome", "com.microsoft.edgemac.Beta": "chrome",
+    "com.vivaldi.Vivaldi": "chrome", "com.operasoftware.Opera": "chrome", "company.thebrowser.Browser": "chrome",
+    "com.apple.Safari": "safari", "com.apple.SafariTechnologyPreview": "safari",
+    "org.mozilla.firefox": "other", "org.mozilla.firefoxdeveloperedition": "other", "app.zen-browser.zen": "other",
+    "com.duckduckgo.macos.browser": "other", "com.kagi.kagimacOS": "other",
+  } as Readonly<Record<string, "chrome" | "safari" | "other">>,
+  // Never judged or blocked: the OS and Tabhush itself.
+  SYSTEM_APPS: [
+    "com.apple.finder", "com.apple.systempreferences", "com.apple.Settings", "com.apple.ActivityMonitor",
+    "com.apple.Terminal", "com.apple.loginwindow", "com.apple.dock", "com.apple.Spotlight", "com.tabhush.app",
+    "com.github.Electron",
+  ],
+  // Q-63 always allowed, as apps.
+  ALWAYS_ALLOWED_APPS: ["com.anthropic.claudefordesktop", "com.openai.chat", "org.blenderfoundation.blender"],
+  // App Store categories of work apps (LSApplicationCategoryType), allowed.
+  TOOL_CATEGORIES: [
+    "public.app-category.developer-tools", "public.app-category.productivity", "public.app-category.education",
+    "public.app-category.reference", "public.app-category.graphics-design", "public.app-category.business",
+    "public.app-category.utilities", "public.app-category.finance", "public.app-category.medical",
+  ],
+  // Categories blocked during a session (Q-63: games, social, streaming, sports). Any "*-games" too.
+  DISTRACTION_CATEGORIES: ["public.app-category.games", "public.app-category.social-networking", "public.app-category.entertainment", "public.app-category.sports"],
+  // Apps that don't declare a category, blocked by bundle ID or name.
+  DISTRACTION_APPS: [
+    "com.valvesoftware.steam", "com.hnc.Discord", "net.whatsapp.WhatsApp", "ru.keepcoder.Telegram",
+    "com.roblox.RobloxPlayer", "com.mojang.minecraftlauncher", "com.apple.TV",
+  ],
+  DISTRACTION_APP_NAMES: ["Steam", "Epic Games Launcher", "Battle.net", "Discord", "WhatsApp", "Telegram", "Messenger", "Roblox", "Minecraft", "League of Legends", "Riot Client", "Netflix", "Prime Video"],
+  // Q-63 music: allowed, at OWNER_RULES.MUSIC_VOLUME during the session.
+  MUSIC_APPS: ["com.spotify.client", "com.apple.Music"],
+  // Meeting and call apps: allowed; no-input time here counts as watching (TIME-03 video grace).
+  MEETING_APPS: ["us.zoom.xos", "com.microsoft.teams2", "com.apple.FaceTime", "com.cisco.webexmeetingsapp"],
+  // DSK-30 excluded apps: never store titles. Plus password managers.
+  EXCLUDED_APPS: ["com.apple.MobileSMS", "com.apple.mail", "com.tinyspeck.slackmacgap", "com.hnc.Discord", "com.apple.Passwords", "com.1password.1password"],
+  // DSK-10: proctoring starts → enforcement suspends.
+  PROCTORING_APP_NAMES: ["LockDown Browser"],
+  // Q-70 emergency stop task: retype this exactly (no paste) before the 60 s countdown.
+  EMERGENCY_PASSAGE:
+    "I am choosing to stop this session before my goal. My work will still be here when I come back, and this stop will show in my report.",
+} as const;
+
 // ───────────────────────── Platform (docs/07, docs/11) ─────────────────────────
 export const PLATFORM = {
   MIN_CHROMIUM_VERSION: 120,

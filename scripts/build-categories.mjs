@@ -15,7 +15,7 @@ function arg(name) {
 }
 
 const from = arg("from");
-const outDir = arg("out") ?? new URL("../apps/extension/public/categories/", import.meta.url).pathname;
+const outDir = arg("out") ?? new URL("../apps/desktop/public/categories/", import.meta.url).pathname;
 const base = `https://raw.githubusercontent.com/${CATEGORY_LIST.MIRROR_REPO}/${CATEGORY_LIST.MIRROR_COMMIT}/blacklists`;
 
 async function domainsOf(ut1Category) {

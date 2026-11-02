@@ -12,7 +12,7 @@ if (!label || items.length === 0) {
 }
 env.allowRemoteModels = false;
 env.allowLocalModels = true;
-env.localModelPath = new URL("../apps/extension/public/models/", import.meta.url).pathname;
+env.localModelPath = new URL("../apps/desktop/public/models/", import.meta.url).pathname;
 const fe = await pipeline("feature-extraction", EMBEDDING.HF_REPO, { dtype: EMBEDDING.TRANSFORMERS_DTYPE });
 const [l, ...v] = (await fe([label, ...items], { pooling: "mean", normalize: true })).tolist();
 const cos = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
