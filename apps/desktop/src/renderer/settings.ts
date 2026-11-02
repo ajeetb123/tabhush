@@ -52,7 +52,7 @@ async function render(): Promise<void> {
   const openAuto = h("button", { className: "btn", textContent: "Open Automation settings" });
   openAuto.addEventListener("click", () => void call({ type: "openPrivacyPane", pane: "automation" }));
 
-  const toggle = (label: string, key: "trackAllDay" | "openAtLogin", hint: string) => {
+  const toggle = (label: string, key: "trackAllDay" | "openAtLogin" | "countOtherWork", hint: string) => {
     const box = h("input", { type: "checkbox", checked: settings[key], disabled: locked });
     box.addEventListener("change", () => void save({ type: "settings", patch: { [key]: box.checked } }));
     return h("div", { className: "stack tight" }, h("label", { className: "row" }, box, h("span", { textContent: label })), h("p", { className: "muted small", textContent: hint }));
@@ -83,7 +83,12 @@ async function render(): Promise<void> {
     ...section(
       "Tracking",
       toggle("Track all day", "trackAllDay", "Log which app, site and window is in front whenever the app runs, not only during sessions. This is what the Activity report shows."),
-      toggle("Open at login", "openAtLogin", `${BRAND.NAME} starts in the menu bar when you log in.`),
+      toggle(
+        "Count other productive work",
+        "countOtherWork",
+        "If you drift to another of your tasks during a session (say, your resume during a CS session), that time shows as other productive work for that task instead of off task.",
+      ),
+      toggle("Open at login", "openAtLogin", `${BRAND.NAME} starts when you log in.`),
     ),
     ...section(
       "School sites",

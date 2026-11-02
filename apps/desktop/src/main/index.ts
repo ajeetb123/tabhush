@@ -240,6 +240,8 @@ async function route(m: UiMessage): Promise<unknown> {
       return engine.endBreak();
     case "dismiss":
       return engine.dismiss();
+    case "addOther":
+      return engine.addOtherTask(m.label);
     case "settings": {
       const next = engine.setSettings(m.patch);
       if (!DEV) app.setLoginItemSettings({ openAtLogin: next.openAtLogin });

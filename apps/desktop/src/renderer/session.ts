@@ -183,6 +183,26 @@ function breakCard(s: Session): HTMLElement {
   return h("div", { className: "card stack" }, h("div", { className: "spread" }, h("b", { textContent: "Break" }), h("span", { className: "muted small", textContent: note })), h("div", { className: "chips" }, ...buttons));
 }
 
+/** Q-72: name a side task mid-session so its work counts as other productive work. */
+function sideWorkCard(s: Session, snap: Snapshot): HTMLElement | null {
+  if (!snap.settings.countOtherWork) return null;
+  const input = h("input", { type: "text", placeholder: "Also working on something else? Name it", attrs: { "aria-label": "Other task" } });
+  input.style.flex = "1";
+  const add = h("button", { className: "btn", textContent: "Add" });
+  const submit = () => input.value.trim() && void call({ type: "addOther", label: input.value.trim() });
+  add.addEventListener("click", submit);
+  input.addEventListener("keydown", (e) => e.key === "Enter" && submit());
+  const named = snap.otherTasks ?? [];
+  return h(
+    "div",
+    { className: "card stack" },
+    h("b", { textContent: "Side work" }),
+    h("p", { className: "muted small", textContent: "Work for your other tasks is spotted on its own and counts as productive. Name a new one here so it’s recognized." }),
+    named.length ? h("div", { className: "chips" }, ...named.map((l) => h("span", { className: "chip static", textContent: l }))) : null,
+    h("div", { className: "row" }, input, add),
+  );
+}
+
 function runningView(s: Session, snap: Snapshot): Node[] {
   setTitle(s.taskLabel ?? "");
   setFooter();
@@ -245,6 +265,7 @@ function runningView(s: Session, snap: Snapshot): Node[] {
     h("div", { className: "stats" }, stat(String(blockedCount(s)), "blocked so far"), stat(formatDuration(focusSplit(asSessionLike(s), Date.now()).on), "on task")),
     ...(s.state === "ACTIVE" ? [breakCard(s)] : []),
     actions,
+    ...(s.state === "ACTIVE" ? [sideWorkCard(s, snap)] : []),
     front,
     s.suspendedFor ? h("p", { className: "note", textContent: `${s.suspendedFor} is running, so blocking is paused.` }) : null,
   ].filter((n): n is HTMLElement => n !== null);

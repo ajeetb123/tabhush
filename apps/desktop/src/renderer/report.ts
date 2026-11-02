@@ -57,11 +57,12 @@ function timelineCard(segments: ActivitySegment[], from: number, to: number): No
   if (!items.length) return [];
   const list = h("ol", { className: "timeline" });
   for (const t of items.slice(-150).reverse()) {
-    const what = t.state === "away" ? "Away" : t.title ? `${t.label} · ${t.title}` : t.label;
-    const cls = t.state === "away" ? "away" : t.sessionId ? (t.onTask === false ? "off" : "on") : "free";
+    const base = t.state === "away" ? "Away" : t.title ? `${t.label} · ${t.title}` : t.label;
+    const what = t.otherTask ? `${base}  (${t.otherTask})` : base;
+    const cls = t.state === "away" ? "away" : t.sessionId ? (t.onTask === false ? "off" : t.otherTask ? "other" : "on") : "free";
     list.append(h("li", { className: `tl ${cls}` }, h("span", { className: "when", textContent: `${clock(t.from)}–${clock(t.to)}` }), h("span", { className: "what title", textContent: what }), h("span", { className: "muted", textContent: formatHm(t.to - t.from) })));
   }
-  return [h("h2", { textContent: "Timeline (latest first)" }), h("p", { className: "muted small", textContent: "Green: in a session, on task. Red: in a session, off task. Grey edge: outside sessions." }), h("div", { className: "card" }, list)];
+  return [h("h2", { textContent: "Timeline (latest first)" }), h("p", { className: "muted small", textContent: "Green: in a session, on task. Blue: other productive work. Red: off task. Grey edge: outside sessions." }), h("div", { className: "card" }, list)];
 }
 
 async function activityView(now: number): Promise<Node[]> {
@@ -118,7 +119,10 @@ function todayView(sessions: SessionLike[], now: number): Node[] {
         h("span", { className: "dot", attrs: { style: `background:${row.color}` } }),
         h("span", { textContent: row.label }),
         h("span", { className: "t", textContent: formatHm(row.onMs) }),
-        h("span", { className: "c", textContent: `${row.sessions} session${row.sessions === 1 ? "" : "s"}` }),
+        h("span", {
+          className: "c",
+          textContent: [row.sessions ? `${row.sessions} session${row.sessions === 1 ? "" : "s"}` : "", row.sideMs ? `${formatHm(row.sideMs)} as side work` : ""].filter(Boolean).join(" · "),
+        }),
       ),
     );
   }

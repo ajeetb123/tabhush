@@ -271,6 +271,8 @@ export const OWNER_RULES = {
   EMERGENCY_COUNTDOWN_SEC: 60,          //   then a 60 s countdown,
   EMERGENCY_STOPS_PER_DAY: 1,           //   once per day; shown as "Emergency stop" in the report
   REPORT_TITLE_MAX_CHARS: 120,          // Q-69: page titles kept for the full report, on this device only
+  OTHER_WORK_MARGIN: 0.1,               // Q-72: other productive work = s(other task) >= ALLOW_MIN_S and beats
+                                        //   s(session task) by this margin (agent's starting value)
   UNDERGROUND_LIST: "warez",            // UT1 category, blocked for the session
   UNDERGROUND_HOST_KEYWORDS: ["streameast"],
   MULTI_TASK_MIN_SCORE: 0.60,           // = INFERENCE.AUTOFILL_MIN_SCORE: two recent tasks this strong → both pre-selected

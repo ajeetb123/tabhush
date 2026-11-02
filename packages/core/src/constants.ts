@@ -285,6 +285,10 @@ export const OWNER_RULES = {
   EMERGENCY_COUNTDOWN_SEC: 60,
   EMERGENCY_STOPS_PER_DAY: 1,
   REPORT_TITLE_MAX_CHARS: 120, // page titles kept for the full report, on this device only
+  // Q-72: allowed work that clearly belongs to another of your tasks counts as "other productive
+  // work" for that task: its similarity to the other task is at least THRESHOLDS.ALLOW_MIN_S and
+  // beats the session task by this margin (agent's starting value).
+  OTHER_WORK_MARGIN: 0.1,
   UNDERGROUND_LIST: "warez", // UT1 category, blocked for the session
   UNDERGROUND_HOST_KEYWORDS: ["streameast"],
   MULTI_TASK_MIN_SCORE: 0.6, // two recent tasks this strong → both pre-selected

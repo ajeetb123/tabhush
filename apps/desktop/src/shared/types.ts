@@ -27,11 +27,16 @@ export interface ActivitySegment {
   /** The session this happened in, and whether it was on task. */
   sessionId?: string;
   onTask?: boolean;
+  /** Q-72: productive work for another of your tasks during the session. */
+  otherTask?: string;
 }
 
 export interface FocusEntry {
   at: number;
-  state: "on" | "off" | "away";
+  /** on: this session's task. other: productive work for another task (Q-72). off: a distraction. */
+  state: "on" | "other" | "off" | "away";
+  /** For "other": the task it was for. */
+  task?: string;
   /** Site or app name. */
   domain?: string;
   title?: string;
@@ -79,6 +84,8 @@ export interface Session {
   /** Proctoring app running: enforcement suspended (DSK-10). */
   suspendedFor: string | null;
   emergency: { at: number; reason: string } | null;
+  /** Tasks you said you were also doing this session (Q-72): their work counts as other productive work. */
+  otherTaskIds: string[];
   endCountdown: { startedAt: number; reason: string } | null;
   endedAt: number | null;
   endKind: EndKind | null;
@@ -95,6 +102,8 @@ export interface Settings {
   essentials: string[];
   /** Log what's in front all day for the report, not only during sessions (Q-70). */
   trackAllDay: boolean;
+  /** Q-72: during a session, work that belongs to another of your tasks shows as other productive work. */
+  countOtherWork: boolean;
   openAtLogin: boolean;
   onboarded: boolean;
 }
@@ -121,6 +130,8 @@ export interface Snapshot {
   /** Added by the main process: "darwin" or "win32", and the OS helper's last error (for testers). */
   platform?: string;
   helperError?: string | null;
+  /** Side tasks named this session (Q-72). */
+  otherTasks?: string[];
 }
 
 export type UiMessage =
@@ -137,6 +148,7 @@ export type UiMessage =
   | { type: "break"; min: number }
   | { type: "breakEnd" }
   | { type: "dismiss" }
+  | { type: "addOther"; label: string }
   | { type: "settings"; patch: Partial<Settings> }
   | { type: "sessions" }
   | { type: "activity"; from: number; to: number }

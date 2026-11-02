@@ -291,3 +291,8 @@ textarea.wrong { border-color: var(--danger); }
 .tl.free { border-left-color: var(--surface-2); }
 .btn:disabled { opacity: .5; cursor: default; }
 .diag { display: block; padding: 10px 12px; border-radius: 9px; background: var(--surface-2); font-size: 12px; white-space: pre-wrap; word-break: break-word; user-select: text; }
+/* Q-72: other productive work (slate blue, the third task color). */
+.bar.other > span { background: #7487ad; }
+.tl.other { border-left-color: #7487ad; }
+.tag.other { background: #e6eaf3; color: #4b5f86; }
+@media (prefers-color-scheme: dark) { .tag.other { background: #232a38; color: #aebbd8; } }

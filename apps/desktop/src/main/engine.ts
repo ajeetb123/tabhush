@@ -30,6 +30,8 @@ import {
   OWNER_RULES,
   parseUrl,
   recentTasks,
+  relatedness,
+  THRESHOLDS,
   sameAsCandidates,
   SESSION,
   taskScore,
@@ -48,7 +50,10 @@ import type { Embed, Judge, SessionTask, Verdict } from "./judge";
 import type { JsonStore } from "./store";
 import type { AppInfo, BrowserTab, FrontInfo, System } from "./system";
 
-export const DEFAULT_SETTINGS: Settings = { schoolSites: [], essentials: [], trackAllDay: true, openAtLogin: true, onboarded: false };
+export const DEFAULT_SETTINGS: Settings = { schoolSites: [], essentials: [], trackAllDay: true, countOtherWork: true, openAtLogin: true, onboarded: false };
+
+/** What the item in front counts as in the report (Q-72). */
+type WorkState = { state: "on" | "off" } | { state: "other"; task: string };
 
 const COMMITTED: readonly string[] = ["ACTIVE", "ON_BREAK", "IDLE_PAUSED"];
 
@@ -91,6 +96,7 @@ function newSession(now: number): Session {
     suspensions: [],
     suspendedFor: null,
     emergency: null,
+    otherTaskIds: [],
     endCountdown: null,
     endedAt: null,
     endKind: null,
@@ -126,7 +132,7 @@ export class Engine {
   private now: () => number;
   private lastFront: FrontItem | null = null;
   private frontApp: AppInfo | null = null;
-  private verdicts = new Map<string, Verdict & { kind?: string }>();
+  private verdicts = new Map<string, Verdict & { work?: WorkState }>();
   /** Key of the item last blocked → when, so one block is one event, not one per second. */
   private recentBlocks = new Map<string, number>();
   /** Apps we asked to quit: when, and which process, to tell "ignored the quit" from "opened again". */
@@ -137,6 +143,7 @@ export class Engine {
   constructor(private readonly d: EngineDeps) {
     this.now = d.now ?? Date.now;
     this.session = d.store.read<Session | null>("session", null);
+    if (this.session) this.session.otherTaskIds ??= [];
     this.settings = { ...DEFAULT_SETTINGS, ...d.store.read<Partial<Settings>>("settings", {}) };
     this.tasks = d.store.read<Task[]>("tasks", []);
     if (this.session) d.judge.startSession(this.session.id);
@@ -192,6 +199,7 @@ export class Engine {
       endAccess: this.endAccess(),
       permissions: { accessibility: await this.d.system.accessibilityTrusted(false) },
       front: this.lastFront,
+      otherTasks: this.session ? this.otherTaskLabels(this.session) : [],
     };
   }
 
@@ -475,16 +483,16 @@ export class Engine {
       const graceMin = watching ? ACTIVE_TIME.VIDEO_GRACE_MIN : ACTIVE_TIME.NO_INPUT_STOP_MIN;
       const away = this.locked || idleSec >= graceMin * 60;
 
-      let onTask: boolean | undefined;
+      let work: WorkState | undefined;
       if (s) {
         const before = s.state;
         await this.deadlines(s, now, away, idleSec);
         if (s.state === "ACTIVE" || s.state === "IDLE_PAUSED" || s.state === "END_COUNTDOWN") {
-          onTask = await this.enforce(s, item, front);
+          work = await this.enforce(s, item, front);
         }
         if (s.state === "ACTIVE") {
           if (away) this.logFocus(s, "away", {}, s.idleSince ?? now);
-          else if (item) this.logFocus(s, onTask === false ? "off" : "on", { domain: item.label, title: item.title });
+          else if (item) this.logFocus(s, work?.state ?? "on", { domain: item.label, title: item.title, ...(work?.state === "other" ? { task: work.task } : {}) });
         }
         if (COMMITTED.includes(s.state) || s.state === "END_COUNTDOWN") s.heartbeat = now;
         changed ||= before !== s.state;
@@ -501,7 +509,9 @@ export class Engine {
           bundleId: item.bundleId,
           ...(item.title ? { title: item.title } : {}),
           ...(item.domain ? { domain: item.domain } : {}),
-          ...(inSession ? { sessionId: s!.id, ...(onTask !== undefined && !away ? { onTask } : {}) } : {}),
+          ...(inSession && s
+            ? { sessionId: s.id, ...(work && !away ? { onTask: work.state !== "off", ...(work.state === "other" ? { otherTask: work.task } : {}) } : {}) }
+            : {}),
         });
       }
       if (changed && !s) this.d.onChange();
@@ -543,8 +553,53 @@ export class Engine {
     }
   }
 
-  /** Judges what's in front and blocks it if it's a distraction. Returns whether it's on task. */
-  private async enforce(s: Session, item: FrontItem | null, front: FrontInfo): Promise<boolean | undefined> {
+  /**
+   * Q-72: allowed work that clearly belongs to another of your tasks (one you named this session,
+   * or any task you've used before) is "other productive work" for that task, not this one.
+   */
+  private async workState(s: Session, task: SessionTask, text: string): Promise<WorkState> {
+    if (!this.settings.countOtherWork || !text.trim()) return { state: "on" };
+    const others = this.tasks.filter((t) => !s.taskIds.includes(t.id) && t.labelVector);
+    if (!others.length) return { state: "on" };
+    try {
+      const v = await this.d.judge.vector(text);
+      const rep = (t: Task) => ({ label: t.labelVector!, prototypes: t.prototypes.map((p) => p.vector) });
+      const mine = Math.max(0, ...task.members.filter((m) => m.labelVector).map((m) => relatedness(v, rep(m))));
+      // Tasks named this session win a tie with older ones.
+      const scored = others
+        .map((t) => ({ t, s: relatedness(v, rep(t)) + (s.otherTaskIds.includes(t.id) ? 1e-6 : 0) }))
+        .sort((a, b) => b.s - a.s);
+      const best = scored[0]!;
+      if (mine < THRESHOLDS.ALLOW_MIN_S && best.s >= THRESHOLDS.ALLOW_MIN_S && best.s - mine >= OWNER_RULES.OTHER_WORK_MARGIN) {
+        return { state: "other", task: best.t.label };
+      }
+    } catch {
+      // tier 2 unavailable: counted as this task, as before
+    }
+    return { state: "on" };
+  }
+
+  /** Q-72: "I'm also doing X" during a session, so that work is recognized as other productive work. */
+  addOtherTask(label: string): Promise<boolean> {
+    return this.run(async () => {
+      const s = this.session;
+      if (!s || !COMMITTED.includes(s.state) || !normalizeLabel(label)) return false;
+      const t = await this.resolveOrCreate(label);
+      if (s.taskIds.includes(t.id)) return false;
+      if (!s.otherTaskIds.includes(t.id)) s.otherTaskIds.push(t.id);
+      this.verdicts.clear(); // re-sort what's open against the new task
+      this.save();
+      return true;
+    });
+  }
+
+  /** Labels of the tasks named as side work this session. */
+  otherTaskLabels(s: Session): string[] {
+    return (s.otherTaskIds ?? []).map((id) => this.tasks.find((t) => t.id === id)?.label).filter((l): l is string => !!l);
+  }
+
+  /** Judges what's in front and blocks it if it's a distraction. Returns what it counts as. */
+  private async enforce(s: Session, item: FrontItem | null, front: FrontInfo): Promise<WorkState | undefined> {
     const app = front.app;
     if (!item || !app || app.regular === false) return undefined;
     const task = await this.sessionTask(s);
@@ -557,11 +612,11 @@ export class Engine {
         s.suspendedFor = app.name;
         this.d.system.notify(`${app.name} is running`, "Tabhush stepped back so it can do its job.");
       }
-      return true;
+      return { state: "on" };
     }
     if (s.suspendedFor) {
       const still = (await this.d.system.apps()).some((a) => a.name === s.suspendedFor);
-      if (still) return true;
+      if (still) return { state: "on" };
       s.suspendedFor = null;
     }
 
@@ -574,13 +629,15 @@ export class Engine {
         v = await this.d.judge.app(task, app, titleExcluded(app.bundleId) ? "" : front.title);
       }
       if (this.verdicts.size > 2000) this.verdicts.clear();
+      if (v.action === "allow") {
+        // CLS-32: pages kept for the task teach it (prototypes), from strong similarity only; once per item.
+        if (kind === "browser" && front.url && v.source === "similarity" && (v.s ?? 0) >= THRESHOLDS.ALLOW_MIN_S) await this.seedPrototype(task, front.url, item.title ?? "");
+        const text = kind === "browser" ? itemText(item.title ?? "", item.domain ?? "") : kind === "tool" || kind === "other" || kind === "meeting" ? itemText(item.title ?? "", app.name) : "";
+        v = { ...v, work: text ? await this.workState(s, task, text) : { state: "on" } };
+      }
       this.verdicts.set(fingerprint, v);
     }
-    if (v.action === "allow") {
-      // CLS-32: pages kept for the task teach it (prototypes), from strong similarity only.
-      if (kind === "browser" && front.url && v.source === "similarity" && (v.s ?? 0) >= 0.45) await this.seedPrototype(task, front.url, item.title ?? "");
-      return true;
-    }
+    if (v.action === "allow") return v.work ?? { state: "on" };
     if (kind === "browser") {
       const closed = front.url
         ? (await this.d.system.closeTabs(app.bundleId, [front.url])) > 0
@@ -594,7 +651,7 @@ export class Engine {
     } else {
       await this.blockApp(s, app.bundleId, app.name, app.pid);
     }
-    return false;
+    return { state: "off" };
   }
 
   private async seedPrototype(task: SessionTask, url: string, title: string): Promise<void> {
@@ -611,12 +668,16 @@ export class Engine {
     }
   }
 
-  private logFocus(s: Session, state: FocusEntry["state"], where: { domain?: string; title?: string } = {}, at = this.now()): void {
+  private logFocus(s: Session, state: FocusEntry["state"], where: { domain?: string; title?: string; task?: string } = {}, at = this.now()): void {
     if (state !== "away" && s.state !== "ACTIVE") return;
     const last = s.focusLog[s.focusLog.length - 1];
-    if (last && last.state === state && (state === "away" || (last.domain === where.domain && last.title === where.title))) return;
+    if (last && last.state === state && (state === "away" || (last.domain === where.domain && last.title === where.title && last.task === where.task))) return;
     const t = Math.max(at, last?.at ?? at);
-    s.focusLog.push(state === "away" ? { at: t, state } : { at: t, state, ...(where.domain ? { domain: where.domain } : {}), ...(where.title ? { title: where.title } : {}) });
+    s.focusLog.push(
+      state === "away"
+        ? { at: t, state }
+        : { at: t, state, ...(where.domain ? { domain: where.domain } : {}), ...(where.title ? { title: where.title } : {}), ...(where.task ? { task: where.task } : {}) },
+    );
   }
 
   setLocked(locked: boolean): void {

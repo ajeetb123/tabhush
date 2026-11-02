@@ -57,7 +57,9 @@ export interface PageTime {
 
 export interface SiteTime {
   domain: string;
-  onTask: boolean;
+  /** on: this session's task. other: productive work for another task (Q-72). off: distraction. */
+  kind: "on" | "other" | "off";
+  task?: string;
   ms: number;
   pages: PageTime[];
 }
@@ -65,9 +67,10 @@ export interface SiteTime {
 export interface TimelineItem {
   from: number;
   to: number;
-  state: "on" | "off" | "away";
+  state: "on" | "other" | "off" | "away";
   domain: string | null;
   title: string | null;
+  task?: string;
 }
 
 /** Each stretch of the session in order, with the site and page in front (Q-69 full report). */
@@ -81,9 +84,16 @@ export function sessionTimeline(s: SessionLike, now: number): TimelineItem[] {
     const from = Math.max(e.at, s.committedAt);
     const to = Math.min(log[i + 1]?.at ?? end, end);
     if (to <= from) continue;
-    const item: TimelineItem = { from, to, state: e.state, domain: e.state === "away" ? null : (e.domain ?? null), title: e.state === "away" ? null : (e.title ?? null) };
+    const item: TimelineItem = {
+      from,
+      to,
+      state: e.state,
+      domain: e.state === "away" ? null : (e.domain ?? null),
+      title: e.state === "away" ? null : (e.title ?? null),
+      ...(e.state === "other" && e.task ? { task: e.task } : {}),
+    };
     const last = out[out.length - 1];
-    if (last && last.to === from && last.state === item.state && last.domain === item.domain && last.title === item.title) last.to = to;
+    if (last && last.to === from && last.state === item.state && last.domain === item.domain && last.title === item.title && last.task === item.task) last.to = to;
     else out.push(item);
   }
   return out;
@@ -95,8 +105,8 @@ export function siteBreakdown(s: SessionLike, now: number): SiteTime[] {
   for (const t of sessionTimeline(s, now)) {
     if (t.state === "away") continue;
     const domain = t.domain ?? "Other";
-    const key = `${t.state}|${domain}`;
-    const site = sites.get(key) ?? { domain, onTask: t.state === "on", ms: 0, pages: [], byTitle: new Map() };
+    const key = `${t.state}|${t.task ?? ""}|${domain}`;
+    const site = sites.get(key) ?? { domain, kind: t.state, ...(t.task ? { task: t.task } : {}), ms: 0, pages: [], byTitle: new Map() };
     site.ms += t.to - t.from;
     if (t.title) site.byTitle.set(t.title, (site.byTitle.get(t.title) ?? 0) + t.to - t.from);
     sites.set(key, site);
@@ -124,9 +134,9 @@ export function colorFor(key: string): string {
   return TASK_COLORS[h % TASK_COLORS.length]!;
 }
 
-/** On-task, off-task and away milliseconds of a session, clipped to [from, to). */
-export function focusSplit(s: SessionLike, now: number, from = -Infinity, to = Infinity): { on: number; off: number; away: number } {
-  const out = { on: 0, off: 0, away: 0 };
+/** On-task, other productive work (Q-72), off-task and away milliseconds of a session, clipped to [from, to). */
+export function focusSplit(s: SessionLike, now: number, from = -Infinity, to = Infinity): { on: number; other: number; off: number; away: number } {
+  const out = { on: 0, other: 0, off: 0, away: 0 };
   if (s.committedAt === null) return out;
   const end = s.endedAt ?? now;
   const log = s.focusLog.length ? s.focusLog : [{ at: s.committedAt, state: "on" as const }];
@@ -136,6 +146,28 @@ export function focusSplit(s: SessionLike, now: number, from = -Infinity, to = I
     if (b > a) out[log[i]!.state] += b - a;
   }
   return out;
+}
+
+/** Productive time of a session by task: its own task, plus other work per task (Q-72). */
+export function productiveParts(s: SessionLike, now: number, from = -Infinity, to = Infinity): { key: string; label: string; color: string; ms: number; side: boolean }[] {
+  const parts = new Map<string, { key: string; label: string; color: string; ms: number; side: boolean }>();
+  const own = s.taskLabel ?? "Untitled";
+  const ownKey = own.toLowerCase();
+  parts.set(ownKey, { key: ownKey, label: own, color: colorFor(taskKey(s)), ms: focusSplit(s, now, from, to).on, side: false });
+  if (s.committedAt !== null) {
+    const end = s.endedAt ?? now;
+    s.focusLog.forEach((e, i) => {
+      if (e.state !== "other" || !e.task) return;
+      const a = Math.max(e.at, from, s.committedAt!);
+      const b = Math.min(s.focusLog[i + 1]?.at ?? end, to, end);
+      if (b <= a) return;
+      const key = e.task.toLowerCase();
+      const p = parts.get(key) ?? { key, label: e.task, color: colorFor(key), ms: 0, side: true };
+      p.ms += b - a;
+      parts.set(key, p);
+    });
+  }
+  return [...parts.values()].filter((p) => p.ms > 0 || !p.side);
 }
 
 function partOfDay(hour: number): string {
@@ -150,6 +182,8 @@ export interface TaskRow {
   color: string;
   onMs: number;
   sessions: number;
+  /** Of onMs, time done during other sessions as side work (Q-72). */
+  sideMs: number;
 }
 
 export interface DayReport {
@@ -173,14 +207,17 @@ export function dayReport(sessions: SessionLike[], now: number): DayReport {
   const events: { at: number; domain: string }[] = [];
   for (const s of today) {
     const split = focusSplit(s, now, from, to);
-    on += split.on;
+    on += split.on + split.other; // other productive work counts as focused (Q-72)
     off += split.off;
     away += split.away;
-    const key = taskKey(s);
-    const row = rows.get(key) ?? { key, label: s.taskLabel ?? "Untitled", color: colorFor(key), onMs: 0, sessions: 0 };
-    row.onMs += split.on;
-    row.sessions += 1;
-    rows.set(key, row);
+    // Rows are per task name, so side work lands on that task's row.
+    for (const part of productiveParts(s, now, from, to)) {
+      const row = rows.get(part.key) ?? { key: part.key, label: part.label, color: part.color, onMs: 0, sessions: 0, sideMs: 0 };
+      row.onMs += part.ms;
+      if (part.side) row.sideMs += part.ms;
+      else row.sessions += 1;
+      rows.set(part.key, row);
+    }
     events.push(...s.blockEvents.filter((e) => e.at >= from && e.at < to));
   }
 
@@ -239,12 +276,15 @@ export function weekReport(sessions: SessionLike[], now: number): { days: WeekDa
     const end = start + MS.DAY;
     const parts = new Map<string, { color: string; label: string; onMs: number }>();
     for (const s of sessions) {
-      const on = focusSplit(s, now, start, end).on;
+      const split = focusSplit(s, now, start, end);
+      const on = split.on + split.other;
       if (on <= 0) continue;
-      const key = taskKey(s);
-      const p = parts.get(key) ?? { color: colorFor(key), label: s.taskLabel ?? "", onMs: 0 };
-      p.onMs += on;
-      parts.set(key, p);
+      for (const part of productiveParts(s, now, start, end)) {
+        if (part.ms <= 0) continue;
+        const p = parts.get(part.key) ?? { color: part.color, label: part.label, onMs: 0 };
+        p.onMs += part.ms;
+        parts.set(part.key, p);
+      }
       if (s.committedAt !== null) {
         const bucket = partOfDay(new Date(s.committedAt).getHours());
         byPart.set(bucket, (byPart.get(bucket) ?? 0) + on);

@@ -20,7 +20,7 @@ describe("report", () => {
 
   it("splits on, off and away time from the focus log", () => {
     const s = sess("a", "Lab", at(10), at(11), { focusLog: [{ at: at(10), state: "on" }, { at: at(10, 30), state: "off" }, { at: at(10, 40), state: "away" }, { at: at(10, 50), state: "on" }, { at: at(11), state: "away" }] });
-    expect(focusSplit(s, at(12))).toEqual({ on: 40 * M, off: 10 * M, away: 10 * M });
+    expect(focusSplit(s, at(12))).toEqual({ on: 40 * M, other: 0, off: 10 * M, away: 10 * M });
   });
 
   it("Today: focused time, focus % without the outside-browser bucket, rows by task, blocks", () => {
@@ -72,7 +72,7 @@ describe("report", () => {
       ],
     });
     const sites = siteBreakdown(s, at(16));
-    expect(sites.map((x) => [x.domain, x.onTask, x.ms / M])).toEqual([
+    expect(sites.map((x) => [x.domain, x.kind === "on", x.ms / M])).toEqual([
       ["docs.google.com", true, 40],
       ["stackoverflow.com", true, 10],
       ["reddit.com", false, 5],
@@ -94,5 +94,22 @@ describe("report", () => {
 
   it("Q-69: breaks and pauses are off the clock; a running one counts up to now", () => {
     expect(offClockMs({ breaks: [{ startedAt: at(14), endedAt: at(14, 5) }], pauses: [{ startedAt: at(15), endedAt: null }] }, at(15, 10))).toBe(15 * M);
+  });
+
+  it("Q-72: side work counts as focused and lands on its own task's row", () => {
+    const s = sess("x", "CS 2114", at(14), at(15), {
+      focusLog: [
+        { at: at(14), state: "on", domain: "docs.google.com" },
+        { at: at(14, 30), state: "other", task: "Resume tailoring", domain: "docs.google.com" },
+        { at: at(14, 50), state: "off", domain: "reddit.com" },
+        { at: at(15), state: "away" },
+      ],
+    });
+    const r = dayReport([s], at(16));
+    expect(r.focusedMs).toBe(50 * M);
+    expect(r.focusPct).toBe(83);
+    const rows = Object.fromEntries(r.rows.map((x) => [x.label, [x.onMs / M, x.sessions, x.sideMs / M]]));
+    expect(rows).toEqual({ "CS 2114": [30, 1, 0], "Resume tailoring": [20, 0, 20] });
+    expect(focusSplit(s, at(16))).toEqual({ on: 30 * M, other: 20 * M, off: 10 * M, away: 0 });
   });
 });

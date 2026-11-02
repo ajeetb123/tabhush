@@ -198,6 +198,48 @@ describe("the tick: tracking and blocking", () => {
   });
 });
 
+describe("other productive work (Q-72)", () => {
+  const resume = chromeTab("https://docs.google.com/document/d/9/edit", "Resume tailoring draft");
+
+  it("work for another of your tasks is logged as other work for that task, not off task", async () => {
+    const e = make();
+    await lockIn(e);
+    expect(await e.addOtherTask("Resume tailoring")).toBe(true);
+    sys.frontNow = resume;
+    clock.advance(MS.SECOND);
+    await e.tick();
+    expect(e.session!.focusLog[e.session!.focusLog.length - 1]).toMatchObject({ state: "other", task: "Resume tailoring", domain: "docs.google.com" });
+    expect(sys.closed.filter((c) => c.urls[0]?.includes("/d/9/"))).toEqual([]); // never blocked
+    sys.frontNow = chromeTab("https://docs.google.com/document/d/1/edit", "CS 2114 Project 3 writeup");
+    clock.advance(MS.SECOND);
+    await e.tick();
+    expect(e.session!.focusLog[e.session!.focusLog.length - 1]!.state).toBe("on");
+  });
+
+  it("a task from an earlier session is recognized without naming it again", async () => {
+    const first = make(true);
+    await first.start();
+    await first.setTasks(["Resume tailoring"]);
+    await first.confirm(25);
+    await first.requestEnd("done");
+    const e = make();
+    await lockIn(e);
+    sys.frontNow = resume;
+    await e.tick();
+    expect(e.session!.focusLog[e.session!.focusLog.length - 1]).toMatchObject({ state: "other", task: "Resume tailoring" });
+  });
+
+  it("switched off in settings, it all counts as this session's task", async () => {
+    const e = make();
+    e.setSettings({ countOtherWork: false });
+    await lockIn(e);
+    await e.addOtherTask("Resume tailoring");
+    sys.frontNow = resume;
+    await e.tick();
+    expect(e.session!.focusLog[e.session!.focusLog.length - 1]!.state).toBe("on");
+  });
+});
+
 describe("ending rules (Q-69, Q-70)", () => {
   it("someone else's install can't End or quit before the goal", async () => {
     const e = make(false);
