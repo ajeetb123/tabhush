@@ -301,6 +301,45 @@ export function focusOrb(): HTMLElement {
   return h("div", { className: "orb-stage", attrs: { "aria-hidden": "true" } }, art);
 }
 
+/**
+ * While a permission is missing, checks every 2 s and calls `granted` as soon as it works, so the
+ * card asking for it goes away on its own (Q-80). Returns a stop function.
+ */
+export function watchAccessibility(granted: () => void): () => void {
+  const timer = window.setInterval(() => {
+    if (document.visibilityState !== "visible") return;
+    void getSnapshot().then((s) => {
+      if (s.permissions.accessibility) {
+        window.clearInterval(timer);
+        granted();
+      }
+    });
+  }, 2000);
+  return () => window.clearInterval(timer);
+}
+
+/** Q-80: the help shown under "Allow" for the case where System Settings already says on. */
+export function staleAccessibilityHelp(): HTMLElement {
+  const fix = h("button", { className: "btn", textContent: "Fix it" });
+  const note = h("p", { className: "muted small", attrs: { role: "status" } });
+  fix.addEventListener("click", () => {
+    fix.disabled = true;
+    void call<boolean>({ type: "fixPermissions" }).then((ok) => {
+      note.textContent = ok
+        ? "Done. Switch Tabhush on in the window that opened (it’s now off). This page updates by itself."
+        : "Couldn’t fix it from here. In System Settings → Privacy & Security → Accessibility, select Tabhush, click −, then click Allow here again.";
+      fix.disabled = false;
+    });
+  });
+  return h(
+    "div",
+    { className: "stack tight" },
+    h("p", { className: "muted small", textContent: "Already switched on in System Settings but still asked? macOS is remembering an older copy of Tabhush. Fix it clears that, then you switch it on once more." }),
+    h("div", { className: "row" }, fix),
+    note,
+  );
+}
+
 /** "https://canvas.vt.edu/courses/1, notion.so" → ["canvas.vt.edu", "notion.so"]. */
 export function domainsFrom(text: string): string[] {
   const out = text

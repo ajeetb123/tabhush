@@ -169,4 +169,5 @@ export type UiMessage =
   | { type: "cancelMistake" }
   | { type: "deleteSession"; id: string }
   | { type: "forgetTask"; taskId: string }
-  | { type: "clearHistory" };
+  | { type: "clearHistory" }
+  | { type: "fixPermissions" };

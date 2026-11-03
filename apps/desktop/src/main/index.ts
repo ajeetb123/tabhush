@@ -282,6 +282,17 @@ async function route(m: UiMessage): Promise<unknown> {
       return activity.between(m.from, m.to);
     case "requestAccessibility":
       return system.accessibilityTrusted(true);
+    case "fixPermissions": {
+      // Q-80: macOS keeps permissions per build of an unsigned app, so after an update the old
+      // "on" switch no longer applies. Clear Tabhush's own entries (nothing else), then ask again.
+      if (IS_WIN || DEV || TEST) return false;
+      for (const service of ["Accessibility", "AppleEvents"]) {
+        await new Promise((done) => execFile("/usr/bin/tccutil", ["reset", service, SELF_BUNDLE_ID], () => done(null)));
+      }
+      await system.accessibilityTrusted(true);
+      await shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility");
+      return true;
+    }
     case "openPrivacyPane":
       if (IS_WIN) return null;
       return shell.openExternal(`x-apple.systempreferences:com.apple.preference.security?Privacy_${m.pane === "accessibility" ? "Accessibility" : "Automation"}`);

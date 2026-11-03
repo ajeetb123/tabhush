@@ -4,7 +4,7 @@
 
 import { BRAND, BREAKS, breakMinutesAvailable, defaultGoal, EXITS, goalNote, goalReached, MS, OWNER_RULES, SESSION, typicalMinutes } from "@tabhush/core";
 import type { PreviewItem, Session } from "../shared/types";
-import { avatar, blockedCount, call, focusOrb, formatDuration, getSnapshot, goalRing, h, onStateChange, playEnter, setMood, setTitle, stat, topbar, type Mood, type Snapshot } from "./common";
+import { staleAccessibilityHelp, watchAccessibility, avatar, blockedCount, call, focusOrb, formatDuration, getSnapshot, goalRing, h, onStateChange, playEnter, setMood, setTitle, stat, topbar, type Mood, type Snapshot } from "./common";
 import { exitActions, stopButton } from "./exits";
 import { asSessionLike, focusSplit, offClockMs } from "./reportData";
 import { endLabel, sessionDetail } from "./sessionDetail";
@@ -38,6 +38,7 @@ function permissionsCard(snap: Snapshot): HTMLElement | null {
     h("b", { textContent: "One permission for a more useful report" }),
     h("p", { className: "muted small", textContent: `This lets your report say which doc or page you worked in, not just the app. It never leaves this computer.` }),
     h("div", { className: "row" }, allow),
+    staleAccessibilityHelp(),
   );
 }
 
@@ -358,9 +359,15 @@ const moodFor = (s: Session | null): Mood => {
   return "calm";
 };
 
+let stopWatching: (() => void) | null = null;
+
 async function render(): Promise<void> {
   window.clearInterval(tick);
+  stopWatching?.();
+  stopWatching = null;
   const snap = await getSnapshot();
+  // Q-80: the permission card goes away by itself once Accessibility works.
+  if (!snap.permissions.accessibility && snap.platform === "darwin") stopWatching = watchAccessibility(() => void render());
   const { session: s, history } = snap;
   setMood(moodFor(s));
   // The entrance plays when the view changes, not on every update.

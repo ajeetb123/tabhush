@@ -4,9 +4,10 @@
 
 import { BRAND } from "@tabhush/core";
 import type { Settings } from "../shared/types";
-import { call, getSnapshot, h, onStateChange, playEnter, setTitle, topbar } from "./common";
+import { call, getSnapshot, h, onStateChange, playEnter, setTitle, staleAccessibilityHelp, topbar, watchAccessibility } from "./common";
 
 setTitle("Settings");
+let stopWatching: (() => void) | null = null;
 const main = document.querySelector("main")!;
 
 /** What the last Clear history said; kept across the redraw that clearing causes. */
@@ -57,6 +58,8 @@ function section(title: string, ...children: (Node | null)[]): Node[] {
 
 async function render(): Promise<void> {
   const { settings, session, permissions, platform, update, appVersion } = await getSnapshot();
+  stopWatching?.();
+  stopWatching = !permissions.accessibility && platform === "darwin" ? watchAccessibility(() => void render()) : null;
   const isWin = platform === "win32";
   const locked = session !== null && session.state !== "IDLE" && session.state !== "ENDED";
   const err = h("p", { className: "error", attrs: { role: "alert" } });
@@ -96,6 +99,7 @@ async function render(): Promise<void> {
           "Permissions",
           h("p", { textContent: permissions.accessibility ? "Accessibility: on. Window titles are read for your report." : "Accessibility: off. Your report will only show app names." }),
           permissions.accessibility ? null : h("div", { className: "row" }, allowAx),
+          permissions.accessibility ? null : staleAccessibilityHelp(),
           h("p", { className: "muted small", textContent: `The first time ${BRAND.NAME} reads or closes a browser tab, macOS asks to let it control that browser (Chrome, Safari, Brave, Edge, Arc…). Allow it, or blocked tabs can’t be closed. Firefox only shares its window title.` }),
           h("div", { className: "row" }, openAuto),
         )),
