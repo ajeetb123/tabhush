@@ -66,6 +66,19 @@ function ambient(): void {
 }
 ambient();
 
+/**
+ * Decorative motion runs only while you're looking at the window (focused and visible): left open
+ * beside your work or behind other apps, it rests, so it costs no CPU or battery (DSK-40, Q-77).
+ */
+function restWhenUnfocused(): void {
+  const update = () => document.body?.classList.toggle("resting", !document.hasFocus() || document.visibilityState !== "visible");
+  for (const ev of ["focus", "blur"]) window.addEventListener(ev, update);
+  document.addEventListener("visibilitychange", update);
+  if (document.body) update();
+  else document.addEventListener("DOMContentLoaded", update);
+}
+restWhenUnfocused();
+
 export type Mood = "calm" | "focus" | "break" | "ending" | "away" | "done";
 
 /** The light follows what you're doing: sage when ready, pine when locked in, amber on a break… */
@@ -153,7 +166,7 @@ function placeNavPill(nav: HTMLElement, ind: HTMLElement): void {
 
 /** Brand header with the page nav and an optional status pill. */
 export function topbar(status?: { text: string; tone?: "live" | "warn" }): HTMLElement {
-  const brand = h("div", { className: "brand" }, logoMark(), BRAND.NAME);
+  const brand = h("div", { className: "brand" }, logoMark(), h("span", { className: "brand-name", textContent: BRAND.NAME }));
   const pill = status ? h("span", { className: `pill${status.tone ? " " + status.tone : ""}`, textContent: status.text }) : null;
   const here = location.pathname.replace(/^\//, "").replace(/\.html$/, "");
   const nav = h("nav", { className: "nav", attrs: { "aria-label": "Pages" } });

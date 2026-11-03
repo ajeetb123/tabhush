@@ -30,12 +30,18 @@ What is built, what isn't, and what's left for the owner. Updated 2026-11-02. Th
 - A real test week to measure wrong blocks (Gate A).
 - Decide whether usage counts are on by default; set the backend address (Q-26) or leave them off.
 
+## Performance (measured 2026-11-03, Q-77)
+
+Window closed to the menu bar: 0.1% CPU. Window open but not in use: 0.3–0.6% (motion rests). Window focused: about 9% while its motion plays. Memory 500–600 MB (Electron; DSK-40's 200 MB isn't reachable with this stack).
+
 ## Not verified
 
 - Never run on a real Windows desktop yet (CI has no user session); the first tester run is the real check.
 - A real update install (0.1.1 → a later version) hasn't happened yet.
 - Game recognition (install folders, engine files) and school-page recognition are tested with fixtures, not on real installs.
-- The regression set (QA-02), red team (QA-20), redaction set (QA-21) and performance budgets (QA-50, DSK-40's 200 MB; Electron is above it) need real data.
+- Measured on the owner's Mac only, not on a Windows PC or an Intel Mac.
+- Never tested end to end with a real locked session on a real machine (it would close the owner's tabs and quit apps); the engine is tested against a fake OS layer and each OS helper separately.
+- The regression set (QA-02), red team (QA-20) and redaction set (QA-21) need real data.
 
 ## Backend (beta 1 subset, not used by the app yet)
 

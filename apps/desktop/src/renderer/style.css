@@ -179,7 +179,10 @@ body[data-mood="focus"] .mark .dot-halo { animation: halo 2.4s var(--ease) infin
   transition: transform .55s var(--spring), width .55s var(--spring);
 }
 
+.topbar { flex-wrap: wrap; row-gap: 10px; }
+@media (max-width: 560px) { .brand-name { display: none; } .nav a { padding: 6px 10px; } }
 .pill {
+  white-space: nowrap; flex: none;
   display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px;
   font-size: 12px; font-weight: 650; background: var(--glass); color: var(--muted);
   border: 1px solid var(--hair); backdrop-filter: blur(12px);
@@ -494,6 +497,9 @@ textarea.wrong { border-color: var(--danger); box-shadow: 0 0 0 4px var(--danger
 .setting .txt b { display: block; font-weight: 650; }
 .setting .txt p { margin: 2px 0 0; }
 .setting + .setting { padding-top: 14px; border-top: 1px solid var(--hair); }
+
+/* Resting (window not focused, Q-77): decorative loops pause; numbers and the timer keep updating. */
+body.resting *, body.resting *::before, body.resting *::after { animation-play-state: paused !important; }
 
 /* ───────────────────────── motion off ───────────────────────── */
 
