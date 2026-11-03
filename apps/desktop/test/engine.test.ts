@@ -10,7 +10,7 @@ import { Categories } from "../src/main/categories";
 import { Engine, passageMatches } from "../src/main/engine";
 import { Judge } from "../src/main/judge";
 import { JsonStore } from "../src/main/store";
-import { activityTotals, appBreakdown, asSessionLike, productiveParts } from "../src/renderer/reportData";
+import { activityTotals, appBreakdown, asSessionLike, productiveParts } from "../src/shared/reportData";
 import { app, categoriesDir, chromeTab, CHROME, Clock, fakeEmbed, FakeSystem, FIREFOX, tempDir } from "./fakes";
 
 const embed = async (t: string[]) => fakeEmbed(t);

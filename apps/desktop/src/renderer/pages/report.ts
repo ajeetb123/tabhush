@@ -2,16 +2,14 @@
 // number, one clear breakdown, one insight; every chart has a written takeaway.
 
 import { MS } from "@tabhush/core";
-import type { ActivitySegment, Session } from "../shared/types";
-import { animateNumber, avatar, call, formatDuration, getSnapshot, h, onStateChange, playEnter, setMood, setTitle, topbar } from "./common";
-import { activityBlocks, activityTotals, appBreakdown, asSessionLike, dayReport, dayStart, formatHm, historyPalette, sessionTasks, taskColor, weekReport, type SessionLike } from "./reportData";
-import { endLabel, sessionDetail } from "./sessionDetail";
+import type { ActivitySegment, Session } from "../../shared/types";
+import { animateNumber, avatar, call, formatDuration, getSnapshot, h, playSwitch, setMood, setTitle, topbar } from "../ui/common";
+import { activityBlocks, activityTotals, appBreakdown, asSessionLike, dayReport, dayStart, formatHm, historyPalette, sessionTasks, taskColor, weekReport, type SessionLike } from "../../shared/reportData";
+import { endLabel, sessionDetail } from "../ui/sessionDetail";
 
-setTitle("Your focus");
-document.querySelector("main")!.classList.add("report");
 const main = document.querySelector("main")!;
 type Tab = "today" | "activity" | "week" | "sessions";
-let tab: Tab = (new URLSearchParams(location.search).get("tab") as Tab | null) ?? "today";
+let tab: Tab = "today";
 let tick: number | undefined;
 
 let dayOffset = 0; // Activity tab: 0 = today, 1 = yesterday, …
@@ -230,7 +228,10 @@ function sessionsView(sessions: SessionLike[], now: number, palette: Map<string,
 
 let counted = false;
 
-async function render(entrance = false): Promise<void> {
+/** `tabSwitch`: a Report tab was picked (quick fade). Numbers count up only the first time the report opens. */
+async function render(tabSwitch = false): Promise<void> {
+  setTitle("Your focus");
+  main.classList.add("report");
   window.clearInterval(tick);
   const { session } = await getSnapshot();
   setMood(session && session.committedAt !== null && session.state === "ACTIVE" ? "focus" : "calm");
@@ -265,16 +266,21 @@ async function render(entrance = false): Promise<void> {
     h("p", { className: "lead", textContent: "Everything here stays on this device." }),
     h("div", { className: "card report-card" }, h("div", { className: "head" }, tabs, live), h("div", { className: "body", attrs: { role: "tabpanel" } }, ...body)),
   );
-  // Numbers count up the first time each tab is shown (Q-73).
-  if (entrance || !counted) {
+  if (tabSwitch) playSwitch();
+  // Numbers count up the first time the report opens; after that they just show (Q-81).
+  if (!counted) {
     counted = true;
-    if (entrance) playEnter();
     for (const el of main.querySelectorAll<HTMLElement>("[data-hm]")) animateNumber(el, Number(el.dataset.hm), formatHm);
     for (const el of main.querySelectorAll<HTMLElement>("[data-pct]")) animateNumber(el, Number(el.dataset.pct), (n) => `${Math.round(n)}%`);
     for (const el of main.querySelectorAll<HTMLElement>("[data-n]")) animateNumber(el, Number(el.dataset.n), (n) => String(Math.round(n)));
   }
+
 }
 
-onStateChange(() => void render());
-playEnter();
-void render();
+export const reportPage = {
+  render: (_opts: { entering: boolean }) => render(),
+  leave(): void {
+    window.clearInterval(tick);
+    main.classList.remove("report");
+  },
+};

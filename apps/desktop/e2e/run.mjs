@@ -204,9 +204,9 @@ async function pass(name, { asUser }, steps) {
 // ───────── pass 1: the owner's development copy ─────────
 
 await pass("owner (development copy)", { asUser: false }, async ({ ui, world, sleep }) => {
-  await ui.waitFor("first run opens setup", `location.pathname === "/settings.html" && document.body.innerText.includes("Set up Tabhush")`, 15000);
+  await ui.waitFor("first run opens setup", `location.hash === "#settings" && document.body.innerText.includes("Set up Tabhush")`, 15000);
   await ui.click("Done, take me to Start");
-  await ui.waitFor("Start screen", `location.pathname === "/session.html" && [...document.querySelectorAll("button")].some((b) => b.textContent === "Start")`);
+  await ui.waitFor("Start screen", `location.hash === "#session" && [...document.querySelectorAll("button")].some((b) => b.textContent === "Start")`);
 
   await ui.click("Start");
   await ui.waitFor("start screen with a task", `document.body.innerText.includes("Let’s lock in") && [...document.querySelectorAll("button")].some((b) => b.textContent.startsWith("Lock in for"))`, 30000);
@@ -235,10 +235,12 @@ await pass("owner (development copy)", { asUser: false }, async ({ ui, world, sl
   check("music turned down to 30%", log.some((l) => l.volume === SPOTIFY.bundleId && l.level === 30));
   check("first session offers 'Started by mistake?'", (await ui.text()).includes("Started this by mistake?"));
 
+  await ui.eval(`(window.__redraws = 0, window.__mo = new MutationObserver((m) => m.forEach((r) => r.target === document.querySelector("main") && window.__redraws++)), window.__mo.observe(document.querySelector("main"), { childList: true }), true)`);
   world.set({ front: front(DOCS), tabs: [DOCS, RESUME, CANVAS] });
   await sleep(3500);
   world.set({ front: front(RESUME) });
   await sleep(3500);
+  check("switching between work apps doesn't redraw the session view", (await ui.eval(`window.__redraws`)) === 0, `${await ui.eval(`window.__redraws`)} redraws`);
   const N2 = tab("https://www.netflix.com/browse", "Netflix");
   world.set({ tabs: [...world.get().tabs, N2], front: front(N2) });
   await sleep(3000);
@@ -291,8 +293,18 @@ await pass("owner (development copy)", { asUser: false }, async ({ ui, world, sl
   await ui.waitFor("summary 3", `document.body.innerText.includes("Session over")`, 8000);
   await ui.click("Done");
   await ui.waitFor("idle after Done", `[...document.querySelectorAll("button")].some((b) => b.textContent === "Start")`);
-  await ui.eval(`(location.href = "report.html", true)`);
-  await ui.waitFor("report opens", `location.pathname === "/report.html" && document.body.innerText.includes("BY TASK")`, 8000);
+  await ui.eval(`(window.__noReload = true, true)`);
+  await ui.click("Report");
+  await ui.waitFor("report opens", `location.hash === "#report" && document.body.innerText.includes("BY TASK")`, 8000);
+  check("switching views doesn't reload the page", (await ui.eval(`window.__noReload === true`)) === true);
+  // An open view doesn't redraw itself while nothing changes (Q-81).
+  const redraws = async (label) => {
+    await ui.eval(`(window.__redraws = 0, window.__mo?.disconnect(), window.__mo = new MutationObserver((m) => m.forEach((r) => r.target === document.querySelector("main") && window.__redraws++)), window.__mo.observe(document.querySelector("main"), { childList: true }), true)`);
+    await sleep(4000);
+    const n = await ui.eval(`window.__redraws`);
+    check(`${label} stays still while nothing changes`, n === 0, `${n} redraws in 4 s`);
+  };
+  await redraws("Report");
   check("Today lists the task", (await ui.text()).includes("CS 2114"));
   for (const t of ["Activity", "Week", "Sessions"]) {
     await ui.eval(`[...document.querySelectorAll('[role=tab]')].find((b) => b.textContent === ${JSON.stringify(t)}).click()`);
@@ -303,8 +315,23 @@ await pass("owner (development copy)", { asUser: false }, async ({ ui, world, sl
   await ui.confirmYes();
   await ui.click("Delete from history");
   await ui.waitFor("session deleted from the report", `window.tabhush.call({type:"sessions"}).then((x) => x.length === 0)`);
-  await ui.eval(`(location.href = "settings.html", true)`);
-  await ui.waitFor("settings opens", `location.pathname === "/settings.html" && document.body.innerText.includes("Clear history")`, 8000);
+  await ui.click("Settings");
+  await ui.waitFor("settings opens", `location.hash === "#settings" && document.body.innerText.includes("Clear history")`, 8000);
+  check("still no reload after more switching", (await ui.eval(`window.__noReload === true`)) === true);
+  await redraws("Settings");
+  // Switching is instant: the next view is on screen a frame or two after the click (Q-81).
+  const switchMs = [];
+  for (const [to, ready] of [
+    ["session", `[...document.querySelectorAll("button")].some((b) => b.textContent === "Start")`],
+    ["report", `!!document.querySelector("main.report [role=tab]")`],
+    ["settings", `document.body.innerText.includes("Clear history")`],
+  ]) {
+    // Watched with a MutationObserver, not a timer: Chromium slows timers to once a second in a
+    // window that's covered or on a sleeping display, which would measure the throttle instead.
+    switchMs.push(await ui.eval(`new Promise((r) => { const t = performance.now(); const done = () => { if (${ready}) { mo.disconnect(); r(Math.round(performance.now() - t)); } }; const mo = new MutationObserver(done); mo.observe(document.body, { childList: true, subtree: true, characterData: true }); location.hash = ${JSON.stringify(to)}; done(); })`));
+  }
+  check("each switch is on screen within 150 ms", switchMs.every((ms) => ms <= 150), `${switchMs.join(", ")} ms`);
+  console.log(`      switch times: ${switchMs.join(", ")} ms`);
   await ui.confirmYes();
   await ui.click("Clear history");
   await ui.waitFor("start fresh confirms", `document.body.innerText.includes("History cleared.")`);
@@ -313,7 +340,7 @@ await pass("owner (development copy)", { asUser: false }, async ({ ui, world, sl
 // ───────── pass 2: a regular install ─────────
 
 await pass("regular user (installed copy)", { asUser: true }, async ({ ui, world, sleep }) => {
-  await ui.waitFor("setup opens", `location.pathname === "/settings.html"`, 15000);
+  await ui.waitFor("setup opens", `location.hash === "#settings"`, 15000);
   await ui.click("Done, take me to Start");
   await ui.waitFor("Start", `[...document.querySelectorAll("button")].some((b) => b.textContent === "Start")`);
   await ui.click("Start");

@@ -546,3 +546,13 @@ body.resting .insight::before { animation-play-state: paused !important; }
 .chip.split .chip-x:hover { color: var(--danger); }
 .chip.split button:disabled { opacity: .45; cursor: default; }
 .mistake { border-color: color-mix(in srgb, var(--warm) 35%, transparent); }
+
+/* Q-81: switching views is a quick, quiet fade; once a view has settled, updates don't replay entrances. */
+body.switching main > * { animation: switch-in .18s ease-out both; }
+@keyframes switch-in { from { opacity: .35; transform: translate3d(0, 3px, 0); } to { opacity: 1; transform: none; } }
+body.settled .bar > span,
+body.settled .weekbars .seg,
+body.settled .weekbars .val,
+body.settled .strip span,
+body.settled .report-card .body,
+body.settled .footer { animation: none; }

@@ -1,6 +1,6 @@
 // Report math (UI-02, UI-04; Q-65).
 import { describe, expect, it } from "vitest";
-import { dayReport, dayStart, focusSplit, formatHm, offClockMs, sessionTimeline, siteBreakdown, weekReport, type SessionLike } from "../src/renderer/reportData";
+import { dayReport, dayStart, focusSplit, formatHm, offClockMs, sessionTimeline, siteBreakdown, weekReport, type SessionLike } from "../src/shared/reportData";
 
 const H = 3_600_000;
 const M = 60_000;

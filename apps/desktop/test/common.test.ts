@@ -5,7 +5,7 @@ vi.stubGlobal("tabhush", { call: vi.fn(), onChange: vi.fn(), onEmbed: vi.fn() })
 
 describe("domainsFrom", () => {
   it("turns pasted addresses into bare domains", async () => {
-    const { domainsFrom } = await import("../src/renderer/common");
+    const { domainsFrom } = await import("../src/renderer/ui/common");
     expect(domainsFrom("https://canvas.vt.edu/courses/1\n www.Notion.so , prairielearn.endeavour.cs.vt.edu/pl, nonsense")).toEqual([
       "canvas.vt.edu",
       "notion.so",

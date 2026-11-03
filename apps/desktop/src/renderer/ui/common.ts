@@ -2,9 +2,9 @@
 // calm colors, dark mode, no badges or confetti.
 
 import { BRAND, MS } from "@tabhush/core";
-import type { Session, Snapshot, UiMessage } from "../shared/types";
+import type { Session, Snapshot, UiMessage } from "../../shared/types";
 
-export type { Snapshot } from "../shared/types";
+export type { Snapshot } from "../../shared/types";
 
 declare global {
   interface Window {
@@ -87,15 +87,38 @@ export function setMood(mood: Mood): void {
 }
 
 let enterTimer: number | undefined;
+let settleTimer: number | undefined;
 
-/** Plays the staggered entrance for the page's content (on load and when the view changes). */
+/**
+ * "Settled" (Q-81): after a view has made its entrance, redraws caused by updates show the new
+ * content at once; bars don't re-grow and the ring doesn't re-draw.
+ */
+function settleAfter(ms: number): void {
+  document.body.classList.remove("settled");
+  window.clearTimeout(settleTimer);
+  settleTimer = window.setTimeout(() => document.body.classList.add("settled"), ms);
+}
+
+/** The staggered entrance, when what the Session view shows changes (Start → locked in → summary). */
 export function playEnter(): void {
+  settleAfter(1600);
   if (reducedMotion()) return;
-  document.body.classList.remove("entering");
+  document.body.classList.remove("entering", "switching");
   void document.body.offsetWidth; // restart the animation
   document.body.classList.add("entering");
   window.clearTimeout(enterTimer);
   enterTimer = window.setTimeout(() => document.body.classList.remove("entering"), 1600);
+}
+
+/** A quick, quiet fade when switching between Session, Report and Settings (no stagger, no blur). */
+export function playSwitch(): void {
+  settleAfter(1100);
+  if (reducedMotion()) return;
+  document.body.classList.remove("entering", "switching");
+  void document.body.offsetWidth;
+  document.body.classList.add("switching");
+  window.clearTimeout(enterTimer);
+  enterTimer = window.setTimeout(() => document.body.classList.remove("switching"), 400);
 }
 
 /** Counts a number up to its value, formatted on every frame. */
@@ -168,12 +191,12 @@ function placeNavPill(nav: HTMLElement, ind: HTMLElement): void {
 export function topbar(status?: { text: string; tone?: "live" | "warn" }): HTMLElement {
   const brand = h("div", { className: "brand" }, logoMark(), h("span", { className: "brand-name", textContent: BRAND.NAME }));
   const pill = status ? h("span", { className: `pill${status.tone ? " " + status.tone : ""}`, textContent: status.text }) : null;
-  const here = location.pathname.replace(/^\//, "").replace(/\.html$/, "");
+  const here = location.hash.replace(/^#\/?/, "") || "session";
   const nav = h("nav", { className: "nav", attrs: { "aria-label": "Pages" } });
   const ind = h("span", { className: "pill-ind", attrs: { "aria-hidden": "true" } });
   nav.append(ind);
   for (const [page, label] of [["session", "Session"], ["report", "Report"], ["settings", "Settings"]] as const) {
-    nav.append(h("a", { href: `${page}.html`, textContent: label, className: here === page ? "on" : "", attrs: here === page ? { "aria-current": "page" } : {} }));
+    nav.append(h("a", { href: `#${page}`, textContent: label, className: here === page ? "on" : "", attrs: here === page ? { "aria-current": "page" } : {} }));
   }
   requestAnimationFrame(() => placeNavPill(nav, ind));
   return h("header", { className: "topbar" }, brand, nav, pill);
@@ -247,8 +270,8 @@ export function goalRing(): {
       sub.textContent = label;
       if (first) {
         first = false;
-        // The first paint draws the arc in from zero, after the entrance.
-        if (!reducedMotion()) {
+        // The first paint draws the arc in from zero, after the entrance; once settled, it just shows.
+        if (!reducedMotion() && !document.body.classList.contains("settled")) {
           arc.style.strokeDashoffset = String(C);
           head.style.transform = "rotate(0deg)";
           requestAnimationFrame(() => {
@@ -267,8 +290,15 @@ export function goalRing(): {
   };
 }
 
-/** The animated focus orb on the Start screen: rings turning, motes drifting into a breathing core. */
+let orbNode: HTMLElement | null = null;
+
+/** The animated focus orb on the Start screen, made once and reused so redraws don't restart it. */
 export function focusOrb(): HTMLElement {
+  orbNode ??= makeOrb();
+  return orbNode;
+}
+
+function makeOrb(): HTMLElement {
   let motes = "";
   for (let i = 0; i < 14; i++) {
     const a = (i / 14) * 2 * Math.PI + (i % 3) * 0.3;

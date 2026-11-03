@@ -28,12 +28,13 @@ packages/core      Shared logic: constants, classifier, sessions, inference, pri
 apps/backend       Cloudflare Worker (not deployed; the app runs fully on device)
 scripts/           Build, check and release scripts
 docs/              The spec, plus docs/business (privacy policy draft, competitive sweep)
-                   and docs/history (the Chrome extension Tabhush replaced)
+                   and docs/history (the Chrome extension Tabhush replaced; original/ has the
+                   first scope PDF and spec pack)
 ```
 
 ## The spec
 
-The spec pack started from "Lock-in App: Full Product Scope" (Oct 31, 2026, @Ajeet) as a Chrome extension; the owner has since moved the product to a desktop app (Q-70, Q-71). Precedence when two places disagree: `CONSTANTS.md`, then the topic doc in `docs/`, then this README. Newer owner decisions in `docs/16-open-questions.md` override older text.
+The spec pack started from "Lock-in App: Full Product Scope" (Oct 31, 2026, @Ajeet; `docs/history/original/`) as a Chrome extension; the owner has since moved the product to a desktop app (Q-70, Q-71). Precedence when two places disagree: `CONSTANTS.md`, then the topic doc in `docs/`, then this README. Newer owner decisions in `docs/16-open-questions.md` override older text.
 
 Reading order: `AGENTS.md` (rules, invariants), `docs/02-glossary.md`, `CONSTANTS.md`, the topic doc for your area, `docs/16-open-questions.md` before you assume anything.
 

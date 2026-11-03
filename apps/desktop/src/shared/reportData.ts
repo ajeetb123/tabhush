@@ -7,7 +7,7 @@
 //   Insight: the most-blocked site and when, plus when the longest session ran (Q-21, Q-65).
 
 import { ACTIVE_TIME, MS, REPORT } from "@tabhush/core";
-import type { ActivitySegment, EndKind, FocusEntry, Session } from "../shared/types";
+import type { ActivitySegment, EndKind, FocusEntry, Session } from "./types";
 
 // Muted task colors: sage, clay, slate blue, ochre, plum, teal.
 export const TASK_COLORS = ["#6f9a8b", "#c48a64", "#7487ad", "#bfa35a", "#9a7aa6", "#5f97a3"] as const;

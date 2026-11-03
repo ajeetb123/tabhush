@@ -3,7 +3,7 @@
 
 import { DESKTOP, MS } from "@tabhush/core";
 import type { ActivitySegment } from "../shared/types";
-import { dayStart } from "../renderer/reportData";
+import { dayStart } from "../shared/reportData";
 import type { JsonStore } from "./store";
 
 type Entry = Omit<ActivitySegment, "from" | "to">;

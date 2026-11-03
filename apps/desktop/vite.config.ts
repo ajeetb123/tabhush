@@ -31,9 +31,7 @@ export default defineConfig({
     modulePreload: false,
     rollupOptions: {
       input: {
-        session: resolve(src, "session.html"),
-        report: resolve(src, "report.html"),
-        settings: resolve(src, "settings.html"),
+        app: resolve(src, "app.html"),
         embedder: resolve(src, "embedder.html"),
       },
     },

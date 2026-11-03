@@ -5,7 +5,7 @@
 //   (a one-line reason, retype a passage with no pasting, hold 3 s, a 60 s countdown, once a day).
 
 import { DESKTOP, OWNER_RULES } from "@tabhush/core";
-import type { EndAccess } from "../shared/types";
+import type { EndAccess } from "../../shared/types";
 import { call, h } from "./common";
 
 export function stopButton(block = true): HTMLElement {

@@ -1,12 +1,12 @@
 # Status
 
-What is built, what isn't, and what's left for the owner. Updated 2026-11-02. The product is the Tabhush desktop app (`apps/desktop`) for macOS and Windows; the Chrome extension it replaced is described in `docs/history/extension-status.md`.
+What is built, what isn't, and what's left for the owner. Updated 2026-11-03. The product is the Tabhush desktop app (`apps/desktop`) for macOS and Windows; the Chrome extension it replaced is described in `docs/history/extension-status.md`.
 
 ## The app
 
 | Area | State | Notes |
 |---|---|---|
-| Menu-bar / tray app, open at login, Session · Report · Settings window | Built | DSK-30. Calm Aurora design with motion (Q-73). |
+| Menu-bar / tray app, open at login, Session · Report · Settings window | Built | DSK-30. Calm Aurora design with motion (Q-73). One page: switching views is instant, motion plays once (Q-81). |
 | Tracking: front app, window title, browser site and page | Built | All day by default; stays on the computer. macOS titles need Accessibility (Q-70). Idle minutes are taken back out of the log (Q-74). |
 | Start: tasks named from what's open (up to 3), time goal, what gets blocked, Lock in | Built | CLS-30..50, Q-64; time split per task in the report (Q-78). |
 | Blocking in every browser and app | Built | Tabs closed (Apple Events on macOS, address bar + Ctrl+W on Windows), distraction apps quit, background tabs and apps re-checked every 15 s. Games and school pages recognized by looking, not lists (Q-74). |

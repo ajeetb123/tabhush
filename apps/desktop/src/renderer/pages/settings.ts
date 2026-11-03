@@ -3,10 +3,9 @@
 // to keep. Locked during a session (LOCK-01). The UT1 list credit ships in the app's NOTICE file.
 
 import { BRAND } from "@tabhush/core";
-import type { Settings } from "../shared/types";
-import { call, getSnapshot, h, onStateChange, playEnter, setTitle, staleAccessibilityHelp, topbar, watchAccessibility } from "./common";
+import type { Settings } from "../../shared/types";
+import { call, getSnapshot, h, setTitle, staleAccessibilityHelp, topbar, watchAccessibility } from "../ui/common";
 
-setTitle("Settings");
 let stopWatching: (() => void) | null = null;
 const main = document.querySelector("main")!;
 
@@ -57,6 +56,7 @@ function section(title: string, ...children: (Node | null)[]): Node[] {
 }
 
 async function render(): Promise<void> {
+  setTitle("Settings");
   const { settings, session, permissions, platform, update, appVersion } = await getSnapshot();
   stopWatching?.();
   stopWatching = !permissions.accessibility && platform === "darwin" ? watchAccessibility(() => void render()) : null;
@@ -82,7 +82,7 @@ async function render(): Promise<void> {
   };
 
   const finish = h("button", { className: "btn primary block", textContent: "Done, take me to Start" });
-  finish.addEventListener("click", () => void call({ type: "settings", patch: { onboarded: true } }).then(() => location.replace("session.html")));
+  finish.addEventListener("click", () => void call({ type: "settings", patch: { onboarded: true } }).then(() => (location.hash = "session")));
 
 
   const nodes: Node[] = [
@@ -128,6 +128,10 @@ async function render(): Promise<void> {
   main.replaceChildren(...nodes);
 }
 
-onStateChange(() => void render());
-playEnter();
-void render();
+export const settingsPage = {
+  render: (_opts: { entering: boolean }) => render(),
+  leave(): void {
+    stopWatching?.();
+    stopWatching = null;
+  },
+};

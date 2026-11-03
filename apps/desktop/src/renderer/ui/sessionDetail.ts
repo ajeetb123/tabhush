@@ -3,7 +3,7 @@
 
 import { MS } from "@tabhush/core";
 import { avatar, h, stat } from "./common";
-import { focusSplit, formatHm, offClockMs, productiveParts, sessionTimeline, siteBreakdown, type SessionLike } from "./reportData";
+import { focusSplit, formatHm, offClockMs, productiveParts, sessionTimeline, siteBreakdown, type SessionLike } from "../../shared/reportData";
 
 const PAGES_SHOWN = 6;
 const TIMELINE_MIN_MS = 30 * MS.SECOND; // shorter stretches are noise in the timeline

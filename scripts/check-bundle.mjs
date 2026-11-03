@@ -20,7 +20,7 @@ function walk(dir) {
   }
 }
 walk(dist);
-for (const page of ["session", "report", "settings", "embedder"]) {
+for (const page of ["app", "embedder"]) {
   const html = readFileSync(join(dist, "renderer", `${page}.html`), "utf8");
   const csp = /Content-Security-Policy" content="([^"]+)"/.exec(html)?.[1] ?? "";
   if (!/script-src 'self'( 'wasm-unsafe-eval')?;/.test(csp)) problems.push(`${page}.html CSP changed: ${csp}`);

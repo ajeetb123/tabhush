@@ -3,11 +3,11 @@
 // Running: the goal ring, breaks, Step away and the exits. Ended: the full session report.
 
 import { BRAND, BREAKS, breakMinutesAvailable, defaultGoal, EXITS, goalNote, goalReached, MS, OWNER_RULES, SESSION, typicalMinutes } from "@tabhush/core";
-import type { PreviewItem, Session } from "../shared/types";
-import { staleAccessibilityHelp, watchAccessibility, avatar, blockedCount, call, focusOrb, formatDuration, getSnapshot, goalRing, h, onStateChange, playEnter, setMood, setTitle, stat, topbar, type Mood, type Snapshot } from "./common";
-import { exitActions, stopButton } from "./exits";
-import { asSessionLike, focusSplit, offClockMs } from "./reportData";
-import { endLabel, sessionDetail } from "./sessionDetail";
+import type { PreviewItem, Session } from "../../shared/types";
+import { staleAccessibilityHelp, watchAccessibility, avatar, blockedCount, call, focusOrb, formatDuration, getSnapshot, goalRing, h, playEnter, setMood, setTitle, stat, topbar, type Mood, type Snapshot } from "../ui/common";
+import { exitActions, stopButton } from "../ui/exits";
+import { asSessionLike, focusSplit, offClockMs } from "../../shared/reportData";
+import { endLabel, sessionDetail } from "../ui/sessionDetail";
 
 const main = document.querySelector("main")!;
 const footer = document.createElement("div");
@@ -219,7 +219,8 @@ function runningView(s: Session, snap: Snapshot): Node[] {
   const countdownSec = s.emergency ? OWNER_RULES.EMERGENCY_COUNTDOWN_SEC : EXITS.END_COUNTDOWN_SEC;
   const actions = h("div", { className: "card stack" });
   let shownReached: boolean | null = null;
-  const front = h("p", { className: "muted small" });
+  // On-task time counts up by itself between redraws (Q-81).
+  const onTask = stat("", "on task");
 
   ring.setLive(s.state === "ACTIVE");
 
@@ -244,6 +245,7 @@ function runningView(s: Session, snap: Snapshot): Node[] {
 
   const update = () => {
     const now = Date.now();
+    onTask.querySelector(".num")!.textContent = formatDuration(focusSplit(asSessionLike(s), now).on);
     if (mistake && until) {
       const left = until - now;
       if (left <= 0) mistake.remove();
@@ -283,7 +285,6 @@ function runningView(s: Session, snap: Snapshot): Node[] {
   }
   update();
   tick = window.setInterval(update, MS.SECOND);
-  if (snap.front && s.state === "ACTIVE") front.textContent = `In front: ${snap.front.label}${snap.front.title ? ` · ${snap.front.title}` : ""}`;
 
   const pause = paused && s.pauses[s.pauses.length - 1]?.auto;
   const top = ending
@@ -297,11 +298,10 @@ function runningView(s: Session, snap: Snapshot): Node[] {
     top,
     mistake,
     h("div", { className: "card ring-card" }, ring.el, s.state === "ACTIVE" ? h("p", { className: "breath-hint", textContent: "Breathe with the ring." }) : null),
-    h("div", { className: "stats" }, stat(String(blockedCount(s)), "blocked so far"), stat(formatDuration(focusSplit(asSessionLike(s), Date.now()).on), "on task")),
+    h("div", { className: "stats" }, stat(String(blockedCount(s)), "blocked so far"), onTask),
     ...(s.state === "ACTIVE" ? [breakCard(s)] : []),
     actions,
     ...(s.state === "ACTIVE" ? [sideWorkCard(s, snap)] : []),
-    front,
     s.suspendedFor ? h("p", { className: "note", textContent: `${s.suspendedFor} is running, so blocking is paused.` }) : null,
   ].filter((n): n is HTMLElement => n !== null);
 }
@@ -319,7 +319,7 @@ function endedView(s: Session): Node[] {
     if (window.confirm("Take this session out of your report? Its tasks are forgotten too, unless another session uses them.")) void call({ type: "deleteSession", id: s.id });
   });
   const report = h("button", { className: "btn", textContent: "See your day" });
-  report.addEventListener("click", () => void call({ type: "dismiss" }).then(() => location.replace("report.html")));
+  report.addEventListener("click", () => void call({ type: "dismiss" }).then(() => (location.hash = "report")));
   setFooter(h("div", { className: "row" }, report, done), again);
   const duration = (s.endedAt ?? Date.now()) - (s.committedAt ?? s.startedAt);
   const won = s.endKind === "normal";
@@ -361,7 +361,7 @@ const moodFor = (s: Session | null): Mood => {
 
 let stopWatching: (() => void) | null = null;
 
-async function render(): Promise<void> {
+async function render(opts: { entering: boolean } = { entering: false }): Promise<void> {
   window.clearInterval(tick);
   stopWatching?.();
   stopWatching = null;
@@ -370,9 +370,11 @@ async function render(): Promise<void> {
   if (!snap.permissions.accessibility && snap.platform === "darwin") stopWatching = watchAccessibility(() => void render());
   const { session: s, history } = snap;
   setMood(moodFor(s));
-  // The entrance plays when the view changes, not on every update.
+  // The entrance plays when what this view shows changes, not on every update; switching to it
+  // from another view gets the router's quick fade instead (Q-81).
   const view = s?.state ?? "IDLE";
-  if (view !== lastView) {
+  if (opts.entering) lastView = view;
+  else if (view !== lastView) {
     lastView = view;
     playEnter();
   }
@@ -391,5 +393,12 @@ async function render(): Promise<void> {
   if (focused) main.querySelector<HTMLElement>(`[aria-label="${CSS.escape(focused)}"]`)?.focus();
 }
 
-onStateChange(() => void render());
-void render();
+export const sessionPage = {
+  render,
+  leave(): void {
+    window.clearInterval(tick);
+    stopWatching?.();
+    stopWatching = null;
+    setFooter();
+  },
+};

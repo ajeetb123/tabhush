@@ -42,7 +42,7 @@ import {
   type Task,
 } from "@tabhush/core";
 import type { EndAccess, EndKind, FocusEntry, FrontItem, PreviewItem, Session, Settings, Snapshot } from "../shared/types";
-import { asSessionLike, dayStart, focusSplit, offClockMs } from "../renderer/reportData";
+import { asSessionLike, dayStart, focusSplit, offClockMs } from "../shared/reportData";
 import type { ActivityLog } from "./activity";
 import { appKind, browserKind, stripBrowserSuffix, titleExcluded } from "./apps";
 import type { Categories } from "./categories";
@@ -483,7 +483,9 @@ export class Engine {
       if (front.app && front.app.regular !== false) this.frontApp = front.app;
       this.lastFront = item;
       const s = this.session;
-      let changed = prevLabel !== `${item?.label}|${item?.title}`;
+      // What's in front changing is stored, but doesn't redraw the window (Q-81): only things the
+      // window shows (the session's state, blocks, a proctoring pause) do.
+      const frontChanged = prevLabel !== `${item?.label}|${item?.title}`;
 
       // No input for a while counts as away; a meeting or a video in front gets the longer grace (TIME-03).
       const watching = !!item && (DESKTOP.MEETING_APPS.includes(item.bundleId as never) || /youtube\.com\/watch/.test(item.url ?? "") || (!!item.url && hostMatchesAny(parseUrl(item.url)?.host ?? "", domainsOf(WEB_MEETINGS))));
@@ -498,6 +500,8 @@ export class Engine {
       let work: WorkState | undefined;
       if (s) {
         const before = s.state;
+        const blocksAtStart = s.blockEvents.length;
+        const suspendedBefore = s.suspendedFor;
         await this.deadlines(s, now, away, idleSec);
         if (s.state === "ACTIVE" || s.state === "IDLE_PAUSED" || s.state === "END_COUNTDOWN") {
           work = await this.enforce(s, item, front);
@@ -518,13 +522,11 @@ export class Engine {
         // another screen) are checked every BACKGROUND_SWEEP_SEC too.
         if ((s.state === "ACTIVE" || s.state === "IDLE_PAUSED") && !s.suspendedFor && now - this.lastSweep >= DESKTOP.BACKGROUND_SWEEP_SEC * MS.SECOND) {
           this.lastSweep = now;
-          const blocksBefore = s.blockEvents.length;
           await this.relock(s);
-          changed ||= s.blockEvents.length !== blocksBefore;
         }
-        changed ||= before !== s.state;
-        if (changed) this.save();
-        else if (now - this.lastSave >= 10 * MS.SECOND) this.save(false);
+        const visible = before !== s.state || s.blockEvents.length !== blocksAtStart || s.suspendedFor !== suspendedBefore;
+        if (visible) this.save();
+        else if (frontChanged || now - this.lastSave >= 10 * MS.SECOND) this.save(false);
       }
 
       const inSession = !!s && s.committedAt !== null && s.endedAt === null;
@@ -541,7 +543,6 @@ export class Engine {
             : {}),
         });
       }
-      if (changed && !s) this.d.onChange();
     });
   }
 

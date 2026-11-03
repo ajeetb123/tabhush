@@ -1,5 +1,5 @@
 // Draws the Tabhush logo (rounded ink square, white "T", sage hush dot) and
-// writes toolbar icons as PNG plus an SVG for pages. Pure Node: shapes are rasterized with 4x4
+// writes the app icon and the tray icons as PNG. Pure Node: shapes are rasterized with 4x4
 // supersampling and encoded with zlib, so no image tools are needed.
 import { writeFileSync, mkdirSync } from "node:fs";
 import { deflateSync } from "node:zlib";
@@ -55,8 +55,8 @@ function png(size, sampler = sample) {
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
 }
 
-for (const size of [16, 32, 48, 128]) writeFileSync(`${out}icon-${size}.png`, png(size));
-writeFileSync(`${out}logo.svg`, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="24" fill="#1D2125"/><rect x="42.5" y="24" width="15" height="54" rx="7" fill="#fff"/><rect x="22" y="24" width="56" height="15" rx="7" fill="#fff"/><circle cx="74" cy="72" r="7.5" fill="#86B5A6"/></svg>\n`);
+// The Windows tray icon.
+writeFileSync(`${out}icon-32.png`, png(32));
 
 // Desktop app (Q-70): the app icon on Apple's grid (artwork inset ~10%), and a menu-bar template
 // image (black glyph on transparent; macOS tints it for light and dark menu bars).

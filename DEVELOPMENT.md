@@ -10,15 +10,19 @@ packages/core          Shared TypeScript: constants module (mirrors CONSTANTS.md
 apps/desktop           The Tabhush app (Electron, Q-70/Q-71)
   src/main             Main process: engine (sessions, tracking, blocking), classifier wiring, activity log,
                        OS-helper client, updater
-  src/renderer         Pages (session, report, settings) and the hidden classifier window (Vite)
-  src/shared           Types shared by main and pages
+  src/renderer         The window: one page (app.html/app.ts) that switches views in place (Q-81),
+                       and the hidden classifier window (embedder.html)
+    pages              Session, Report, Settings
+    ui                 Shared pieces: top bar, ring, orb, exits, session detail, style.css
+  src/shared           Types and report math shared by main and pages
+  e2e                  The real app clicked through on a simulated OS (Q-79)
   native               OS helpers: helper.swift (macOS), helper-win.ps1 (Windows, PowerShell + C# 5)
   test                 Engine tests against a fake OS layer (fakes.ts)
 apps/backend           Cloudflare Worker: install tokens, tier 3 proxy, telemetry, delete-my-data (D1); not deployed
 scripts/               check-ship (TODO_Q guard), check-bundle (INV-05 guard), fetch-model, build-categories,
                        build-lexicons, make-icons, release-win (publish a Windows update)
 docs/                  The spec (01-16); docs/business: privacy policy draft, competitive sweep;
-                       docs/history: the removed extension's status
+                       docs/history: the removed extension's status, original/ (the first scope PDF and spec pack)
 ```
 
 ## Commands

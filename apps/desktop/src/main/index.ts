@@ -12,7 +12,7 @@ import { dirname, join, normalize, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { BRAND, DESKTOP, EMBEDDING, MS, OWNER_RULES, EXITS, goalReached } from "@tabhush/core";
 import type { UiMessage } from "../shared/types";
-import { offClockMs } from "../renderer/reportData";
+import { offClockMs } from "../shared/reportData";
 import { ActivityLog } from "./activity";
 import { Categories } from "./categories";
 import { Engine } from "./engine";
@@ -70,7 +70,8 @@ let allowQuit = false;
 let appNapBlock: number | null = null;
 let updates: Updates | null = null;
 
-const pageUrl = (page: string) => `app://tabhush/${page}.html`;
+// One page for the window (Q-81): views are switched by the address after "#", never reloaded.
+const pageUrl = (page: string) => (page === "embedder" ? "app://tabhush/embedder.html" : `app://tabhush/app.html#${page}`);
 
 function showWindow(page: "session" | "report" | "settings" = "session"): void {
   if (!main || main.isDestroyed()) {
@@ -97,7 +98,8 @@ function showWindow(page: "session" | "report" | "settings" = "session"): void {
     void main.loadURL(pageUrl(page));
   } else {
     const current = main.webContents.getURL();
-    if (!current.endsWith(`/${page}.html`)) void main.loadURL(pageUrl(page));
+    if (!current.startsWith("app://tabhush/app.html")) void main.loadURL(pageUrl(page));
+    else if (!current.endsWith(`#${page}`)) void main.webContents.executeJavaScript(`location.hash = ${JSON.stringify(page)}`).catch(() => undefined);
     if (TEST) main.showInactive();
     else main.show();
   }
