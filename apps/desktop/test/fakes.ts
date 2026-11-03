@@ -12,6 +12,8 @@ export class FakeSystem implements System {
   openTabs: BrowserTab[] = [];
   idle = 0;
   trusted = true;
+  /** Simulates macOS Automation (browser control) being denied: tab closing by Apple Events fails. */
+  automationDenied = false;
   volumes: Record<string, number> = { "com.spotify.client": 80 };
   quits: string[] = [];
   hides: string[] = [];
@@ -29,6 +31,7 @@ export class FakeSystem implements System {
     return structuredClone(this.openTabs);
   }
   async closeTabs(bundleId: string, urls: string[]) {
+    if (this.automationDenied) return 0;
     this.closed.push({ bundleId, urls });
     const before = this.openTabs.length;
     this.openTabs = this.openTabs.filter((t) => !(t.bundleId === bundleId && urls.includes(t.url)));

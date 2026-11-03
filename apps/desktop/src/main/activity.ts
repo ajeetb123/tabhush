@@ -46,8 +46,12 @@ export class ActivityLog {
   }
 
   /** Turns active time since `since` into away time: no input meant nobody was working (Q-74). */
-  markAwaySince(since: number): void {
-    const name = dayFile(since);
+  markAwaySince(since: number, now = since): void {
+    // Idle that began before 4am spans two day files.
+    for (let t = dayStart(since); t <= dayStart(now); t += MS.DAY) this.markAwayIn(dayFile(t + MS.HOUR), since);
+  }
+
+  private markAwayIn(name: string, since: number): void {
     const list = this.day(name);
     for (let i = list.length - 1; i >= 0; i--) {
       const s = list[i]!;

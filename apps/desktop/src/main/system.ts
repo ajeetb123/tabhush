@@ -74,7 +74,7 @@ export class HelperSystem implements System {
   ) {}
 
   private ensure(): ChildProcessWithoutNullStreams | null {
-    if (this.proc && this.proc.exitCode === null && !this.proc.killed) return this.proc;
+    if (this.proc && this.proc.exitCode === null && !this.proc.killed && this.proc.pid !== undefined) return this.proc;
     // A helper that keeps failing is retried every 30 s, not on every poll.
     if (Date.now() < this.retryAfter) return null;
     const started = Date.now();
@@ -90,11 +90,22 @@ export class HelperSystem implements System {
       }
     });
     proc.stderr.on("data", (d: Buffer) => (this.lastError = String(d).trim().slice(0, 500) || this.lastError));
-    proc.on("error", (e) => (this.lastError = `helper didn't start: ${e.message}`));
-    proc.on("exit", (code) => {
-      if (code && Date.now() - started < 30_000) this.retryAfter = Date.now() + 30_000;
+    // Writing to a helper that died must never become an uncaught error in the app.
+    proc.stdin.on("error", () => undefined);
+    const dead = () => {
+      if (this.proc === proc) this.proc = null;
       for (const done of this.pending.values()) done(null);
       this.pending.clear();
+    };
+    proc.on("error", (e) => {
+      // Didn't start (missing or blocked binary): calls come back empty at once, retried every 30 s.
+      this.lastError = `helper didn't start: ${e.message}`;
+      this.retryAfter = Date.now() + 30_000;
+      dead();
+    });
+    proc.on("exit", (code) => {
+      if (code && Date.now() - started < 30_000) this.retryAfter = Date.now() + 30_000;
+      dead();
     });
     this.proc = proc;
     return proc;

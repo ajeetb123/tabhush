@@ -2,6 +2,7 @@
 // task and proposes blocks across apps and browsers, Lock in closes and quits them, the tick tracks
 // and enforces, and the ending rules hold (owner's dev build vs everyone else).
 import { beforeEach, describe, expect, it } from "vitest";
+import { writeFileSync } from "node:fs";
 import { DESKTOP, MS } from "@tabhush/core";
 import { ActivityLog } from "../src/main/activity";
 import { appKind, isSchoolPage, looksLikeGame } from "../src/main/apps";
@@ -433,5 +434,199 @@ describe("recognizing by looking (Q-74)", () => {
     clock.advance(DESKTOP.BACKGROUND_SWEEP_SEC * MS.SECOND);
     await e.tick();
     expect(sys.closed.flatMap((c) => c.urls)).toContain("https://www.netflix.com/watch/77");
+  });
+});
+
+describe("edge cases", () => {
+  it("nothing open at Start: no task, and Lock in does nothing until one is typed", async () => {
+    sys.openTabs = [];
+    sys.running = [];
+    sys.frontNow = { app: null, title: "" };
+    const e = make();
+    await e.start();
+    expect(e.session!.taskLabel).toBeNull();
+    await e.confirm(45);
+    expect(e.session!.state).toBe("SWEEP_PREVIEW");
+    await e.setTasks(["   "]);
+    expect(e.session!.taskIds).toEqual([]);
+    await e.setTasks(["Chem lab"]);
+    await e.confirm(45);
+    expect(e.session!.state).toBe("ACTIVE");
+  });
+
+  it("two Starts at once make one session", async () => {
+    const e = make();
+    await Promise.all([e.start(), e.start()]);
+    const id = e.session!.id;
+    await e.start();
+    expect(e.session!.id).toBe(id);
+  });
+
+  it("a corrupted save file starts clean instead of crashing", () => {
+    writeFileSync(store.path("session"), "{ not json");
+    writeFileSync(store.path("tasks"), "garbage");
+    const e = make();
+    expect(e.session).toBeNull();
+    expect(e.endAccess().canEnd).toBe(false);
+  });
+
+  it("relaunched during the end countdown: the countdown still finishes", async () => {
+    const e = make();
+    await lockIn(e, 25);
+    clock.advance(26 * MS.MINUTE);
+    await e.requestEnd("done");
+    clock.advance(10 * MS.MINUTE); // app was closed past the countdown
+    const again = make();
+    await again.tick();
+    expect(again.session!.state).toBe("ENDED");
+  });
+
+  it("relaunched after a break ran out: back to work, and what was opened during it is closed", async () => {
+    const e = make();
+    await lockIn(e);
+    await e.tick(); // the app ticks every second; focused time needs a front item
+    clock.advance(30 * MS.MINUTE);
+    expect(await e.startBreak(5)).toBe(true);
+    sys.openTabs.push({ bundleId: CHROME.bundleId, url: "https://www.netflix.com/title/9", title: "Netflix" });
+    clock.advance(20 * MS.MINUTE);
+    const again = make();
+    sys.closed = [];
+    await again.tick();
+    expect(again.session!.state).toBe("ACTIVE");
+    expect(sys.closed.flatMap((c) => c.urls)).toContain("https://www.netflix.com/title/9");
+  });
+
+  it("settings are locked during a session and open again after it", async () => {
+    const e = make(true);
+    await lockIn(e);
+    expect(() => e.setSettings({ trackAllDay: false })).toThrow(/locked/);
+    await e.requestEnd("done");
+    expect(e.setSettings({ trackAllDay: false }).trackAllDay).toBe(false);
+  });
+
+  it("blocking comes back once the proctoring app closes", async () => {
+    const e = make();
+    await lockIn(e);
+    const lockdown = app("LockDown Browser", "com.respondus.lockdownbrowser");
+    sys.running.push(lockdown);
+    sys.frontNow = { app: lockdown, title: "Exam" };
+    await e.tick();
+    sys.running = sys.running.filter((a) => a !== lockdown);
+    sys.quits = [];
+    sys.frontNow = { app: { ...STEAM, pid: 3 }, title: "Steam" };
+    clock.advance(MS.SECOND);
+    await e.tick();
+    expect(e.session!.suspendedFor).toBeNull();
+    expect(sys.quits).toContain(STEAM.bundleId);
+  });
+
+  it("the once-a-day emergency stop is available again after 4am the next day", async () => {
+    const e = make();
+    await lockIn(e);
+    await e.emergencyStop("family", DESKTOP.EMERGENCY_PASSAGE);
+    clock.advance(61 * MS.SECOND);
+    await e.tick();
+    expect(e.emergencyStopsLeft()).toBe(0);
+    clock.advance(15 * MS.HOUR); // 2pm + 15h = 5am next day
+    expect(e.emergencyStopsLeft()).toBe(1);
+  });
+
+  it("popups and notification banners in front don't count as switching away", async () => {
+    const e = make();
+    await lockIn(e);
+    const before = e.session!.focusLog.length;
+    sys.frontNow = { app: { ...app("UserNotificationCenter", "com.apple.UserNotificationCenter"), regular: false }, title: "" };
+    clock.advance(MS.SECOND);
+    await e.tick();
+    expect(e.session!.focusLog.length).toBe(before);
+    expect(sys.quits.filter((q) => q === "com.apple.UserNotificationCenter")).toEqual([]);
+  });
+
+  it("looking at Tabhush itself doesn't add a row or count as work on something else", async () => {
+    const e = make();
+    await lockIn(e);
+    const last = e.session!.focusLog[e.session!.focusLog.length - 1];
+    sys.frontNow = { app: app("Tabhush", "com.tabhush.app"), title: "Tabhush" };
+    clock.advance(MS.SECOND);
+    await e.tick();
+    expect(e.session!.focusLog[e.session!.focusLog.length - 1]).toEqual(last);
+  });
+
+  it("browser control denied (macOS Automation): the blocked tab is still closed with Cmd+W", async () => {
+    const e = make();
+    await lockIn(e);
+    sys.automationDenied = true;
+    sys.frontNow = chromeTab("https://www.netflix.com/browse", "Netflix");
+    await e.tick();
+    expect(sys.frontClosed).toEqual([`${CHROME.bundleId}|Netflix - Google Chrome`]);
+  });
+
+  it("browser pages (new tab, settings, blank) are never blocked", async () => {
+    const e = make();
+    await lockIn(e);
+    sys.closed = [];
+    for (const url of ["chrome://newtab/", "about:blank", "chrome://settings/"]) {
+      sys.frontNow = chromeTab(url, "New Tab");
+      clock.advance(MS.SECOND);
+      await e.tick();
+    }
+    expect(sys.closed).toEqual([]);
+  });
+
+  it("very long titles are cut for the report", async () => {
+    const e = make();
+    sys.frontNow = { app: VSCODE, title: "x".repeat(500) };
+    await e.tick();
+    expect(e.describe(await sys.front())!.title!.length).toBe(DESKTOP.APP_TITLE_MAX_CHARS);
+  });
+
+  it("with all-day tracking off, only session time is logged", async () => {
+    const e = make();
+    e.setSettings({ trackAllDay: false });
+    sys.frontNow = { app: VSCODE, title: "before" };
+    for (let i = 0; i < 5; i++) {
+      await e.tick();
+      clock.advance(MS.SECOND);
+    }
+    activity.flush(clock.t);
+    expect(new ActivityLog(store).between(clock.t - MS.HOUR, clock.t + 1)).toEqual([]);
+    await lockIn(e);
+    for (let i = 0; i < 5; i++) {
+      await e.tick();
+      clock.advance(MS.SECOND);
+    }
+    activity.flush(clock.t);
+    expect(new ActivityLog(store).between(clock.t - MS.HOUR, clock.t + 1).length).toBeGreaterThan(0);
+  });
+
+  it("idle that started before 4am is taken out of both days' logs", () => {
+    const log = new ActivityLog(store);
+    const t4 = new Date(2026, 10, 3, 4, 0, 0).getTime();
+    const seg = { state: "active" as const, label: "Code", app: "Code", bundleId: "com.microsoft.VSCode", title: "x" };
+    for (let t = t4 - 5 * MS.MINUTE; t <= t4 + 5 * MS.MINUTE; t += MS.SECOND) log.record(t, seg);
+    log.markAwaySince(t4 - 3 * MS.MINUTE, t4 + 5 * MS.MINUTE);
+    log.flush(t4 + 5 * MS.MINUTE);
+    const all = new ActivityLog(store).between(t4 - MS.HOUR, t4 + MS.HOUR);
+    expect(Math.round(activityTotals(all, t4 - MS.HOUR, t4 + MS.HOUR).activeMs / MS.MINUTE)).toBe(2);
+  });
+
+  it("Stop during a break past the goal ends normally and closes the break", async () => {
+    const e = make();
+    await lockIn(e, 25);
+    await e.tick();
+    clock.advance(30 * MS.MINUTE);
+    expect(await e.startBreak(5)).toBe(true);
+    clock.advance(MS.MINUTE);
+    expect(await e.stop()).toBe(true);
+    expect(e.session!.endKind).toBe("normal");
+    expect(e.session!.breaks[0]!.endedAt).not.toBeNull();
+  });
+
+  it("an emergency stop works from a pause, and the pause is closed", async () => {
+    const e = make();
+    await lockIn(e);
+    await e.stepAway();
+    expect(await e.emergencyStop("ER visit", DESKTOP.EMERGENCY_PASSAGE)).toBe(true);
+    expect(e.session!.pauses[0]!.endedAt).not.toBeNull();
   });
 });

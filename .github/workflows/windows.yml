@@ -16,25 +16,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Helper smoke test (compiles the C# and answers every command)
+      - name: Windows helper edge-case test (compiles the C#, real Notepad, relaunch guard)
         shell: powershell
-        run: |
-          $in = @(
-            '{"id":1,"cmd":"trust"}',
-            '{"id":2,"cmd":"front"}',
-            '{"id":3,"cmd":"apps"}',
-            '{"id":4,"cmd":"tabs"}',
-            '{"id":5,"cmd":"hide","bundleId":"notepad.exe"}',
-            '{"id":6,"cmd":"closeFrontTab","bundleId":"chrome.exe","title":"x"}',
-            '{"id":7,"cmd":"volume","bundleId":"spotify.exe","level":30}',
-            '{"id":8,"cmd":"relaunch","on":false}'
-          ) -join "`n"
-          $out = $in | powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File apps/desktop/native/helper-win.ps1
-          $out
-          $lines = @($out | Where-Object { $_ -match '^\{' })
-          if ($lines.Count -ne 8) { throw "expected 8 replies, got $($lines.Count)" }
-          foreach ($l in $lines) { $r = $l | ConvertFrom-Json; if (-not $r.ok) { throw "command failed: $l" } }
-      - run: npx vitest run apps/desktop/test/engine.test.ts
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/desktop/native/helper-win.test.ps1
+      - run: npx vitest run apps/desktop/test/engine.test.ts apps/desktop/test/system.test.ts apps/desktop/test/updates.test.ts
       - run: npm run fetch-model -w @tabhush/desktop
       - run: npm run build-categories -w @tabhush/desktop
       - run: npm run dist:win -w @tabhush/desktop

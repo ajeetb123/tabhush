@@ -489,7 +489,7 @@ export class Engine {
       const away = this.locked || idleSec >= graceMin * 60;
       // Q-74: sitting there doing nothing is never work. When no-input is noticed, the minutes since
       // the last input come back out of the log as away time.
-      if (away && !this.wasAway) this.d.activity.markAwaySince(this.locked ? now : now - idleSec * MS.SECOND);
+      if (away && !this.wasAway) this.d.activity.markAwaySince(this.locked ? now : now - idleSec * MS.SECOND, now);
       this.wasAway = away;
 
       let work: WorkState | undefined;
@@ -499,7 +499,9 @@ export class Engine {
         if (s.state === "ACTIVE" || s.state === "IDLE_PAUSED" || s.state === "END_COUNTDOWN") {
           work = await this.enforce(s, item, front);
         }
-        if (s.state === "ACTIVE") {
+        const self = front.app?.bundleId === this.d.selfBundleId;
+        if (s.state === "ACTIVE" && !self) {
+          // Glancing at Tabhush itself leaves the focus log as it was.
           if (away) this.logFocus(s, "away", {}, s.idleSince ?? now);
           else if (item) this.logFocus(s, work?.state ?? "on", { domain: item.label, title: item.title, ...(work?.state === "other" ? { task: work.task } : {}) });
         }
@@ -656,9 +658,11 @@ export class Engine {
     }
     if (v.action === "allow") return v.work ?? { state: "on" };
     if (kind === "browser") {
-      const closed = front.url
-        ? (await this.d.system.closeTabs(app.bundleId, [front.url])) > 0
-        : await this.d.system.closeFrontTab(app.bundleId, front.title);
+      // Apple Events first; if browser control is denied (or the browser has none), Cmd+W after
+      // re-checking the window title, which needs only Accessibility.
+      const closed =
+        (front.url ? (await this.d.system.closeTabs(app.bundleId, [front.url])) > 0 : false) ||
+        (await this.d.system.closeFrontTab(app.bundleId, front.title));
       if (closed) {
         this.verdicts.delete(fingerprint);
         if (this.recordBlock(s, item.label, `tab:${front.url ?? front.title}`, { url: front.url, title: item.title ?? item.label, reason: "closed" })) {

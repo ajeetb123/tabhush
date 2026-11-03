@@ -55,7 +55,7 @@ public static class TH {
   static readonly Dictionary<uint, Proc> procs = new Dictionary<uint, Proc>();
   static readonly Dictionary<string, string> urls = new Dictionary<string, string>(); // hwnd|title -> url
 
-  // ───────── JSON out (a small writer: strings, numbers, bools, null, lists, maps) ─────────
+  // --------- JSON out (a small writer: strings, numbers, bools, null, lists, maps) ---------
 
   public static string Json(object v) {
     var sb = new StringBuilder();
@@ -110,7 +110,7 @@ public static class TH {
 
   public static Dictionary<string, object> Map() { return new Dictionary<string, object>(); }
 
-  // ───────── windows and processes ─────────
+  // --------- windows and processes ---------
 
   static string Title(IntPtr h) {
     int n = GetWindowTextLength(h);
@@ -180,11 +180,11 @@ public static class TH {
 
   static string StripBrowserName(string title) {
     int i = title.LastIndexOf(" - ", StringComparison.Ordinal);
-    if (i < 0) i = title.LastIndexOf(" — ", StringComparison.Ordinal);
+    if (i < 0) i = title.LastIndexOf(" \u2014 ", StringComparison.Ordinal);
     return i > 0 ? title.Substring(0, i).Trim() : title.Trim();
   }
 
-  // ───────── browser address bar (UI Automation, with a timeout) ─────────
+  // --------- browser address bar (UI Automation, with a timeout) ---------
 
   static string AddressBar(IntPtr h, string title) {
     string key = h.ToInt64().ToString() + "|" + title;
@@ -216,7 +216,7 @@ public static class TH {
     return result;
   }
 
-  // ───────── commands ─────────
+  // --------- commands ---------
 
   public static Dictionary<string, object> Front() {
     var r = Map();
