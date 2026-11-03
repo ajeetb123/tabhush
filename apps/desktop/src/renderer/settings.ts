@@ -1,10 +1,10 @@
-// Settings (and the first-run setup, EXT-12 on desktop): permissions, school sites, essentials
-// (LOCK-02), tracking and login (Q-70), what's always allowed (Q-63), credits (Q-08).
-// Locked during a session (LOCK-01).
+// Settings (and the first-run setup, EXT-12 on desktop): permissions, tracking and login (Q-70),
+// and a plain word on privacy. School pages are recognized on their own (Q-74), so there is no list
+// to keep. Locked during a session (LOCK-01). The UT1 list credit ships in the app's NOTICE file.
 
-import { BRAND, CATEGORY_LIST, DESKTOP, OWNER_RULES } from "@lockin/core";
+import { BRAND } from "@lockin/core";
 import type { Settings } from "../shared/types";
-import { call, domainsFrom, getSnapshot, h, onStateChange, playEnter, setTitle, topbar } from "./common";
+import { call, getSnapshot, h, onStateChange, playEnter, setTitle, topbar } from "./common";
 
 setTitle("Settings");
 const main = document.querySelector("main")!;
@@ -14,7 +14,7 @@ function section(title: string, ...children: (Node | null)[]): Node[] {
 }
 
 async function render(): Promise<void> {
-  const { settings, session, permissions, platform, helperError } = await getSnapshot();
+  const { settings, session, permissions, platform } = await getSnapshot();
   const isWin = platform === "win32";
   const locked = session !== null && session.state !== "IDLE" && session.state !== "ENDED";
   const err = h("p", { className: "error", attrs: { role: "alert" } });
@@ -24,28 +24,6 @@ async function render(): Promise<void> {
       () => (saved.textContent = "Saved."),
       (e: Error) => (err.textContent = e.message),
     );
-
-  const schoolSites = h("textarea", {
-    rows: 3,
-    value: settings.schoolSites.join("\n"),
-    disabled: locked,
-    placeholder: "canvas.vt.edu\nprairielearn.endeavour.cs.vt.edu",
-    attrs: { "aria-label": "School sites, one per line" },
-  });
-  const saveSchool = h("button", { className: "btn", textContent: "Save", disabled: locked });
-  saveSchool.addEventListener("click", () => void save({ type: "settings", patch: { schoolSites: domainsFrom(schoolSites.value) } }));
-
-  const essentials = h("textarea", {
-    rows: 4,
-    value: settings.essentials.join("\n"),
-    disabled: locked,
-    placeholder: "notion.so\nfigma.com",
-    attrs: { "aria-label": "Essentials, one domain per line" },
-  });
-  const saveEssentials = h("button", { className: "btn", textContent: "Save", disabled: locked });
-  saveEssentials.addEventListener("click", () => {
-    void save({ type: "settings", patch: { essentials: domainsFrom(essentials.value) } });
-  });
 
   const allowAx = h("button", { className: "btn primary", textContent: "Allow Accessibility" });
   allowAx.addEventListener("click", () => void call({ type: "requestAccessibility" }).then(() => call({ type: "openPrivacyPane", pane: "accessibility" })));
@@ -61,7 +39,6 @@ async function render(): Promise<void> {
   const finish = h("button", { className: "btn primary block", textContent: "Done, take me to Start" });
   finish.addEventListener("click", () => void call({ type: "settings", patch: { onboarded: true } }).then(() => location.replace("session.html")));
 
-  const chips = (items: readonly string[]) => h("div", { className: "chips" }, ...items.map((t) => h("span", { className: "chip static", textContent: t })));
 
   const nodes: Node[] = [
     topbar(locked ? { text: "Locked in", tone: "live" } : undefined),
@@ -91,48 +68,14 @@ async function render(): Promise<void> {
       toggle("Open at login", "openAtLogin", `${BRAND.NAME} starts when you log in.`),
     ),
     ...section(
-      "School sites",
-      h("p", { className: "muted small", textContent: "Your school’s course, quiz and sign-in sites. Never blocked, like Canvas and Gradescope." }),
-      schoolSites,
-      h("div", { className: "row" }, saveSchool),
+      "Your privacy",
+      h("p", { textContent: "Tabhush only notes which apps and sites you spend your time on, so it can show you your own report and keep distractions away during a session." }),
+      h("p", { className: "muted small", textContent: "It all stays on this computer. Nothing is uploaded, sold or shared, and there are no ads or accounts. Uninstalling Tabhush removes it." }),
     ),
-    ...section(
-      "Essentials",
-      h("p", { className: "muted small", textContent: "Sites that are never blocked, one per line. Subdomains are included." }),
-      essentials,
-      h("div", { className: "spread" }, saved, saveEssentials),
-      err,
-    ),
-    ...section(
-      "Always allowed",
-      h("p", { className: "muted small", textContent: "Never blocked: these sites, the apps Claude, ChatGPT and Blender, work apps (developer tools, productivity, education, design), and your school sites." }),
-      chips(OWNER_RULES.ALWAYS_ALLOWED_TOOLS),
-      h("p", { className: "muted small", textContent: isWin ? "Music is always allowed: Spotify and music on YouTube." : `Music is always allowed and turned down to ${Math.round(OWNER_RULES.MUSIC_VOLUME * 100)}%: Spotify and Music apps, and music on YouTube.` }),
-    ),
-    ...section(
-      "Blocked during a session",
-      h("p", { className: "muted small", textContent: "Games, social apps and streaming apps are quit; distracting tabs are closed in every browser." }),
-      chips(DESKTOP.DISTRACTION_APP_NAMES),
-    ),
-    ...section("Privacy", h("p", { textContent: "Everything is decided and stored on this computer. No titles, addresses, app names or task names are sent anywhere." })),
-    ...section(
-      "Diagnostics",
-      h("p", { className: "muted small", textContent: "For testers: if tracking or blocking doesn’t work, send this to whoever gave you the app." }),
-      h("code", { className: "diag", textContent: `${platform ?? "?"} · helper: ${helperError ?? "ok"}` }),
-    ),
+    err,
+    saved,
   ];
 
-  nodes.push(
-    ...section(
-      "Credits",
-      h(
-        "p",
-        { className: "muted small" },
-        `Site categories are adapted from the ${CATEGORY_LIST.SOURCE}, licensed ${CATEGORY_LIST.LICENSE}. `,
-        h("a", { href: "categories/NOTICE.txt", textContent: "Details" }),
-      ),
-    ),
-  );
   if (!settings.onboarded) nodes.push(h("div", { attrs: { style: "margin-top:24px" } }, finish));
   main.replaceChildren(...nodes);
 }

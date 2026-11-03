@@ -80,19 +80,29 @@ export function sessionDetail(s: SessionLike, now = Date.now()): HTMLElement {
     wrap.append(h("div", { className: "card" }, list));
   }
 
-  const timeline = sessionTimeline(s, now).filter((t) => t.to - t.from >= TIMELINE_MIN_MS);
+  // Q-74: back-to-back time on the same site or app is one row, with its pages listed under it.
+  const merged: (ReturnType<typeof sessionTimeline>[number] & { titles: string[] })[] = [];
+  for (const t of sessionTimeline(s, now)) {
+    const last = merged[merged.length - 1];
+    if (last && last.state === t.state && last.domain === t.domain && last.task === t.task) {
+      last.to = t.to;
+      if (t.title && !last.titles.includes(t.title)) last.titles.push(t.title);
+    } else merged.push({ ...t, titles: t.title ? [t.title] : [] });
+  }
+  const timeline = merged.filter((t) => t.to - t.from >= TIMELINE_MIN_MS);
   if (timeline.length) {
     wrap.append(h("h2", { textContent: "Timeline" }));
     const list = h("ol", { className: "timeline" });
     for (const t of timeline.slice(0, TIMELINE_MAX)) {
-      const base = t.state === "away" ? "Away" : t.title ? `${t.domain ?? ""} · ${t.title}` : (t.domain ?? "Browser");
+      const base = t.state === "away" ? "Away" : (t.domain ?? "Browser");
       const what = t.state === "other" && t.task ? `${base}  (${t.task})` : base;
+      const pages = t.titles.length ? t.titles.slice(0, 3).join(" · ") + (t.titles.length > 3 ? ` · +${t.titles.length - 3} more` : "") : "";
       list.append(
         h(
           "li",
           { className: `tl ${t.state}` },
           h("span", { className: "when", textContent: `${clock(t.from)}–${clock(t.to)}` }),
-          h("span", { className: "what title", textContent: what }),
+          h("span", { className: "what" }, h("span", { className: "title", textContent: what }), pages ? h("span", { className: "sub title", textContent: pages }) : null),
           h("span", { className: "muted", textContent: formatHm(t.to - t.from) }),
         ),
       );

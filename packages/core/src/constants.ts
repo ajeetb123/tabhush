@@ -312,6 +312,10 @@ export const OWNER_RULES = {
     "anime and manga",
     "torrents and pirated downloads",
     "live sports streams",
+    // Q-74: game sites (measured 2026-11-02: Steam store, Poki, Cool Math, Chess.com, game wikis,
+    // Liquipedia and Twitch blocked; no work page, game theory or game-dev page blocked)
+    "play free online games",
+    "video game guides and esports",
   ],
   SEARCH_WORK_TOPICS: [
     "programming and software",
@@ -327,6 +331,9 @@ export const OWNER_RULES = {
     "online course and lectures",
     "spreadsheets and documents",
     "email and calendar",
+    // Q-74: keeps game theory and game development pages on the work side
+    "economics and game theory",
+    "game development and design",
   ],
   SEARCH_TOPIC_MIN: 0.25,
   SEARCH_TOPIC_MARGIN: 0.1,
@@ -472,6 +479,26 @@ export const DESKTOP = {
   EXCLUDED_APPS: [
     "com.apple.MobileSMS", "com.apple.mail", "com.tinyspeck.slackmacgap", "com.hnc.Discord", "com.apple.Passwords", "com.1password.1password",
     "outlook.exe", "olk.exe", "hxoutlook.exe", "slack.exe", "discord.exe", "whatsapp.exe", "1password.exe", "keepassxc.exe", "bitwarden.exe",
+  ],
+  // Q-74: an app is recognized as a game by where it is installed and what it is built with, not
+  // by its name: store library folders, and game-engine or Steamworks files inside it.
+  GAME_INSTALL_MARKERS: [
+    "/steamapps/common/", "/Epic Games/", "/Riot Games/", "/GOG Galaxy/Games/", "/GOG Games/", "/XboxGames/",
+    "/itch/apps/", "/Ubisoft Game Launcher/games/", "/EA Games/", "/Origin Games/", "/Battle.net/",
+  ],
+  GAME_FILE_MARKERS: [
+    "UnityPlayer.dll", "UnityPlayer.dylib", "GameAssembly.dll", "GameAssembly.dylib", "steam_api.dll", "steam_api64.dll",
+    "libsteam_api.dylib", "libsteam_api.so", "EOSSDK-Win64-Shipping.dll", "libEOSSDK-Mac-Shipping.dylib",
+  ],
+  // Q-74: background tabs and apps are checked this often during a session, so a show playing in
+  // a tab behind your work or a game on another screen is caught too.
+  BACKGROUND_SWEEP_SEC: 15,
+  // Q-74: school pages are recognized by their address and title (TODO_Q10's page fingerprint).
+  SCHOOL_HOST_SUFFIXES: [".edu", ".k12.us"],
+  SCHOOL_HOST_PATTERN: "\\.(edu|ac|sch)\\.[a-z]{2}$",
+  SCHOOL_TITLE_MARKERS: [
+    "Canvas", "Blackboard", "Moodle", "Brightspace", "D2L", "Gradescope", "PrairieLearn", "Piazza", "Ed Discussion",
+    "zyBooks", "WebAssign", "Top Hat", "Panopto", "Kaltura", "Schoology", "Google Classroom", "MyLab",
   ],
   // DSK-10: proctoring starts → enforcement suspends.
   PROCTORING_APP_NAMES: ["LockDown Browser"],

@@ -40,6 +40,7 @@ export class FakeSystem implements System {
   }
   async quit(bundleId: string) {
     this.quits.push(bundleId);
+    this.running = this.running.filter((a) => a.bundleId !== bundleId); // a quit app is gone
     return true;
   }
   async hide(bundleId: string) {

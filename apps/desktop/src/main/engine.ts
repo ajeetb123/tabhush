@@ -139,6 +139,8 @@ export class Engine {
   private quitAt = new Map<string, { at: number; pid: number | null }>();
   private locked = false;
   private lastSave = 0;
+  private lastSweep = 0;
+  private wasAway = false;
 
   constructor(private readonly d: EngineDeps) {
     this.now = d.now ?? Date.now;
@@ -315,7 +317,8 @@ export class Engine {
       const strong = scored.filter((x) => x.score >= OWNER_RULES.MULTI_TASK_MIN_SCORE).map((x) => x.task);
       const result = inferTask(recent, forScore);
       let chosen: Task[] = [];
-      if (strong.length >= 2) chosen = strong;
+      // Q-74: one task per session keeps the report clear; other tasks show up as side work.
+      if (strong.length >= 2) chosen = [strong[0]!];
       else if (result.kind === "autofill") chosen = [result.task];
       else {
         const label = autoLabel(items.map((i) => ({ title: i.title, front: i.front })), this.knownCourses());
@@ -337,7 +340,9 @@ export class Engine {
     return this.run(async () => {
       const s = this.session;
       if (s?.state !== "SWEEP_PREVIEW") return;
-      const labels = [...new Map(labelsIn.filter((l) => normalizeLabel(l)).map((l) => [normalizeLabel(l), l.trim()])).values()];
+      // Q-74: one task per session; the last one picked or typed wins.
+      const picked = labelsIn.filter((l) => normalizeLabel(l)).pop();
+      const labels = picked ? [picked.trim()] : [];
       const chosen: Task[] = [];
       for (const l of labels) {
         const t = await this.resolveOrCreate(l);
@@ -482,6 +487,10 @@ export class Engine {
       const idleSec = this.d.system.idleSeconds();
       const graceMin = watching ? ACTIVE_TIME.VIDEO_GRACE_MIN : ACTIVE_TIME.NO_INPUT_STOP_MIN;
       const away = this.locked || idleSec >= graceMin * 60;
+      // Q-74: sitting there doing nothing is never work. When no-input is noticed, the minutes since
+      // the last input come back out of the log as away time.
+      if (away && !this.wasAway) this.d.activity.markAwaySince(this.locked ? now : now - idleSec * MS.SECOND);
+      this.wasAway = away;
 
       let work: WorkState | undefined;
       if (s) {
@@ -495,6 +504,14 @@ export class Engine {
           else if (item) this.logFocus(s, work?.state ?? "on", { domain: item.label, title: item.title, ...(work?.state === "other" ? { task: work.task } : {}) });
         }
         if (COMMITTED.includes(s.state) || s.state === "END_COUNTDOWN") s.heartbeat = now;
+        // Q-74: tabs and apps behind the one in front (a show playing in a background tab, a game on
+        // another screen) are checked every BACKGROUND_SWEEP_SEC too.
+        if ((s.state === "ACTIVE" || s.state === "IDLE_PAUSED") && !s.suspendedFor && now - this.lastSweep >= DESKTOP.BACKGROUND_SWEEP_SEC * MS.SECOND) {
+          this.lastSweep = now;
+          const blocksBefore = s.blockEvents.length;
+          await this.relock(s);
+          changed ||= s.blockEvents.length !== blocksBefore;
+        }
         changed ||= before !== s.state;
         if (changed) this.save();
         else if (now - this.lastSave >= 10 * MS.SECOND) this.save(false);

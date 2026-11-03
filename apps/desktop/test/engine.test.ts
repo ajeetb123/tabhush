@@ -4,7 +4,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { DESKTOP, MS } from "@lockin/core";
 import { ActivityLog } from "../src/main/activity";
-import { appKind } from "../src/main/apps";
+import { appKind, isSchoolPage, looksLikeGame } from "../src/main/apps";
 import { Categories } from "../src/main/categories";
 import { Engine, passageMatches } from "../src/main/engine";
 import { Judge } from "../src/main/judge";
@@ -365,5 +365,73 @@ describe("startup (regression)", () => {
     });
     expect(again.session!.gaps).toHaveLength(1);
     expect(changes).toBe(0);
+  });
+});
+
+describe("recognizing by looking (Q-74)", () => {
+  it("a game is known by where it's installed or what it's built with, not its name", () => {
+    expect(looksLikeGame("/Users/a/Library/Application Support/Steam/steamapps/common/dota 2 beta/game/dota.app")).toBe(true);
+    expect(looksLikeGame("C:\\Program Files\\Epic Games\\Fortnite\\FortniteGame\\Binaries\\Win64\\FortniteClient-Win64-Shipping.exe")).toBe(true);
+    const files = new Set(["/Applications/Some Indie Game.app/Contents/Frameworks/UnityPlayer.dylib"]);
+    expect(looksLikeGame("/Applications/Some Indie Game.app", (p) => files.has(p))).toBe(true);
+    expect(looksLikeGame("/Applications/Visual Studio Code.app", () => false)).toBe(false);
+    expect(looksLikeGame("C:\\Program Files\\Microsoft VS Code\\Code.exe", () => false)).toBe(false);
+  });
+
+  it("school pages are known by address or site name", () => {
+    expect(isSchoolPage("canvas.vt.edu", "Dashboard")).toBe(true);
+    expect(isSchoolPage("moodle.ox.ac.uk", "Course home")).toBe(true);
+    expect(isSchoolPage("us.prairielearn.com", "Homework 3 | PrairieLearn")).toBe(true);
+    expect(isSchoolPage("developer.mozilla.org", "HTML canvas tutorial - MDN")).toBe(false);
+    expect(isSchoolPage("netflix.com", "Netflix")).toBe(false);
+  });
+
+  it("Dota 2 is quit even though no list names it", async () => {
+    const e = make();
+    await lockIn(e);
+    const dota = { ...app("Dota 2", "com.valvesoftware.dota2"), path: "/Users/a/Library/Application Support/Steam/steamapps/common/dota 2 beta/game/dota.app" };
+    sys.frontNow = { app: dota, title: "Dota 2" };
+    await e.tick();
+    expect(sys.quits).toContain("com.valvesoftware.dota2");
+  });
+
+  it("a school page from a site no list knows is never blocked", async () => {
+    const e = make();
+    await lockIn(e);
+    sys.closed = [];
+    sys.frontNow = chromeTab("https://canvas.vt.edu/courses/12/assignments", "Assignments");
+    await e.tick();
+    expect(sys.closed).toEqual([]);
+  });
+
+  it("one task per session: picking another replaces it", async () => {
+    const e = make();
+    await e.start();
+    await e.setTasks(["CS 2114", "Resume tailoring"]);
+    expect(e.session!.taskIds).toHaveLength(1);
+    expect(e.session!.taskLabel).toBe("Resume tailoring");
+  });
+
+  it("sitting there doing nothing doesn't count: idle minutes come back out of the log", async () => {
+    const e = make();
+    sys.frontNow = { app: VSCODE, title: "engine.ts" };
+    for (let i = 0; i < 600; i++) {
+      sys.idle = i >= 300 ? i - 300 : 0; // input stops after 5 minutes
+      await e.tick();
+      clock.advance(MS.SECOND);
+    }
+    activity.flush(clock.t);
+    const t = activityTotals(new ActivityLog(store).between(clock.t - MS.HOUR, clock.t + 1), clock.t - MS.HOUR, clock.t + 1);
+    expect(Math.round(t.activeMs / MS.SECOND)).toBe(300); // the 3 no-input minutes before it was noticed are away too
+  });
+
+  it("a distracting tab playing behind your work is closed by the background check", async () => {
+    const e = make();
+    await lockIn(e);
+    sys.closed = [];
+    sys.openTabs.push({ bundleId: CHROME.bundleId, url: "https://www.netflix.com/watch/77", title: "Netflix" });
+    clock.advance(DESKTOP.BACKGROUND_SWEEP_SEC * MS.SECOND);
+    await e.tick();
+    expect(sys.closed.flatMap((c) => c.urls)).toContain("https://www.netflix.com/watch/77");
   });
 });

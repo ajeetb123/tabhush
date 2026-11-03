@@ -12,6 +12,8 @@ export interface AppInfo {
   category: string;
   /** False for background agents (notification popups and the like). */
   regular?: boolean;
+  /** Where the app is installed (the .app bundle or the .exe), for recognizing games (Q-74). */
+  path?: string;
 }
 
 export interface FrontInfo {
@@ -54,12 +56,21 @@ export class HelperSystem implements System {
   private pending = new Map<number, (r: Reply | null) => void>();
   private retryAfter = 0;
   /** The helper's last failure (start error, compile error, stderr), shown in Settings for testers. */
-  lastError: string | null = null;
+  private _lastError: string | null = null;
+
+  get lastError(): string | null {
+    return this._lastError;
+  }
+
+  set lastError(e: string | null) {
+    if (e && e !== this._lastError) this.env.log?.(e);
+    this._lastError = e;
+  }
 
   constructor(
     private readonly binary: string,
     private readonly args: string[],
-    private readonly env: { idleSeconds: () => number; notify: (title: string, body: string) => void },
+    private readonly env: { idleSeconds: () => number; notify: (title: string, body: string) => void; log?: (line: string) => void },
   ) {}
 
   private ensure(): ChildProcessWithoutNullStreams | null {

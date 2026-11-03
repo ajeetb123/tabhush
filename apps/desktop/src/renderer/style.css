@@ -501,3 +501,21 @@ textarea.wrong { border-color: var(--danger); box-shadow: 0 0 0 4px var(--danger
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .ring .halo { opacity: 1; }
 }
+
+/* Q-74: the day in blocks. */
+.blocks { display: grid; gap: 4px; }
+.block > summary {
+  list-style: none; cursor: pointer; display: grid; grid-template-columns: 9.5em minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  padding: 11px 12px 11px 18px; border-radius: 12px; position: relative; transition: background .2s ease;
+}
+.block > summary::-webkit-details-marker { display: none; }
+.block > summary::before { content: ""; position: absolute; left: 6px; top: 12px; bottom: 12px; width: 3px; border-radius: 3px; background: var(--border); }
+.block.is-session > summary::before { background: var(--accent); }
+.block > summary:hover, .block[open] > summary { background: var(--surface-2); }
+.block > summary .when { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 13px; }
+.block > summary .what { display: grid; min-width: 0; }
+.block > summary .dur { font-weight: 700; font-variant-numeric: tabular-nums; }
+.block > .timeline { padding: 6px 0 10px 12px; animation: rise .45s var(--ease) both; }
+.what { display: grid; min-width: 0; }
+.what .sub, .block .sub { color: var(--faint); font-size: 12px; }
+@media (max-width: 480px) { .block > summary { grid-template-columns: 1fr auto; } .block > summary .when { grid-column: 1 / -1; } }

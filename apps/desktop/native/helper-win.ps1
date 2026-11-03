@@ -51,7 +51,7 @@ public static class TH {
     "chrome.exe", "msedge.exe", "brave.exe", "opera.exe", "vivaldi.exe", "arc.exe", "firefox.exe", "zen.exe", "chromium.exe"
   };
 
-  class Proc { public string Exe; public string Name; }
+  class Proc { public string Exe; public string Name; public string Path; }
   static readonly Dictionary<uint, Proc> procs = new Dictionary<uint, Proc>();
   static readonly Dictionary<string, string> urls = new Dictionary<string, string>(); // hwnd|title -> url
 
@@ -128,13 +128,16 @@ public static class TH {
       var pr = Process.GetProcessById((int)pid);
       p.Exe = pr.ProcessName.ToLowerInvariant() + ".exe";
       p.Name = pr.ProcessName;
+      p.Path = "";
       try {
+        p.Path = pr.MainModule.FileName;
         string d = pr.MainModule.FileVersionInfo.FileDescription;
         if (!string.IsNullOrEmpty(d)) p.Name = d.Trim();
       } catch (Exception) { }
     } catch (Exception) {
       p.Exe = "unknown.exe";
       p.Name = "Unknown";
+      p.Path = "";
     }
     if (procs.Count > 500) procs.Clear();
     procs[pid] = p;
@@ -169,6 +172,7 @@ public static class TH {
       m["bundleId"] = p.Exe;
     }
     m["pid"] = (int)pid;
+    m["path"] = p.Path ?? "";
     m["category"] = "";
     m["regular"] = true;
     return m;

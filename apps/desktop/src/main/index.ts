@@ -7,7 +7,7 @@
 
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, net, Notification, powerMonitor, powerSaveBlocker, protocol, shell, Tray } from "electron";
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
+import { appendFile, existsSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { BRAND, DESKTOP, EMBEDDING, MS, OWNER_RULES, EXITS, goalReached } from "@lockin/core";
@@ -292,6 +292,8 @@ app.whenReady().then(() => {
   system = new HelperSystem(helper.binary, helper.args, {
     idleSeconds: () => powerMonitor.getSystemIdleTime(),
     notify: (title, body) => new Notification({ title, body, silent: true }).show(),
+    // Helper problems go to tabhush.log in the app's data folder (for testers to send).
+    log: (line) => appendFile(join(app.getPath("userData"), "tabhush.log"), `${new Date().toISOString()} ${line}\n`, () => undefined),
   });
   const judge = new Judge({
     embed,

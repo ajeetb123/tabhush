@@ -35,8 +35,8 @@ function permissionsCard(snap: Snapshot): HTMLElement | null {
   return h(
     "div",
     { className: "card stack" },
-    h("b", { textContent: "One permission so it can see what you’re doing" }),
-    h("p", { className: "muted small", textContent: `Accessibility lets ${BRAND.NAME} read window titles (which doc, which page). Without it the report only shows app names. Nothing leaves this Mac.` }),
+    h("b", { textContent: "One permission for a more useful report" }),
+    h("p", { className: "muted small", textContent: `This lets your report say which doc or page you worked in, not just the app. It never leaves this computer.` }),
     h("div", { className: "row" }, allow),
   );
 }
@@ -54,40 +54,35 @@ function idleView(snap: Snapshot): Node[] {
     focusOrb(),
     start,
     ...[permissionsCard(snap)].filter((n): n is HTMLElement => n !== null),
-    snap.settings.trackAllDay && now ? h("p", { className: "muted small", textContent: `Tracking for your report. In front now: ${now}` }) : null,
+    snap.settings.trackAllDay ? h("p", { className: "muted small", textContent: "Your report shows where your time goes. It stays on this computer." }) : null,
   ].filter((n): n is HTMLElement => n !== null);
 }
 
 // ───────────────────────── start screen ─────────────────────────
 
-function currentLabels(s: Session): string[] {
-  return s.taskLabel ? s.taskLabel.split(" + ") : [];
-}
-
+/** Q-74: one task per session. Picking another chip or typing one replaces it. */
 function tasksCard(s: Session): HTMLElement {
-  const labels = currentLabels(s);
-  const setTasks = (next: string[]) => void call({ type: "setTasks", labels: next });
-  const on = labels.map((l) => {
-    const chip = h("button", { className: "chip on", textContent: `${l}  ×`, attrs: { "aria-label": `Remove ${l}` } });
-    chip.addEventListener("click", () => setTasks(labels.filter((x) => x !== l)));
-    return chip;
-  });
-  const off = s.suggestions
-    .filter((g) => !labels.includes(g.label))
-    .map((g) => {
-      const chip = h("button", { className: "chip", textContent: `+ ${g.label}`, attrs: { "aria-label": `Add ${g.label}` } });
-      chip.addEventListener("click", () => setTasks([...labels, g.label]));
-      return chip;
-    });
-  const input = h("input", { type: "text", placeholder: labels.length ? "Add another task" : "What are you working on?", attrs: { "aria-label": "Add a task" } });
-  input.addEventListener("keydown", (e) => e.key === "Enter" && input.value.trim() && setTasks([...labels, input.value.trim()]));
+  const current = s.taskLabel;
+  const setTask = (label: string) => void call({ type: "setTasks", labels: [label] });
+  const chips = [
+    ...(current ? [h("button", { className: "chip on", textContent: current, attrs: { "aria-pressed": "true", "aria-label": `Working on ${current}` } })] : []),
+    ...s.suggestions
+      .filter((g) => g.label !== current)
+      .map((g) => {
+        const chip = h("button", { className: "chip", textContent: g.label, attrs: { "aria-label": `Work on ${g.label} instead` } });
+        chip.addEventListener("click", () => setTask(g.label));
+        return chip;
+      }),
+  ];
+  const input = h("input", { type: "text", placeholder: current ? "Something else? Type it" : "What are you working on?", attrs: { "aria-label": "Task" } });
+  input.addEventListener("keydown", (e) => e.key === "Enter" && input.value.trim() && setTask(input.value.trim()));
   input.style.flex = "1";
   return h(
     "div",
     { className: "card stack" },
-    on.length || off.length ? h("div", { className: "chips" }, ...on, ...off) : null,
+    chips.length ? h("div", { className: "chips" }, ...chips) : null,
     h("div", { className: "row" }, input),
-    h("p", { className: "muted small", textContent: "Tip: separate tasks you juggle, like “CS 2114” and “Internship apps”." }),
+    h("p", { className: "muted small", textContent: "One task per session. Anything else you get done shows up as side work in your report." }),
   );
 }
 

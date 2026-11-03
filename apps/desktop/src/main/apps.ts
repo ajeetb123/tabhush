@@ -2,6 +2,8 @@
 // apps by these rules, in order. Unknown apps are allowed (INV-06 fail open, Q-63 "block only
 // clear distractions"); their window title can still be blocked by topic (judge.ts).
 
+import { existsSync } from "node:fs";
+import { dirname } from "node:path";
 import { DESKTOP } from "@lockin/core";
 import type { AppInfo } from "./system";
 
@@ -40,4 +42,46 @@ export function stripBrowserSuffix(title: string, appName: string): string {
     if (t.endsWith(`${sep}${appName}`)) return t.slice(0, -(sep.length + appName.length)).trim();
   }
   return t.replace(/\s[-—–]\s(Mozilla Firefox|Google Chrome|Safari|Microsoft\u200B? Edge|Brave|Opera|Vivaldi)$/, "").trim();
+}
+
+// ───────────────────────── recognizing by looking (Q-74) ─────────────────────────
+
+const gameCache = new Map<string, boolean>();
+
+/**
+ * Is this app a game? Decided from what it is, not its name: installed in a game store's library
+ * (Steam, Epic, Riot, GOG, Xbox…), built as an Unreal shipping game, or carrying game-engine or
+ * Steamworks files. `exists` is injectable for tests.
+ */
+export function looksLikeGame(path: string | undefined, exists: (p: string) => boolean = existsSync): boolean {
+  if (!path) return false;
+  const hit = gameCache.get(path);
+  if (hit !== undefined) return hit;
+  const norm = path.replace(/\\/g, "/");
+  const lower = norm.toLowerCase();
+  let game = DESKTOP.GAME_INSTALL_MARKERS.some((m) => lower.includes(m.toLowerCase())) || /-(win64|wingdk)-shipping\.exe$/i.test(norm);
+  if (!game) {
+    // macOS bundles keep libraries in Contents/…; Windows games keep them next to the .exe.
+    const dirs = norm.endsWith(".app")
+      ? ["Contents/Frameworks", "Contents/MacOS", "Contents/Plugins", "Contents/Resources/Data/Plugins"].map((d) => `${norm}/${d}`)
+      : [dirname(norm), dirname(dirname(norm))];
+    game = dirs.some((d) => DESKTOP.GAME_FILE_MARKERS.some((f) => exists(`${d}/${f}`)));
+  }
+  if (gameCache.size > 500) gameCache.clear();
+  gameCache.set(path, game);
+  return game;
+}
+
+const schoolHost = new RegExp(DESKTOP.SCHOOL_HOST_PATTERN, "i");
+
+/**
+ * Is this a school page (courseware, course site, school sign-in)? From its address (.edu and
+ * similar school domains) or the site name a title ends with ("Homework 3 | PrairieLearn").
+ * Replaces the hand-entered school sites list (TODO_Q10's page fingerprint, Q-74).
+ */
+export function isSchoolPage(host: string, title: string): boolean {
+  const h = host.toLowerCase();
+  if (DESKTOP.SCHOOL_HOST_SUFFIXES.some((s) => h.endsWith(s)) || schoolHost.test(h)) return true;
+  const site = title.split(/\s[|–—-]\s/).pop()?.trim() ?? "";
+  return title.includes(" ") && DESKTOP.SCHOOL_TITLE_MARKERS.some((m) => site === m || site.startsWith(`${m} `) || site.endsWith(` ${m}`));
 }

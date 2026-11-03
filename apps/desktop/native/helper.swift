@@ -56,6 +56,7 @@ func appInfo(_ app: NSRunningApplication) -> [String: Any] {
   var info: [String: Any] = [
     "name": app.localizedName ?? "", "bundleId": app.bundleIdentifier ?? "", "pid": Int(app.processIdentifier),
     "regular": app.activationPolicy == .regular,
+    "path": app.bundleURL?.path ?? app.executableURL?.path ?? "",
   ]
   if let url = app.bundleURL, let bundle = Bundle(url: url) {
     info["category"] = (bundle.infoDictionary?["LSApplicationCategoryType"] as? String) ?? ""

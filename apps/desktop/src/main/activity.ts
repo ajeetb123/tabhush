@@ -45,6 +45,28 @@ export class ActivityLog {
     if (now - this.lastFlush >= DESKTOP.ACTIVITY_FLUSH_SEC * MS.SECOND) this.flush(now);
   }
 
+  /** Turns active time since `since` into away time: no input meant nobody was working (Q-74). */
+  markAwaySince(since: number): void {
+    const name = dayFile(since);
+    const list = this.day(name);
+    for (let i = list.length - 1; i >= 0; i--) {
+      const s = list[i]!;
+      if (s.to <= since) break;
+      if (s.state !== "active") continue;
+      if (s.from >= since) {
+        s.state = "away";
+        delete s.onTask;
+        delete s.otherTask;
+      } else {
+        // Split: the part before `since` stays active, the rest becomes away.
+        const { onTask: _o, otherTask: _t, ...rest } = s;
+        list.splice(i + 1, 0, { ...rest, from: since, to: s.to, state: "away" });
+        s.to = since;
+      }
+    }
+    this.dirty.add(name);
+  }
+
   flush(now = Date.now()): void {
     for (const name of this.dirty) this.store.write(name, this.days.get(name) ?? []);
     this.dirty.clear();

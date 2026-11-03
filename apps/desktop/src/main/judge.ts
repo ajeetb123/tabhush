@@ -5,6 +5,7 @@
 import {
   cacheKey,
   cosine,
+  DESKTOP,
   isDistractingPage,
   isDistractingSearch,
   itemDomain,
@@ -25,7 +26,7 @@ import {
   type ItemKey,
   type Task,
 } from "@lockin/core";
-import { appKind, type AppKind } from "./apps";
+import { appKind, isSchoolPage, looksLikeGame, type AppKind } from "./apps";
 import type { Categories } from "./categories";
 import type { AppInfo } from "./system";
 
@@ -108,7 +109,8 @@ export class Judge {
     const t1 = tier1(url, {
       essentials: this.d.essentials(),
       schoolCoursewareDomains: this.d.schoolSites(),
-      coursewareFingerprint: false,
+      // Q-74: school pages are recognized by looking at them, never blocked.
+      coursewareFingerprint: isSchoolPage(parseUrl(url)?.host ?? "", title),
       ownExtensionId: "",
       undergroundDomains: this.d.categories.underground(),
       youtubeGenre: null,
@@ -155,6 +157,7 @@ export class Judge {
   /** A browser window whose URL can't be read: the title names a blocked site, or is about a distraction. */
   async titleOnly(task: SessionTask, title: string): Promise<Verdict> {
     if (!title) return { action: "allow", source: "fail_open" };
+    if (isSchoolPage("", title)) return { action: "allow", source: "never_locked" };
     const lower = title.toLowerCase();
     const named = PURE_DISTRACTION.find((site) => new RegExp(`(^|[\\s|·-])${site.name.toLowerCase()}($|[\\s|·-])`).test(lower));
     if (named) return { action: "park", source: "distraction" };
@@ -162,8 +165,10 @@ export class Judge {
   }
 
   /** An app other than a browser (DSK-10). Unknown apps: blocked only when the window is about a distraction. */
-  async app(task: SessionTask | null, app: Pick<AppInfo, "bundleId" | "name" | "category">, title: string): Promise<Verdict & { kind: AppKind }> {
-    const kind = appKind(app, this.d.selfBundleId);
+  async app(task: SessionTask | null, app: Pick<AppInfo, "bundleId" | "name" | "category" | "path">, title: string): Promise<Verdict & { kind: AppKind }> {
+    let kind = appKind(app, this.d.selfBundleId);
+    // Q-74: a game is recognized from its files and install location, whatever it is called.
+    if ((kind === "other" || (kind === "tool" && !DESKTOP.ALWAYS_ALLOWED_APPS.includes(app.bundleId as never))) && looksLikeGame(app.path)) kind = "distraction";
     if (kind === "distraction") return { kind, action: "park", source: "distraction" };
     if (kind === "other" && task && title) {
       const v = await this.byTopic(task, `${title} ${app.name}`, "page");

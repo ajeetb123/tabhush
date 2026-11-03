@@ -4,7 +4,7 @@
 import { MS } from "@lockin/core";
 import type { ActivitySegment, Session } from "../shared/types";
 import { animateNumber, avatar, call, formatDuration, getSnapshot, h, onStateChange, playEnter, setMood, setTitle, topbar } from "./common";
-import { activityTimeline, activityTotals, appBreakdown, asSessionLike, colorFor, dayReport, dayStart, formatHm, taskKey, weekReport, type SessionLike } from "./reportData";
+import { activityBlocks, activityTotals, appBreakdown, asSessionLike, colorFor, dayReport, dayStart, formatHm, taskKey, weekReport, type SessionLike } from "./reportData";
 import { endLabel, sessionDetail } from "./sessionDetail";
 
 setTitle("Your focus");
@@ -52,20 +52,48 @@ function appsCard(segments: ActivitySegment[], from: number, to: number, limit?:
   return [h("div", { className: "card" }, list)];
 }
 
-function timelineCard(segments: ActivitySegment[], from: number, to: number): Node[] {
-  const items = activityTimeline(segments, from, to).filter((t) => t.to - t.from >= MS.MINUTE);
-  if (!items.length) return [];
-  const list = h("ol", { className: "timeline" });
-  for (const t of items.slice(-150).reverse()) {
-    const base = t.state === "away" ? "Away" : t.title ? `${t.label} · ${t.title}` : t.label;
-    const what = t.otherTask ? `${base}  (${t.otherTask})` : base;
-    const cls = t.state === "away" ? "away" : t.sessionId ? (t.onTask === false ? "off" : t.otherTask ? "other" : "on") : "free";
-    list.append(h("li", { className: `tl ${cls}` }, h("span", { className: "when", textContent: `${clock(t.from)}–${clock(t.to)}` }), h("span", { className: "what title", textContent: what }), h("span", { className: "muted", textContent: formatHm(t.to - t.from) })));
+/** Q-74: the day as blocks (each session, and stretches of free time), each opening to its entries. */
+function timelineCard(segments: ActivitySegment[], from: number, to: number, sessionLabels: Map<string, string>): Node[] {
+  const blocks = activityBlocks(segments, from, to);
+  if (!blocks.length) return [];
+  const list = h("div", { className: "blocks" });
+  for (const b of [...blocks].reverse()) {
+    const name = b.sessionId ? (sessionLabels.get(b.sessionId) ?? "Session") : "Free time";
+    const top = b.top.slice(0, 3).map((t) => t.label).join(", ") + (b.top.length > 3 ? `, +${b.top.length - 3}` : "");
+    const items = h("ol", { className: "timeline" });
+    for (const i of b.items.filter((x) => x.to - x.from >= 30 * MS.SECOND)) {
+      const cls = i.state === "away" ? "away" : b.sessionId ? (i.onTask === false ? "off" : i.otherTask ? "other" : "on") : "free";
+      const what = i.state === "away" ? "Away" : i.label + (i.otherTask ? `  (${i.otherTask})` : "");
+      const sub = i.titles.length ? i.titles.slice(0, 3).join(" · ") + (i.titles.length > 3 ? ` · +${i.titles.length - 3} more` : "") : "";
+      items.append(
+        h(
+          "li",
+          { className: `tl ${cls}` },
+          h("span", { className: "when", textContent: `${clock(i.from)}–${clock(i.to)}` }),
+          h("span", { className: "what" }, h("span", { className: "title", textContent: what }), sub ? h("span", { className: "sub title", textContent: sub }) : null),
+          h("span", { className: "muted", textContent: formatHm(i.to - i.from) }),
+        ),
+      );
+    }
+    list.append(
+      h(
+        "details",
+        { className: `block ${b.sessionId ? "is-session" : "is-free"}` },
+        h(
+          "summary",
+          {},
+          h("span", { className: "when", textContent: `${clock(b.from)}–${clock(b.to)}` }),
+          h("span", { className: "what" }, h("b", { textContent: name }), h("span", { className: "sub title", textContent: top })),
+          h("span", { className: "dur", textContent: formatHm(b.activeMs) }),
+        ),
+        items,
+      ),
+    );
   }
-  return [h("h2", { textContent: "Timeline (latest first)" }), h("p", { className: "muted small", textContent: "Green: in a session, on task. Blue: other productive work. Red: off task. Grey edge: outside sessions." }), h("div", { className: "card" }, list)];
+  return [h("h2", { textContent: "Your day, block by block" }), h("div", { className: "card" }, list)];
 }
 
-async function activityView(now: number): Promise<Node[]> {
+async function activityView(now: number, sessions: SessionLike[]): Promise<Node[]> {
   const from = dayStart(now) - dayOffset * MS.DAY;
   const to = Math.min(now, from + MS.DAY);
   const segments = await call<ActivitySegment[]>({ type: "activity", from, to });
@@ -92,7 +120,7 @@ async function activityView(now: number): Promise<Node[]> {
     ),
     h("h2", { textContent: "Apps, sites and windows" }),
     ...appsCard(segments, from, to),
-    ...timelineCard(segments, from, to),
+    ...timelineCard(segments, from, to, new Map(sessions.map((s) => [s.id, s.taskLabel ?? "Session"]))),
   ];
 }
 
@@ -245,7 +273,7 @@ async function render(entrance = false): Promise<void> {
     tick = window.setInterval(update, MS.SECOND);
   }
   const body =
-    tab === "today" ? [...todayView(all, now), ...(await todayActivity(now))] : tab === "activity" ? await activityView(now) : tab === "week" ? weekView(all, now) : sessionsView(all, now);
+    tab === "today" ? [...todayView(all, now), ...(await todayActivity(now))] : tab === "activity" ? await activityView(now, all) : tab === "week" ? weekView(all, now) : sessionsView(all, now);
   main.replaceChildren(
     topbar(),
     h("h1", { textContent: "Your focus" }),

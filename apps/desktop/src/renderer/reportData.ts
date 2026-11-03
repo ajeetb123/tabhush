@@ -384,3 +384,72 @@ export function activityTimeline(segments: readonly ActivitySegment[], from: num
   }
   return out;
 }
+
+// ───────────────────────── grouped timeline (Q-74) ─────────────────────────
+
+export interface BlockItem {
+  from: number;
+  to: number;
+  state: "active" | "away";
+  label: string;
+  /** Distinct titles seen in this stretch, most time first. */
+  titles: string[];
+  onTask?: boolean;
+  otherTask?: string;
+}
+
+export interface ActivityBlock {
+  from: number;
+  to: number;
+  /** Set when the block is a session. */
+  sessionId?: string;
+  activeMs: number;
+  /** The sites and apps with the most time, for the summary line. */
+  top: { label: string; ms: number }[];
+  items: BlockItem[];
+}
+
+const FREE_BLOCK_GAP_MS = 10 * MS.MINUTE; // outside sessions, a pause this long starts a new block
+
+/**
+ * The day as a few readable blocks instead of a long list (Q-74): each session is one block, and
+ * time outside sessions is split where you stepped away for a while. Inside a block, back-to-back
+ * time on the same site or app is one row, whatever pages it went through.
+ */
+export function activityBlocks(segments: readonly ActivitySegment[], from: number, to: number): ActivityBlock[] {
+  const blocks: ActivityBlock[] = [];
+  for (const s of activityTimeline(segments, from, to)) {
+    let b = blocks[blocks.length - 1];
+    const sameBlock = b && (s.sessionId ? b.sessionId === s.sessionId : !b.sessionId && s.from - b.to < FREE_BLOCK_GAP_MS);
+    if (!b || !sameBlock) {
+      b = { from: s.from, to: s.to, ...(s.sessionId ? { sessionId: s.sessionId } : {}), activeMs: 0, top: [], items: [] };
+      blocks.push(b);
+    }
+    b.to = Math.max(b.to, s.to);
+    const ms = s.to - s.from;
+    if (s.state === "active") b.activeMs += ms;
+    const last = b.items[b.items.length - 1];
+    const label = s.state === "away" ? "Away" : s.label;
+    if (last && last.label === label && last.state === s.state && last.otherTask === s.otherTask && (last.onTask === false) === (s.onTask === false)) {
+      last.to = s.to;
+      if (s.title && !last.titles.includes(s.title)) last.titles.push(s.title);
+    } else {
+      b.items.push({
+        from: s.from,
+        to: s.to,
+        state: s.state,
+        label,
+        titles: s.title && s.state === "active" ? [s.title] : [],
+        ...(s.onTask !== undefined ? { onTask: s.onTask } : {}),
+        ...(s.otherTask ? { otherTask: s.otherTask } : {}),
+      });
+    }
+  }
+  for (const b of blocks) {
+    const byLabel = new Map<string, number>();
+    for (const i of b.items) if (i.state === "active") byLabel.set(i.label, (byLabel.get(i.label) ?? 0) + i.to - i.from);
+    b.top = [...byLabel.entries()].map(([label, ms]) => ({ label, ms })).sort((x, y) => y.ms - x.ms);
+  }
+  // Blocks with no real activity (only away time) are left out.
+  return blocks.filter((b) => b.activeMs >= MS.MINUTE);
+}
