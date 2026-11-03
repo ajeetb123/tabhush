@@ -214,7 +214,7 @@ export class Engine {
       this.logFocus(s, "away", {}, s.heartbeat);
     }
     s.heartbeat = now;
-    this.save();
+    this.save(false); // no pages are open yet
   }
 
   // ───────────────────────── tasks (CLS-30..33, CLS-50, Q-64) ─────────────────────────

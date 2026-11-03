@@ -351,3 +351,19 @@ describe("Step away, idle and gaps", () => {
 });
 
 const SESSION_END_MS = 2 * MS.HOUR + MS.MINUTE;
+describe("startup (regression)", () => {
+  it("a session saved by an earlier run loads without touching the UI during construction", async () => {
+    const first = make(true);
+    await lockIn(first);
+    clock.advance(10 * MS.MINUTE); // the app was not running for a while: a gap is logged
+    let changes = 0;
+    const categories = new Categories(categoriesDir());
+    const again = new Engine({
+      store, system: sys, embed, activity: new ActivityLog(store), categories, dev: false, selfBundleId: "com.tabhush.app",
+      judge: new Judge({ embed, categories, essentials: () => [], schoolSites: () => [], selfBundleId: "com.tabhush.app" }),
+      openWindow: () => undefined, onChange: () => void changes++, setRelaunch: () => undefined, now: clock.now,
+    });
+    expect(again.session!.gaps).toHaveLength(1);
+    expect(changes).toBe(0);
+  });
+});

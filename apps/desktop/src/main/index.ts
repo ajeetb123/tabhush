@@ -199,6 +199,7 @@ function quitNow(): void {
 }
 
 function broadcast(): void {
+  if (!engine) return; // the engine announces changes while it is still being created
   for (const w of BrowserWindow.getAllWindows()) if (w !== embedder && !w.isDestroyed()) w.webContents.send("changed");
   rebuildMenu();
   // DSK-01: no App Nap while a session runs, so tracking and the classifier keep their pace.
