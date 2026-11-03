@@ -71,6 +71,28 @@ export class ActivityLog {
     this.dirty.add(name);
   }
 
+  /** A session taken out of the history (Q-78): its time stays in the log as ordinary time. */
+  untagSession(id: string, from: number, to: number): void {
+    for (let t = dayStart(from); t <= dayStart(to); t += MS.DAY) {
+      const name = dayFile(t + MS.HOUR);
+      for (const s of this.day(name)) {
+        if (s.sessionId !== id) continue;
+        delete s.sessionId;
+        delete s.onTask;
+        delete s.otherTask;
+        this.dirty.add(name);
+      }
+    }
+    this.flush();
+  }
+
+  /** Start fresh (Q-78): every day file goes. */
+  clear(): void {
+    this.days.clear();
+    this.dirty.clear();
+    this.store.remove("activity");
+  }
+
   flush(now = Date.now()): void {
     for (const name of this.dirty) this.store.write(name, this.days.get(name) ?? []);
     this.dirty.clear();

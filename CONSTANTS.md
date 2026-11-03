@@ -273,6 +273,9 @@ export const OWNER_RULES = {
   REPORT_TITLE_MAX_CHARS: 120,          // Q-69: page titles kept for the full report, on this device only
   OTHER_WORK_MARGIN: 0.1,               // Q-72: other productive work = s(other task) >= ALLOW_MIN_S and beats
                                         //   s(session task) by this margin (agent's starting value)
+  MAX_TASKS_PER_SESSION: 3,             // Q-78: tasks in one session; time is split between them per stretch
+  MISTAKE_CANCEL_SEC: 120,              // Q-78: "Started by mistake? Cancel" window after Lock in,
+  MISTAKE_CANCEL_FIRST_SESSIONS: 3,     //   offered during the first 3 recorded sessions only
   UNDERGROUND_LIST: "warez",            // UT1 category, blocked for the session
   UNDERGROUND_HOST_KEYWORDS: ["streameast"],
   MULTI_TASK_MIN_SCORE: 0.60,           // = INFERENCE.AUTOFILL_MIN_SCORE: two recent tasks this strong → both pre-selected

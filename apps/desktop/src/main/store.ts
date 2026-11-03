@@ -2,7 +2,7 @@
 // Writes go to a temp file and are renamed into place, so a crash never leaves half a file.
 // Nothing here leaves the device (PRIV-01).
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 export class JsonStore {
@@ -28,6 +28,12 @@ export class JsonStore {
     const tmp = `${p}.tmp`;
     writeFileSync(tmp, JSON.stringify(value));
     renameSync(tmp, p);
+  }
+
+  /** Removes a file, or a folder of them (`activity`). */
+  remove(name: string): void {
+    rmSync(this.path(name), { force: true });
+    rmSync(join(this.dir, name), { recursive: true, force: true });
   }
 
   exists(name: string): boolean {

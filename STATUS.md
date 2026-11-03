@@ -8,12 +8,13 @@ What is built, what isn't, and what's left for the owner. Updated 2026-11-02. Th
 |---|---|---|
 | Menu-bar / tray app, open at login, Session · Report · Settings window | Built | DSK-30. Calm Aurora design with motion (Q-73). |
 | Tracking: front app, window title, browser site and page | Built | All day by default; stays on the computer. macOS titles need Accessibility (Q-70). Idle minutes are taken back out of the log (Q-74). |
-| Start: one task named from what's open, time goal, what gets blocked, Lock in | Built | CLS-30..50, Q-64; one task per session (Q-74). |
+| Start: tasks named from what's open (up to 3), time goal, what gets blocked, Lock in | Built | CLS-30..50, Q-64; time split per task in the report (Q-78). |
 | Blocking in every browser and app | Built | Tabs closed (Apple Events on macOS, address bar + Ctrl+W on Windows), distraction apps quit, background tabs and apps re-checked every 15 s. Games and school pages recognized by looking, not lists (Q-74). |
 | Side work for other tasks counts in the report | Built | Q-72. |
 | Ending rules | Built | Dev build ends any time; others Stop past the goal, Step away, or the once-a-day Emergency stop with a retyped passage (Q-69, Q-70). |
 | No quitting a locked session; force quit relaunches; gaps logged | Built | INV-15 changed by the owner (Q-70). |
-| Report: Today, Activity (apps, sites, windows; day in blocks), Week, Sessions | Built | Q-65, Q-69, Q-74. |
+| Report: Today (like the mockup: strip and rows per task), Activity (apps, sites, windows; day in blocks), Week, Sessions | Built | Q-65, Q-69, Q-74, Q-78. |
+| Mistakes: 2-minute cancel for first-timers, delete a session, forget a task, start fresh | Built | Q-78. |
 | Proctoring (LockDown Browser) suspends blocking | Built | DSK-10. |
 | Windows | Built | `native/helper-win.ps1` (PowerShell 5.1 + C#), compiled and smoke-tested in CI. No music volume or reopening quit apps on Windows (Q-71). |
 | Automatic updates | Windows only | From the public `ajeetb123/tabhush-releases` repo, never mid-session (Q-75). macOS needs a signed app first. |

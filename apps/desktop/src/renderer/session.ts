@@ -60,29 +60,38 @@ function idleView(snap: Snapshot): Node[] {
 
 // ───────────────────────── start screen ─────────────────────────
 
-/** Q-74: one task per session. Picking another chip or typing one replaces it. */
+/**
+ * Q-78: up to MAX_TASKS_PER_SESSION tasks. Your tasks are filled chips (× removes); suggestions add
+ * with a click, and their small × forgets a task you don't want suggested again (a typo, a test).
+ */
 function tasksCard(s: Session): HTMLElement {
-  const current = s.taskLabel;
-  const setTask = (label: string) => void call({ type: "setTasks", labels: [label] });
-  const chips = [
-    ...(current ? [h("button", { className: "chip on", textContent: current, attrs: { "aria-pressed": "true", "aria-label": `Working on ${current}` } })] : []),
-    ...s.suggestions
-      .filter((g) => g.label !== current)
-      .map((g) => {
-        const chip = h("button", { className: "chip", textContent: g.label, attrs: { "aria-label": `Work on ${g.label} instead` } });
-        chip.addEventListener("click", () => setTask(g.label));
-        return chip;
-      }),
-  ];
-  const input = h("input", { type: "text", placeholder: current ? "Something else? Type it" : "What are you working on?", attrs: { "aria-label": "Task" } });
-  input.addEventListener("keydown", (e) => e.key === "Enter" && input.value.trim() && setTask(input.value.trim()));
+  const labels = s.taskLabel ? s.taskLabel.split(" + ") : [];
+  const max = OWNER_RULES.MAX_TASKS_PER_SESSION;
+  const setTasks = (next: string[]) => void call({ type: "setTasks", labels: next });
+  const mine = labels.map((l) => {
+    const chip = h("button", { className: "chip on", textContent: `${l}  ×`, attrs: { "aria-label": `Remove ${l}` } });
+    chip.addEventListener("click", () => setTasks(labels.filter((x) => x !== l)));
+    return chip;
+  });
+  const full = labels.length >= max;
+  const suggested = s.suggestions
+    .filter((g) => !labels.includes(g.label))
+    .map((g) => {
+      const add = h("button", { className: "chip-main", textContent: `+ ${g.label}`, disabled: full, attrs: { "aria-label": `Add ${g.label}` } });
+      add.addEventListener("click", () => setTasks([...labels, g.label]));
+      const forget = h("button", { className: "chip-x", textContent: "×", title: "Don’t suggest this again", attrs: { "aria-label": `Forget ${g.label}` } });
+      forget.addEventListener("click", () => void call({ type: "forgetTask", taskId: g.taskId }));
+      return h("span", { className: "chip split" }, add, forget);
+    });
+  const input = h("input", { type: "text", disabled: full, placeholder: full ? `Up to ${max} tasks` : labels.length ? "Add another task" : "What are you working on?", attrs: { "aria-label": "Add a task" } });
+  input.addEventListener("keydown", (e) => e.key === "Enter" && input.value.trim() && setTasks([...labels, input.value.trim()]));
   input.style.flex = "1";
   return h(
     "div",
     { className: "card stack" },
-    chips.length ? h("div", { className: "chips" }, ...chips) : null,
+    mine.length || suggested.length ? h("div", { className: "chips" }, ...mine, ...suggested) : null,
     h("div", { className: "row" }, input),
-    h("p", { className: "muted small", textContent: "One task per session. Anything else you get done shows up as side work in your report." }),
+    h("p", { className: "muted small", textContent: `Doing more than one thing? Add up to ${max}. Your report splits the time between them.` }),
   );
 }
 
@@ -212,8 +221,33 @@ function runningView(s: Session, snap: Snapshot): Node[] {
   const front = h("p", { className: "muted small" });
 
   ring.setLive(s.state === "ACTIVE");
+
+  // Q-78: a first-timer who started by mistake can back out for a couple of minutes.
+  const until = snap.endAccess.mistakeCancelUntil;
+  const mistakeLeft = h("span", { className: "muted small" });
+  const cancel = h("button", { className: "btn", textContent: "Cancel session" });
+  cancel.addEventListener("click", () => {
+    cancel.disabled = true;
+    void call({ type: "cancelMistake" });
+  });
+  const mistake =
+    until && s.state !== "END_COUNTDOWN"
+      ? h(
+          "div",
+          { className: "card stack mistake" },
+          h("b", { textContent: "Started this by mistake?" }),
+          h("p", { className: "muted small", textContent: "You can still cancel. Nothing is saved, and the tabs and apps it closed open again." }),
+          h("div", { className: "spread" }, mistakeLeft, cancel),
+        )
+      : null;
+
   const update = () => {
     const now = Date.now();
+    if (mistake && until) {
+      const left = until - now;
+      if (left <= 0) mistake.remove();
+      else mistakeLeft.textContent = `${Math.floor(left / MS.MINUTE)}:${String(Math.floor((left % MS.MINUTE) / MS.SECOND)).padStart(2, "0")} left`;
+    }
     if (ending) {
       const left = Math.max(0, s.endCountdown!.startedAt + countdownSec * MS.SECOND - now);
       ring.update(left, null, "until it ends", left / (countdownSec * MS.SECOND));
@@ -260,6 +294,7 @@ function runningView(s: Session, snap: Snapshot): Node[] {
         : hero({ text: "Locked in", tone: "live" }, "You’re locked in", s.taskLabel ?? undefined);
   return [
     top,
+    mistake,
     h("div", { className: "card ring-card" }, ring.el, s.state === "ACTIVE" ? h("p", { className: "breath-hint", textContent: "Breathe with the ring." }) : null),
     h("div", { className: "stats" }, stat(String(blockedCount(s)), "blocked so far"), stat(formatDuration(focusSplit(asSessionLike(s), Date.now()).on), "on task")),
     ...(s.state === "ACTIVE" ? [breakCard(s)] : []),
@@ -278,6 +313,10 @@ function endedView(s: Session): Node[] {
   again.addEventListener("click", () => void call({ type: "start" }));
   const done = h("button", { className: "btn", textContent: "Done" });
   done.addEventListener("click", () => void call({ type: "dismiss" }));
+  const forget = h("button", { className: "linkish", textContent: "This was a test. Don’t count it" });
+  forget.addEventListener("click", () => {
+    if (window.confirm("Take this session out of your report? Its tasks are forgotten too, unless another session uses them.")) void call({ type: "deleteSession", id: s.id });
+  });
   const report = h("button", { className: "btn", textContent: "See your day" });
   report.addEventListener("click", () => void call({ type: "dismiss" }).then(() => location.replace("report.html")));
   setFooter(h("div", { className: "row" }, report, done), again);
@@ -288,6 +327,7 @@ function endedView(s: Session): Node[] {
     hero({ text: label.charAt(0).toUpperCase() + label.slice(1) }, won ? "Session complete" : "Session over", s.taskLabel ?? undefined),
     h("div", { className: "stats" }, stat(formatDuration(duration), "locked in"), stat(s.goalMin ? `${s.goalMin} min` : "–", "goal")),
     sessionDetail(asSessionLike(s)),
+    forget,
   ];
   if (s.gaps.length) {
     const total = s.gaps.reduce((a, g) => a + g.to - g.from, 0);

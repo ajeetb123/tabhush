@@ -52,8 +52,8 @@ import type { AppInfo, BrowserTab, FrontInfo, System } from "./system";
 
 export const DEFAULT_SETTINGS: Settings = { schoolSites: [], essentials: [], trackAllDay: true, countOtherWork: true, openAtLogin: true, onboarded: false };
 
-/** What the item in front counts as in the report (Q-72). */
-type WorkState = { state: "on" | "off" } | { state: "other"; task: string };
+/** What the item in front counts as in the report: which session task (Q-78) or another task (Q-72). */
+type WorkState = { state: "on"; task?: string } | { state: "off" } | { state: "other"; task: string };
 
 const COMMITTED: readonly string[] = ["ACTIVE", "ON_BREAK", "IDLE_PAUSED"];
 
@@ -317,8 +317,8 @@ export class Engine {
       const strong = scored.filter((x) => x.score >= OWNER_RULES.MULTI_TASK_MIN_SCORE).map((x) => x.task);
       const result = inferTask(recent, forScore);
       let chosen: Task[] = [];
-      // Q-74: one task per session keeps the report clear; other tasks show up as side work.
-      if (strong.length >= 2) chosen = [strong[0]!];
+      // Q-78: several strong recent tasks are all picked (up to MAX_TASKS_PER_SESSION); the report splits time between them.
+      if (strong.length >= 2) chosen = strong.slice(0, OWNER_RULES.MAX_TASKS_PER_SESSION);
       else if (result.kind === "autofill") chosen = [result.task];
       else {
         const label = autoLabel(items.map((i) => ({ title: i.title, front: i.front })), this.knownCourses());
@@ -340,9 +340,8 @@ export class Engine {
     return this.run(async () => {
       const s = this.session;
       if (s?.state !== "SWEEP_PREVIEW") return;
-      // Q-74: one task per session; the last one picked or typed wins.
-      const picked = labelsIn.filter((l) => normalizeLabel(l)).pop();
-      const labels = picked ? [picked.trim()] : [];
+      // Q-78: up to MAX_TASKS_PER_SESSION tasks, deduplicated.
+      const labels = [...new Map(labelsIn.filter((l) => normalizeLabel(l)).map((l) => [normalizeLabel(l), l.trim()])).values()].slice(0, OWNER_RULES.MAX_TASKS_PER_SESSION);
       const chosen: Task[] = [];
       for (const l of labels) {
         const t = await this.resolveOrCreate(l);
@@ -372,7 +371,7 @@ export class Engine {
     for (const app of await this.d.system.apps()) {
       if (app.regular === false) continue;
       const v = await this.d.judge.app(task, app, "");
-      if (v.action === "park") s.preview.push({ id: `app:${app.bundleId}`, kind: "app", bundleId: app.bundleId, pid: app.pid, title: app.name, label: app.name, park: true });
+      if (v.action === "park") s.preview.push({ id: `app:${app.bundleId}`, kind: "app", bundleId: app.bundleId, pid: app.pid, ...(app.path ? { path: app.path } : {}), title: app.name, label: app.name, park: true });
     }
     s.suspensions = namedPureDistraction(task.label).map((name) => `${name} is in the task name but stays blocked.`);
   }
@@ -414,7 +413,7 @@ export class Engine {
     const byBrowser = new Map<string, PreviewItem[]>();
     for (const item of items) {
       if (item.kind === "tab" && item.url) byBrowser.set(item.bundleId, [...(byBrowser.get(item.bundleId) ?? []), item]);
-      if (item.kind === "app") await this.blockApp(s, item.bundleId, item.title, item.pid ?? null);
+      if (item.kind === "app") await this.blockApp(s, item.bundleId, item.title, item.pid ?? null, item.path);
     }
     for (const [bundleId, list] of byBrowser) {
       await this.d.system.closeTabs(bundleId, list.map((t) => t.url!));
@@ -433,7 +432,7 @@ export class Engine {
     return true;
   }
 
-  private async blockApp(s: Session, bundleId: string, name: string, pid: number | null = null): Promise<void> {
+  private async blockApp(s: Session, bundleId: string, name: string, pid: number | null = null, path?: string): Promise<void> {
     const now = this.now();
     const prev = this.quitAt.get(bundleId);
     const sameProcess = prev !== undefined && (pid === null || prev.pid === null || prev.pid === pid);
@@ -446,7 +445,7 @@ export class Engine {
       await this.d.system.quit(bundleId);
       this.quitAt.set(bundleId, { at: now, pid });
     }
-    if (this.recordBlock(s, name, `app:${bundleId}`, { bundleId, title: name, reason: "quit" })) {
+    if (this.recordBlock(s, name, `app:${bundleId}`, { bundleId, ...(path ? { path } : {}), title: name, reason: "quit" })) {
       this.d.system.notify(`${name} is blocked`, `Not part of ${s.taskLabel ?? "your session"}. Back to it.`);
     }
   }
@@ -503,7 +502,12 @@ export class Engine {
         if (s.state === "ACTIVE" && !self) {
           // Glancing at Tabhush itself leaves the focus log as it was.
           if (away) this.logFocus(s, "away", {}, s.idleSince ?? now);
-          else if (item) this.logFocus(s, work?.state ?? "on", { domain: item.label, title: item.title, ...(work?.state === "other" ? { task: work.task } : {}) });
+          else if (item) {
+            // Work with no task of its own (Finder, a blank tab) keeps counting for the task you were on.
+            const lastTask = [...s.focusLog].reverse().find((e) => e.state === "on" && e.task)?.task;
+            const task = work && work.state !== "off" ? (work.task ?? (work.state === "on" ? lastTask : undefined)) : undefined;
+            this.logFocus(s, work?.state ?? "on", { domain: item.label, title: item.title, ...(task ? { task } : {}) });
+          }
         }
         if (COMMITTED.includes(s.state) || s.state === "END_COUNTDOWN") s.heartbeat = now;
         // Q-74: tabs and apps behind the one in front (a show playing in a background tab, a game on
@@ -577,13 +581,17 @@ export class Engine {
    * or any task you've used before) is "other productive work" for that task, not this one.
    */
   private async workState(s: Session, task: SessionTask, text: string): Promise<WorkState> {
-    if (!this.settings.countOtherWork || !text.trim()) return { state: "on" };
-    const others = this.tasks.filter((t) => !s.taskIds.includes(t.id) && t.labelVector);
-    if (!others.length) return { state: "on" };
+    // With one task there's nothing to split; with several, the closest one gets the time (Q-78).
+    const single: WorkState = { state: "on", ...(task.members.length === 1 ? { task: task.members[0]!.label } : {}) };
+    if (!text.trim()) return single;
     try {
       const v = await this.d.judge.vector(text);
       const rep = (t: Task) => ({ label: t.labelVector!, prototypes: t.prototypes.map((p) => p.vector) });
-      const mine = Math.max(0, ...task.members.filter((m) => m.labelVector).map((m) => relatedness(v, rep(m))));
+      const members = task.members.filter((m) => m.labelVector).map((m) => ({ m, s: relatedness(v, rep(m)) })).sort((a, b) => b.s - a.s);
+      const mine = members[0]?.s ?? 0;
+      const own: WorkState = { state: "on", task: (members[0]?.m ?? task.members[0]!).label };
+      const others = this.settings.countOtherWork ? this.tasks.filter((t) => !s.taskIds.includes(t.id) && t.labelVector) : [];
+      if (!others.length) return task.members.length === 1 ? single : own;
       // Tasks named this session win a tie with older ones.
       const scored = others
         .map((t) => ({ t, s: relatedness(v, rep(t)) + (s.otherTaskIds.includes(t.id) ? 1e-6 : 0) }))
@@ -592,10 +600,10 @@ export class Engine {
       if (mine < THRESHOLDS.ALLOW_MIN_S && best.s >= THRESHOLDS.ALLOW_MIN_S && best.s - mine >= OWNER_RULES.OTHER_WORK_MARGIN) {
         return { state: "other", task: best.t.label };
       }
+      return task.members.length === 1 ? single : own;
     } catch {
-      // tier 2 unavailable: counted as this task, as before
+      return single; // tier 2 unavailable: counted as the session's task, as before
     }
-    return { state: "on" };
   }
 
   /** Q-72: "I'm also doing X" during a session, so that work is recognized as other productive work. */
@@ -670,7 +678,7 @@ export class Engine {
         }
       }
     } else {
-      await this.blockApp(s, app.bundleId, app.name, app.pid);
+      await this.blockApp(s, app.bundleId, app.name, app.pid, app.path);
     }
     return { state: "off" };
   }
@@ -749,7 +757,7 @@ export class Engine {
       if ((await this.d.judge.page(task, tab.url, tab.title)).action === "park") items.push({ id: `tab:${i}`, kind: "tab", bundleId: tab.bundleId, url: tab.url, title: tab.title, label: itemDomain(tab.url) ?? tab.url, park: true });
     }
     for (const app of await this.d.system.apps()) {
-      if (app.regular !== false && (await this.d.judge.app(task, app, "")).action === "park") items.push({ id: `app:${app.bundleId}`, kind: "app", bundleId: app.bundleId, pid: app.pid, title: app.name, label: app.name, park: true });
+      if (app.regular !== false && (await this.d.judge.app(task, app, "")).action === "park") items.push({ id: `app:${app.bundleId}`, kind: "app", bundleId: app.bundleId, pid: app.pid, ...(app.path ? { path: app.path } : {}), title: app.name, label: app.name, park: true });
     }
     await this.sweep(s, items);
   }
@@ -813,7 +821,95 @@ export class Engine {
     const dev = this.d.dev && OWNER_RULES.DEV_INSTALL_ENDS_ANYTIME;
     const reached = !!s && goalReached(s.committedAt, s.goalMin, now, offClockMs(s, now));
     const committed = !!s && COMMITTED.includes(s.state);
-    return { dev, goalReached: reached, canEnd: !!s && (!committed || dev || reached), emergencyLeft: this.emergencyStopsLeft() };
+    return { dev, goalReached: reached, canEnd: !!s && (!committed || dev || reached), emergencyLeft: this.emergencyStopsLeft(), mistakeCancelUntil: this.mistakeCancelUntil() };
+  }
+
+  // ───────────────────────── mistakes (Q-78) ─────────────────────────
+
+  /** First-timers (fewer than MISTAKE_CANCEL_FIRST_SESSIONS recorded sessions) can cancel right after Lock in. */
+  private mistakeCancelUntil(): number | null {
+    const s = this.session;
+    if (!s || s.committedAt === null || !COMMITTED.includes(s.state)) return null;
+    if (this.pastSessions().length >= OWNER_RULES.MISTAKE_CANCEL_FIRST_SESSIONS) return null;
+    const until = s.committedAt + OWNER_RULES.MISTAKE_CANCEL_SEC * MS.SECOND;
+    return this.now() <= until ? until : null;
+  }
+
+  /**
+   * "Started by mistake? Cancel": the session ends without a trace (not in the report, its tasks
+   * forgotten if nothing else uses them) and returns what it closed, to be reopened.
+   */
+  cancelMistake(): Promise<Session["restoreList"] | null> {
+    return this.run(async () => {
+      const s = this.session;
+      if (!s || this.mistakeCancelUntil() === null) return null;
+      for (const [bundleId, level] of Object.entries(s.musicVolumes)) await this.d.system.setVolume(bundleId, level);
+      this.d.activity.untagSession(s.id, s.committedAt ?? s.startedAt, this.now());
+      const restore = s.restoreList;
+      this.session = null;
+      this.pruneTasks([...s.taskIds, ...s.otherTaskIds]);
+      this.save();
+      return restore;
+    });
+  }
+
+  /** Takes a finished session out of the history (a test, a mistake). Its time stays in the activity log as ordinary time. */
+  deleteSession(id: string): Promise<boolean> {
+    return this.run(() => {
+      const past = this.pastSessions();
+      const current = this.session?.id === id ? this.session : null;
+      if (current && current.state !== "ENDED") return false; // a running session can't be deleted
+      const target = past.find((p) => p.id === id) ?? current;
+      if (!target) return false;
+      this.d.store.write("sessions", past.filter((p) => p.id !== id));
+      this.d.activity.untagSession(id, target.committedAt ?? target.startedAt, target.endedAt ?? this.now());
+      if (current) this.session = null;
+      this.pruneTasks([...target.taskIds, ...(target.otherTaskIds ?? [])]);
+      this.save();
+      return true;
+    });
+  }
+
+  /** Removes a task from the suggestions (a typo, an old one). Not one the running session uses. */
+  forgetTask(taskId: string): Promise<boolean> {
+    return this.run(() => {
+      const s = this.session;
+      if (s && s.state !== "ENDED" && s.taskIds.includes(taskId)) return false;
+      const before = this.tasks.length;
+      this.tasks = this.tasks.filter((t) => t.id !== taskId);
+      if (this.tasks.length === before) return false;
+      this.saveTasks();
+      if (s) s.suggestions = s.suggestions.filter((x) => x.taskId !== taskId);
+      this.save();
+      return true;
+    });
+  }
+
+  /** Start fresh: sessions, activity, tasks and learned courses go. Settings stay. Not during a session. */
+  clearHistory(): Promise<boolean> {
+    return this.run(() => {
+      const s = this.session;
+      if (s && s.state !== "IDLE" && s.state !== "ENDED") return false;
+      this.d.store.write("sessions", []);
+      this.d.store.write("profile", {});
+      this.tasks = [];
+      this.saveTasks();
+      this.d.activity.clear();
+      this.session = null;
+      this.save();
+      return true;
+    });
+  }
+
+  /** Forgets these tasks unless a recorded session or the current one still uses them. */
+  private pruneTasks(ids: string[]): void {
+    const used = new Set<string>();
+    for (const p of this.pastSessions()) for (const id of [...p.taskIds, ...(p.otherTaskIds ?? [])]) used.add(id);
+    if (this.session) for (const id of [...this.session.taskIds, ...this.session.otherTaskIds]) used.add(id);
+    const drop = new Set(ids.filter((id) => !used.has(id)));
+    if (!drop.size) return;
+    this.tasks = this.tasks.filter((t) => !drop.has(t.id));
+    this.saveTasks();
   }
 
   /** Past the goal, Stop ends at once as a normal end (Q-64). */

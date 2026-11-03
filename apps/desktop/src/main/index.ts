@@ -267,13 +267,30 @@ async function route(m: UiMessage): Promise<unknown> {
       return shell.openExternal(`x-apple.systempreferences:com.apple.preference.security?Privacy_${m.pane === "accessibility" ? "Accessibility" : "Automation"}`);
     case "reopen": {
       const r = engine.session?.restoreList[m.index];
-      if (r?.url) return shell.openExternal(r.url);
-      if (r?.bundleId && !IS_WIN) execFile("/usr/bin/open", ["-b", r.bundleId], () => undefined);
-      return null;
+      return r ? reopen(r) : null;
     }
+    case "cancelMistake": {
+      const restore = await engine.cancelMistake();
+      if (!restore) return false;
+      for (const r of restore) await reopen(r);
+      return true;
+    }
+    case "deleteSession":
+      return engine.deleteSession(m.id);
+    case "forgetTask":
+      return engine.forgetTask(m.taskId);
+    case "clearHistory":
+      return engine.clearHistory();
     case "open":
       return showWindow(m.page);
   }
+}
+
+/** Opens a closed tab in the default browser, or a quit app from where it's installed. */
+async function reopen(r: { url?: string; bundleId?: string; path?: string }): Promise<void> {
+  if (r.url) return void (await shell.openExternal(r.url).catch(() => undefined));
+  if (r.path) return void (await shell.openPath(r.path));
+  if (r.bundleId && !IS_WIN) execFile("/usr/bin/open", ["-b", r.bundleId], () => undefined);
 }
 
 ipcMain.handle("call", async (_e, m: UiMessage) => route(m));

@@ -428,7 +428,7 @@ main.report { max-width: 880px; }
 .weekbars .val { text-align: center; font-size: 12px; font-weight: 650; margin-bottom: 6px; font-variant-numeric: tabular-nums; animation: fade .6s ease both .5s; }
 @keyframes grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 @keyframes grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-.sess { display: grid; grid-template-columns: 12px 1fr auto; gap: 14px; align-items: center; padding: 15px 4px; border-top: 1px solid var(--hair); border-radius: 12px; transition: background .25s ease; }
+.sess { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; padding: 15px 4px; border-top: 1px solid var(--hair); border-radius: 12px; transition: background .25s ease; }
 .sess:hover { background: var(--surface-2); }
 .sess:first-child { border-top: 0; }
 .sess .meta { color: var(--muted); font-size: 13px; }
@@ -498,8 +498,17 @@ textarea.wrong { border-color: var(--danger); box-shadow: 0 0 0 4px var(--danger
 .setting .txt p { margin: 2px 0 0; }
 .setting + .setting { padding-top: 14px; border-top: 1px solid var(--hair); }
 
-/* Resting (window not focused, Q-77): decorative loops pause; numbers and the timer keep updating. */
-body.resting *, body.resting *::before, body.resting *::after { animation-play-state: paused !important; }
+/* Resting (window not focused, Q-77): only the endless decorative loops pause. One-time entrances
+   (rise, fade, bars growing) always finish, so content never stays invisible. */
+body.resting .ambient .orb,
+body.resting .orb-stage *,
+body.resting .ring .halo,
+body.resting .ring .head circle.glow,
+body.resting .mark *,
+body.resting .pill::before,
+body.resting .live::before,
+body.resting .btn.primary::after,
+body.resting .insight::before { animation-play-state: paused !important; }
 
 /* ───────────────────────── motion off ───────────────────────── */
 
@@ -525,3 +534,15 @@ body.resting *, body.resting *::before, body.resting *::after { animation-play-s
 .what { display: grid; min-width: 0; }
 .what .sub, .block .sub { color: var(--faint); font-size: 12px; }
 @media (max-width: 480px) { .block > summary { grid-template-columns: 1fr auto; } .block > summary .when { grid-column: 1 / -1; } }
+
+/* Q-78: one dot per task in a session. */
+.dots { display: inline-flex; gap: 4px; align-items: center; }
+
+/* Q-78: a suggestion chip with its own "forget" ×. */
+.chip.split { padding: 0; gap: 0; overflow: hidden; }
+.chip.split button { background: none; border: 0; font: inherit; color: inherit; cursor: pointer; }
+.chip.split .chip-main { padding: 8px 6px 8px 15px; }
+.chip.split .chip-x { padding: 8px 12px 8px 6px; color: var(--faint); }
+.chip.split .chip-x:hover { color: var(--danger); }
+.chip.split button:disabled { opacity: .45; cursor: default; }
+.mistake { border-color: color-mix(in srgb, var(--warm) 35%, transparent); }

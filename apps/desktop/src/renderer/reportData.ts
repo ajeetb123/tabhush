@@ -148,26 +148,75 @@ export function focusSplit(s: SessionLike, now: number, from = -Infinity, to = I
   return out;
 }
 
-/** Productive time of a session by task: its own task, plus other work per task (Q-72). */
+/** The tasks a session was for, by name ("A + B" is two tasks, Q-78). */
+export function sessionTasks(s: SessionLike): string[] {
+  return (s.taskLabel ?? "Untitled").split(" + ").map((t) => t.trim()).filter(Boolean);
+}
+
+/** A task's default color, from its name (used where only one task is shown). */
+export const taskColor = (label: string): string => colorFor(label.toLowerCase());
+
+// Most distinct first, so the top three tasks read as blue, clay and green (Q-78, the Today mockup).
+const DISTINCT_ORDER = ["#7487ad", "#c48a64", "#6f9a8b", "#bfa35a", "#9a7aa6", "#5f97a3"] as const;
+
+/** Different colors for the tasks in one view, the task with the most time first (UI-06: one color per task). */
+export function paletteFor(labels: readonly string[]): Map<string, string> {
+  const out = new Map<string, string>();
+  labels.forEach((l, i) => out.set(l.toLowerCase(), DISTINCT_ORDER[i % DISTINCT_ORDER.length]!));
+  return out;
+}
+
+/**
+ * Productive time of a session by task (Q-72, Q-78): each on-task stretch counts for the task it
+ * was tagged with (several tasks in one session are split this way), side work for its own task.
+ * Untagged stretches (older sessions) count for the session's first task.
+ */
 export function productiveParts(s: SessionLike, now: number, from = -Infinity, to = Infinity): { key: string; label: string; color: string; ms: number; side: boolean }[] {
+  const tasks = sessionTasks(s);
   const parts = new Map<string, { key: string; label: string; color: string; ms: number; side: boolean }>();
-  const own = s.taskLabel ?? "Untitled";
-  const ownKey = own.toLowerCase();
-  parts.set(ownKey, { key: ownKey, label: own, color: colorFor(taskKey(s)), ms: focusSplit(s, now, from, to).on, side: false });
+  for (const t of tasks) parts.set(t.toLowerCase(), { key: t.toLowerCase(), label: t, color: taskColor(t), ms: 0, side: false });
   if (s.committedAt !== null) {
     const end = s.endedAt ?? now;
-    s.focusLog.forEach((e, i) => {
-      if (e.state !== "other" || !e.task) return;
+    const log = s.focusLog.length ? s.focusLog : [{ at: s.committedAt, state: "on" as const }];
+    log.forEach((e, i) => {
+      if (e.state !== "on" && e.state !== "other") return;
       const a = Math.max(e.at, from, s.committedAt!);
-      const b = Math.min(s.focusLog[i + 1]?.at ?? end, to, end);
+      const b = Math.min(log[i + 1]?.at ?? end, to, end);
       if (b <= a) return;
-      const key = e.task.toLowerCase();
-      const p = parts.get(key) ?? { key, label: e.task, color: colorFor(key), ms: 0, side: true };
+      const label = e.state === "on" ? (e.task && tasks.some((t) => t.toLowerCase() === e.task!.toLowerCase()) ? e.task : tasks[0]!) : e.task;
+      if (!label) return;
+      const key = label.toLowerCase();
+      const p = parts.get(key) ?? { key, label, color: taskColor(label), ms: 0, side: e.state === "other" };
       p.ms += b - a;
       parts.set(key, p);
     });
   }
-  return [...parts.values()].filter((p) => p.ms > 0 || !p.side);
+  // A task of this session that got no time still shows when it's the only one.
+  return [...parts.values()].filter((p) => p.ms > 0 || (!p.side && tasks.length === 1));
+}
+
+const STRIP_MERGE_GAP_MS = 5 * MS.MINUTE; // a short break in a task's stretch doesn't split its block
+const STRIP_MIN_MS = MS.MINUTE;
+
+/** The day strip's blocks for one session, one color per task (Q-78): when you switch between tasks, the strip shows it. */
+export function taskStretches(s: SessionLike, now: number, from = -Infinity, to = Infinity): { from: number; to: number; color: string; label: string }[] {
+  if (s.committedAt === null) return [];
+  const tasks = sessionTasks(s);
+  const end = s.endedAt ?? now;
+  const log = s.focusLog.length ? s.focusLog : [{ at: s.committedAt, state: "on" as const }];
+  const out: { from: number; to: number; color: string; label: string }[] = [];
+  log.forEach((e, i) => {
+    if (e.state !== "on" && e.state !== "other") return;
+    const a = Math.max(e.at, from, s.committedAt!);
+    const b = Math.min(log[i + 1]?.at ?? end, to, end);
+    if (b <= a) return;
+    const label = e.state === "on" ? (e.task && tasks.some((t) => t.toLowerCase() === e.task!.toLowerCase()) ? e.task : tasks[0]!) : e.task;
+    if (!label) return;
+    const last = out[out.length - 1];
+    if (last && last.label.toLowerCase() === label.toLowerCase() && a - last.to <= STRIP_MERGE_GAP_MS) last.to = b;
+    else out.push({ from: a, to: b, color: taskColor(label), label });
+  });
+  return out.filter((x) => x.to - x.from >= STRIP_MIN_MS);
 }
 
 function partOfDay(hour: number): string {
@@ -229,14 +278,20 @@ export function dayReport(sessions: SessionLike[], now: number): DayReport {
     startMs = Math.min(startMs, Math.floor(s.committedAt! / MS.HOUR) * MS.HOUR);
     endMs = Math.max(endMs, Math.ceil((s.endedAt ?? now) / MS.HOUR) * MS.HOUR);
   }
-  const segments = today.map((s) => ({ from: s.committedAt!, to: s.endedAt ?? now, color: colorFor(taskKey(s)), label: s.taskLabel ?? "" }));
+  const segments = today.flatMap((s) => taskStretches(s, now, from, to));
+
+  // Every task in the day gets its own color, in the strip and the rows alike.
+  const ordered = [...rows.values()].sort((a, b) => b.onMs - a.onMs);
+  const palette = paletteFor(ordered.map((r) => r.label));
+  for (const r of ordered) r.color = palette.get(r.label.toLowerCase()) ?? r.color;
+  for (const seg of segments) seg.color = palette.get(seg.label.toLowerCase()) ?? seg.color;
 
   return {
     focusedMs: on,
     focusPct: on + off > 0 ? Math.round((on / (on + off)) * 100) : null,
     awayMs: away,
     blocked: events.length,
-    rows: [...rows.values()].sort((a, b) => b.onMs - a.onMs),
+    rows: ordered,
     strip: { startMs, endMs, segments },
     insight: dayInsight(today, events, now),
   };
@@ -293,6 +348,10 @@ export function weekReport(sessions: SessionLike[], now: number): { days: WeekDa
     const list = [...parts.values()];
     days.push({ start, label: new Date(start).toLocaleDateString(undefined, { weekday: "short" }), parts: list, totalMs: list.reduce((a, p) => a + p.onMs, 0) });
   }
+  const weekTotals = new Map<string, number>();
+  for (const d of days) for (const p of d.parts) weekTotals.set(p.label, (weekTotals.get(p.label) ?? 0) + p.onMs);
+  const weekPalette = paletteFor([...weekTotals.entries()].sort((a, b) => b[1] - a[1]).map(([l]) => l));
+  for (const d of days) for (const p of d.parts) p.color = weekPalette.get(p.label.toLowerCase()) ?? p.color;
   const totalMs = days.reduce((a, d) => a + d.totalMs, 0);
   const best = [...byPart.entries()].sort((a, b) => b[1] - a[1])[0];
   const bestDay = [...days].sort((a, b) => b.totalMs - a.totalMs)[0];

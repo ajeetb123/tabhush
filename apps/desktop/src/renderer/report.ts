@@ -4,7 +4,7 @@
 import { MS } from "@tabhush/core";
 import type { ActivitySegment, Session } from "../shared/types";
 import { animateNumber, avatar, call, formatDuration, getSnapshot, h, onStateChange, playEnter, setMood, setTitle, topbar } from "./common";
-import { activityBlocks, activityTotals, appBreakdown, asSessionLike, colorFor, dayReport, dayStart, formatHm, taskKey, weekReport, type SessionLike } from "./reportData";
+import { activityBlocks, activityTotals, appBreakdown, asSessionLike, dayReport, dayStart, formatHm, sessionTasks, taskColor, weekReport, type SessionLike } from "./reportData";
 import { endLabel, sessionDetail } from "./sessionDetail";
 
 setTitle("Your focus");
@@ -154,16 +154,6 @@ function todayView(sessions: SessionLike[], now: number): Node[] {
       ),
     );
   }
-  rows.append(
-    h(
-      "li",
-      {},
-      h("span", { className: "dot hollow" }),
-      h("span", { className: "muted", textContent: "Away or on a break" }),
-      h("span", { className: "t muted", textContent: formatHm(r.awayMs) }),
-      h("span", { className: "c", textContent: "not counted in focus %" }),
-    ),
-  );
   return [
     h(
       "div",
@@ -177,23 +167,6 @@ function todayView(sessions: SessionLike[], now: number): Node[] {
     h("h2", { textContent: "By task" }),
     rows,
     h("div", { className: "insight" }, h("b", { textContent: "Insight" }), r.insight),
-  ];
-}
-
-async function todayActivity(now: number): Promise<Node[]> {
-  const from = dayStart(now);
-  const segments = await call<ActivitySegment[]>({ type: "activity", from, to: now });
-  const totals = activityTotals(segments, from, now);
-  const more = h("button", { className: "btn", textContent: "See everything" });
-  more.addEventListener("click", () => {
-    tab = "activity";
-    dayOffset = 0;
-    void render();
-  });
-  return [
-    h("h2", { textContent: `Your day on this computer · ${formatHm(totals.activeMs)}` }),
-    ...appsCard(segments, from, now, 6),
-    h("div", { className: "row" }, more),
   ];
 }
 
@@ -226,14 +199,24 @@ function sessionsView(sessions: SessionLike[], now: number): Node[] {
     const row = h(
       "summary",
       { className: "sess" },
-      h("span", { className: "dot", attrs: { style: `background:${colorFor(taskKey(s))}` } }),
+      h("span", { className: "dots" }, ...sessionTasks(s).map((t) => h("span", { className: "dot", title: t, attrs: { style: `background:${taskColor(t)}` } }))),
       h("div", {}, h("div", { textContent: s.taskLabel ?? "Untitled" }), h("div", { className: "meta" }, `${when} · ${s.blockEvents.length} blocked `, status)),
       h("div", { className: "right" }, h("div", { textContent: formatHm(len) }), h("div", { className: "meta", textContent: s.goalMin ? `goal ${s.goalMin}m` : "" })),
     );
     // Q-69: open a session for its full report (sites, pages, timeline), built on first open.
     const box = h("details", { className: "sess-box", open: openIds.has(s.id) }, row);
     const fill = () => {
-      if (box.open && box.childElementCount === 1) box.append(sessionDetail(s, now));
+      if (!box.open || box.childElementCount !== 1) return;
+      const detail = sessionDetail(s, now);
+      // Q-78: a test or a mistake can be taken out of the history.
+      if (s.endedAt !== null) {
+        const del = h("button", { className: "linkish", textContent: "Delete from history" });
+        del.addEventListener("click", () => {
+          if (window.confirm(`Delete “${s.taskLabel ?? "this session"}” from your report? This can’t be undone.`)) void call({ type: "deleteSession", id: s.id }).then(() => render());
+        });
+        detail.append(del);
+      }
+      box.append(detail);
     };
     box.addEventListener("toggle", () => {
       if (box.open) openIds.add(s.id);
@@ -273,7 +256,7 @@ async function render(entrance = false): Promise<void> {
     tick = window.setInterval(update, MS.SECOND);
   }
   const body =
-    tab === "today" ? [...todayView(all, now), ...(await todayActivity(now))] : tab === "activity" ? await activityView(now, all) : tab === "week" ? weekView(all, now) : sessionsView(all, now);
+    tab === "today" ? todayView(all, now) : tab === "activity" ? await activityView(now, all) : tab === "week" ? weekView(all, now) : sessionsView(all, now);
   main.replaceChildren(
     topbar(),
     h("h1", { textContent: "Your focus" }),

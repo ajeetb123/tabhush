@@ -113,3 +113,30 @@ describe("report", () => {
     expect(focusSplit(s, at(16))).toEqual({ on: 30 * M, other: 20 * M, off: 10 * M, away: 0 });
   });
 });
+
+describe("several tasks in one session (Q-78)", () => {
+  const s = sess("m", "Lab report + Internship work", at(9), at(11), {
+    focusLog: [
+      { at: at(9), state: "on", task: "Lab report", domain: "docs.google.com" },
+      { at: at(9, 40), state: "on", task: "Internship work", domain: "linkedin.com" },
+      { at: at(10, 10), state: "away" },
+      { at: at(10, 12), state: "on", task: "Internship work", domain: "docs.google.com" },
+      { at: at(10, 30), state: "on", task: "Lab report", domain: "docs.google.com" },
+      { at: at(11), state: "away" },
+    ],
+  });
+
+  it("time goes to each task separately", () => {
+    const rows = Object.fromEntries(dayReport([s], at(12)).rows.map((r) => [r.label, [r.onMs / M, r.sessions]]));
+    expect(rows).toEqual({ "Lab report": [70, 1], "Internship work": [48, 1] });
+  });
+
+  it("the day strip shows a block per task, a short break doesn't split one", () => {
+    const strip = dayReport([s], at(12)).strip.segments.map((x) => [x.label, (x.to - x.from) / M]);
+    expect(strip).toEqual([
+      ["Lab report", 40],
+      ["Internship work", 50],
+      ["Lab report", 30],
+    ]);
+  });
+});

@@ -289,6 +289,11 @@ export const OWNER_RULES = {
   // work" for that task: its similarity to the other task is at least THRESHOLDS.ALLOW_MIN_S and
   // beats the session task by this margin (agent's starting value).
   OTHER_WORK_MARGIN: 0.1,
+  // Q-78: up to this many tasks in one session; each stretch of work counts for the task it's closest to.
+  MAX_TASKS_PER_SESSION: 3,
+  // Q-78: a first-timer who started by mistake can cancel within this window, during their first sessions.
+  MISTAKE_CANCEL_SEC: 120,
+  MISTAKE_CANCEL_FIRST_SESSIONS: 3,
   UNDERGROUND_LIST: "warez", // UT1 category, blocked for the session
   UNDERGROUND_HOST_KEYWORDS: ["streameast"],
   MULTI_TASK_MIN_SCORE: 0.6, // two recent tasks this strong → both pre-selected

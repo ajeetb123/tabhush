@@ -43,6 +43,17 @@ export function sessionDetail(s: SessionLike, now = Date.now()): HTMLElement {
   if (notes.length) wrap.append(h("p", { className: "muted small", textContent: `${notes.join(" · ")}. Away time is outside the browser, idle, on a break or stepped away.` }));
   if (s.endKind === "emergency") wrap.append(h("p", { className: "note warn", textContent: `Emergency stop${s.emergencyReason ? `: “${s.emergencyReason}”` : ""}` }));
 
+  // Q-78: a session with several tasks shows how the time split between them.
+  const own = productiveParts(s, now).filter((p) => !p.side && p.ms > 0);
+  if (own.length > 1) {
+    wrap.append(h("h2", { textContent: "By task" }));
+    const list = h("ul", { className: "items" });
+    for (const p of own.sort((a, b) => b.ms - a.ms)) {
+      list.append(h("li", { className: "spread" }, h("div", { className: "site" }, h("span", { className: "dot", attrs: { style: `background:${p.color}` } }), h("span", { textContent: p.label })), h("b", { textContent: formatHm(p.ms) })));
+    }
+    wrap.append(h("div", { className: "card" }, list));
+  }
+
   // Q-72: productive work for other tasks during this session.
   const side = productiveParts(s, now).filter((p) => p.side);
   if (side.length) {

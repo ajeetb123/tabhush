@@ -49,6 +49,8 @@ export interface PreviewItem {
   bundleId: string;
   /** The app's process at Start, to tell a reopened app from one that ignored the quit. */
   pid?: number;
+  /** Where the app is installed, to reopen it (Q-78). */
+  path?: string;
   url?: string;
   title: string;
   label: string;
@@ -77,7 +79,7 @@ export interface Session {
   pauses: { startedAt: number; endedAt: number | null; auto: boolean }[];
   idleSince: number | null;
   /** Tabs and apps closed by a block, to reopen at the end (LOOP-07). */
-  restoreList: { url?: string; bundleId?: string; title: string; reason: "closed" | "quit" }[];
+  restoreList: { url?: string; bundleId?: string; path?: string; title: string; reason: "closed" | "quit" }[];
   /** Music app volumes before the session lowered them (Q-63), restored at the end. */
   musicVolumes: Record<string, number>;
   suspensions: string[];
@@ -114,6 +116,8 @@ export interface EndAccess {
   goalReached: boolean;
   canEnd: boolean;
   emergencyLeft: number;
+  /** Q-78: during a first-timer's first sessions, "Started by mistake? Cancel" is open until this time. */
+  mistakeCancelUntil: number | null;
 }
 
 export interface Permissions {
@@ -159,4 +163,8 @@ export type UiMessage =
   | { type: "openPrivacyPane"; pane: "accessibility" | "automation" }
   | { type: "reopen"; index: number }
   | { type: "open"; page: "session" | "report" | "settings" }
-  | { type: "installUpdate" };
+  | { type: "installUpdate" }
+  | { type: "cancelMistake" }
+  | { type: "deleteSession"; id: string }
+  | { type: "forgetTask"; taskId: string }
+  | { type: "clearHistory" };

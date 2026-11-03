@@ -9,6 +9,22 @@ import { call, getSnapshot, h, onStateChange, playEnter, setTitle, topbar } from
 setTitle("Settings");
 const main = document.querySelector("main")!;
 
+/** Q-78: clears the history (a first try, tests, mistakes). Settings and permissions stay. */
+function startFresh(locked: boolean): HTMLElement {
+  const clear = h("button", { className: "btn danger", textContent: "Clear history", disabled: locked });
+  const done = h("p", { className: "muted small", attrs: { role: "status" } });
+  clear.addEventListener("click", () => {
+    if (!window.confirm("Clear your whole history? Sessions, the activity log and saved tasks are deleted. Settings stay. This can’t be undone.")) return;
+    void call<boolean>({ type: "clearHistory" }).then((ok) => (done.textContent = ok ? "History cleared." : "Finish your session first."));
+  });
+  return h(
+    "div",
+    { className: "setting" },
+    h("div", { className: "txt" }, h("b", { textContent: "Clear history" }), h("p", { className: "muted small", textContent: locked ? "Available after your session." : "Deletes sessions, the activity log and saved tasks, for a clean start. Settings stay." }), done),
+    clear,
+  );
+}
+
 /** Q-75: the running version, and "Restart to update" once a new one is downloaded (never mid-session). */
 function versionRow(update: Awaited<ReturnType<typeof getSnapshot>>["update"], version: string | undefined, locked: boolean): HTMLElement {
   const v = `Tabhush ${version ?? ""}`.trim();
@@ -91,6 +107,7 @@ async function render(): Promise<void> {
       h("p", { className: "muted small", textContent: "It all stays on this computer. Nothing is uploaded, sold or shared, and there are no ads or accounts. Uninstalling Tabhush removes it." }),
     ),
     ...section("Version", versionRow(update, appVersion, locked)),
+    ...section("Start fresh", startFresh(locked)),
     err,
     saved,
   ];

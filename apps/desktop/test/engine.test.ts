@@ -3,14 +3,14 @@
 // and enforces, and the ending rules hold (owner's dev build vs everyone else).
 import { beforeEach, describe, expect, it } from "vitest";
 import { writeFileSync } from "node:fs";
-import { DESKTOP, MS } from "@tabhush/core";
+import { DESKTOP, MS, OWNER_RULES } from "@tabhush/core";
 import { ActivityLog } from "../src/main/activity";
 import { appKind, isSchoolPage, looksLikeGame } from "../src/main/apps";
 import { Categories } from "../src/main/categories";
 import { Engine, passageMatches } from "../src/main/engine";
 import { Judge } from "../src/main/judge";
 import { JsonStore } from "../src/main/store";
-import { activityTotals, appBreakdown } from "../src/renderer/reportData";
+import { activityTotals, appBreakdown, asSessionLike, productiveParts } from "../src/renderer/reportData";
 import { app, categoriesDir, chromeTab, CHROME, Clock, fakeEmbed, FakeSystem, FIREFOX, tempDir } from "./fakes";
 
 const embed = async (t: string[]) => fakeEmbed(t);
@@ -405,12 +405,27 @@ describe("recognizing by looking (Q-74)", () => {
     expect(sys.closed).toEqual([]);
   });
 
-  it("one task per session: picking another replaces it", async () => {
+  it("Q-78: several tasks in one session (up to 3), and each stretch of work counts for its own task", async () => {
     const e = make();
     await e.start();
-    await e.setTasks(["CS 2114", "Resume tailoring"]);
-    expect(e.session!.taskIds).toHaveLength(1);
-    expect(e.session!.taskLabel).toBe("Resume tailoring");
+    await e.setTasks(["Chem lab report", "Resume tailoring", "Calc homework", "Fourth task"]);
+    expect(e.session!.taskIds).toHaveLength(3);
+    await e.setTasks(["Chem lab report", "Resume tailoring"]);
+    await e.confirm(45);
+    const tick = async (front: ReturnType<typeof chromeTab> | { app: ReturnType<typeof app>; title: string }, seconds: number) => {
+      sys.frontNow = front;
+      for (let i = 0; i < seconds; i++) {
+        await e.tick();
+        clock.advance(MS.SECOND);
+      }
+    };
+    await tick(chromeTab("https://docs.google.com/document/d/2/edit", "Chem lab report titration draft"), 120);
+    await tick({ app: app("Finder", "com.apple.finder"), title: "Downloads" }, 30); // no task of its own: keeps counting for chem
+    await tick(chromeTab("https://docs.google.com/document/d/3/edit", "Resume tailoring for internship"), 60);
+    const parts = Object.fromEntries(productiveParts(asSessionLike(e.session!), clock.t).map((p) => [p.label, Math.round(p.ms / MS.SECOND)]));
+    expect(parts["Chem lab report"]).toBeGreaterThanOrEqual(150);
+    expect(parts["Resume tailoring"]).toBeGreaterThanOrEqual(59);
+    expect(Object.keys(parts)).toEqual(["Chem lab report", "Resume tailoring"]);
   });
 
   it("sitting there doing nothing doesn't count: idle minutes come back out of the log", async () => {
@@ -628,5 +643,84 @@ describe("edge cases", () => {
     await e.stepAway();
     expect(await e.emergencyStop("ER visit", DESKTOP.EMERGENCY_PASSAGE)).toBe(true);
     expect(e.session!.pauses[0]!.endedAt).not.toBeNull();
+  });
+});
+
+describe("mistakes (Q-78)", () => {
+  it("a first-timer can cancel within 2 minutes: nothing is saved, what was closed comes back, new tasks are forgotten", async () => {
+    const e = make();
+    await e.start();
+    await e.setTasks(["Typo taskk"]);
+    await e.confirm(45);
+    expect(e.endAccess().mistakeCancelUntil).toBe(e.session!.committedAt! + OWNER_RULES.MISTAKE_CANCEL_SEC * MS.SECOND);
+    clock.advance(60 * MS.SECOND);
+    const restore = await e.cancelMistake();
+    expect(restore!.map((r) => r.reason).sort()).toEqual(["closed", "quit"]);
+    expect(e.session).toBeNull();
+    expect(e.pastSessions()).toEqual([]);
+    expect(sys.volumes["com.spotify.client"]).toBe(80); // music back to how it was
+    expect(relaunch[relaunch.length - 1]).toBe(false);
+    await e.start();
+    expect(e.session!.suggestions.map((x) => x.label)).not.toContain("Typo taskk");
+  });
+
+  it("the cancel window closes after 2 minutes", async () => {
+    const e = make();
+    await lockIn(e);
+    clock.advance(OWNER_RULES.MISTAKE_CANCEL_SEC * MS.SECOND + 1);
+    expect(e.endAccess().mistakeCancelUntil).toBeNull();
+    expect(await e.cancelMistake()).toBeNull();
+    expect(e.session!.state).toBe("ACTIVE");
+  });
+
+  it("the cancel is only for the first few sessions", async () => {
+    const e = make(true);
+    for (let i = 0; i < OWNER_RULES.MISTAKE_CANCEL_FIRST_SESSIONS; i++) {
+      await lockIn(e);
+      await e.requestEnd("done");
+    }
+    await lockIn(e);
+    expect(e.endAccess().mistakeCancelUntil).toBeNull();
+  });
+
+  it("a finished session can be deleted from the history; its time stays in the log as ordinary time", async () => {
+    const e = make();
+    await lockIn(e, 25);
+    for (let i = 0; i < 5; i++) {
+      await e.tick();
+      clock.advance(MS.SECOND);
+    }
+    clock.advance(26 * MS.MINUTE);
+    await e.stop();
+    const id = e.session!.id;
+    expect(await e.deleteSession(id)).toBe(true);
+    expect(e.pastSessions()).toEqual([]);
+    expect(e.session).toBeNull();
+    activity.flush(clock.t);
+    const segs = new ActivityLog(store).between(clock.t - MS.HOUR, clock.t + 1);
+    expect(segs.length).toBeGreaterThan(0);
+    expect(segs.some((x) => x.sessionId === id)).toBe(false);
+  });
+
+  it("a running session can't be deleted, and its tasks can't be forgotten", async () => {
+    const e = make();
+    await lockIn(e);
+    expect(await e.deleteSession(e.session!.id)).toBe(false);
+    expect(await e.forgetTask(e.session!.taskIds[0]!)).toBe(false);
+  });
+
+  it("start fresh clears everything but settings, and not during a session", async () => {
+    const e = make(true);
+    e.setSettings({ countOtherWork: false });
+    await lockIn(e);
+    expect(await e.clearHistory()).toBe(false);
+    await e.requestEnd("done");
+    expect(await e.clearHistory()).toBe(true);
+    expect(e.pastSessions()).toEqual([]);
+    expect(e.session).toBeNull();
+    expect(new ActivityLog(store).between(clock.t - MS.DAY, clock.t + 1)).toEqual([]);
+    expect(e.settings.countOtherWork).toBe(false);
+    await e.start();
+    expect(e.session!.suggestions).toEqual([]);
   });
 });
