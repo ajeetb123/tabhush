@@ -2,7 +2,7 @@
 // tasks named from what's open, a time goal and what gets blocked (LOOP-04), then "Lock in".
 // Running: the goal ring, breaks, Step away and the exits. Ended: the full session report.
 
-import { BRAND, BREAKS, breakMinutesAvailable, defaultGoal, EXITS, goalNote, goalReached, MS, OWNER_RULES, SESSION, typicalMinutes } from "@lockin/core";
+import { BRAND, BREAKS, breakMinutesAvailable, defaultGoal, EXITS, goalNote, goalReached, MS, OWNER_RULES, SESSION, typicalMinutes } from "@tabhush/core";
 import type { PreviewItem, Session } from "../shared/types";
 import { avatar, blockedCount, call, focusOrb, formatDuration, getSnapshot, goalRing, h, onStateChange, playEnter, setMood, setTitle, stat, topbar, type Mood, type Snapshot } from "./common";
 import { exitActions, stopButton } from "./exits";

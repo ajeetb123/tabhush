@@ -2,7 +2,7 @@
 // ONNX Runtime WASM binary is emitted by Vite from node_modules. Nothing is downloaded at runtime (no remote code).
 //
 // Model: Xenova/all-MiniLM-L6-v2 at a pinned revision (CONSTANTS.md EMBEDDING), int8 ONNX ~23 MB.
-// Run: npm run fetch-model -w @lockin/desktop
+// Run: npm run fetch-model -w @tabhush/desktop
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";

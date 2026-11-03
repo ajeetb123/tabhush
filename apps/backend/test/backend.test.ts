@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { API, emptyCounts, solvePow } from "@lockin/core";
+import { API, emptyCounts, solvePow } from "@tabhush/core";
 import { handle, type Deps } from "../src/app";
 import type { LlmTransport } from "../src/llm";
 import { MemoryStore } from "./memoryStore";
 
-vi.mock("@lockin/core", async (orig) => {
-  const real = await orig<typeof import("@lockin/core")>();
+vi.mock("@tabhush/core", async (orig) => {
+  const real = await orig<typeof import("@tabhush/core")>();
   // Tests run the real PoW at a low difficulty so they stay fast.
   // The tier 3 tests exercise the switched-off fallback (Q-61), so they turn it on.
   return {
@@ -166,7 +166,7 @@ describe("routing", () => {
 
 describe("Q-61 LLM switched off", () => {
   it("the shipped constant keeps tier 3 off", async () => {
-    const real = await vi.importActual<typeof import("@lockin/core")>("@lockin/core");
+    const real = await vi.importActual<typeof import("@tabhush/core")>("@tabhush/core");
     expect(real.LLM.ENABLED).toBe(false);
   });
 });

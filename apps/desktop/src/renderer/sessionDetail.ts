@@ -1,7 +1,7 @@
 // The full report of one session (Q-69): where the time went, site by site and page by page,
 // and the session in order. Used by the session summary and the report's Sessions tab.
 
-import { MS } from "@lockin/core";
+import { MS } from "@tabhush/core";
 import { avatar, h, stat } from "./common";
 import { focusSplit, formatHm, offClockMs, productiveParts, sessionTimeline, siteBreakdown, type SessionLike } from "./reportData";
 

@@ -35,9 +35,9 @@ jobs:
           if ($lines.Count -ne 8) { throw "expected 8 replies, got $($lines.Count)" }
           foreach ($l in $lines) { $r = $l | ConvertFrom-Json; if (-not $r.ok) { throw "command failed: $l" } }
       - run: npx vitest run apps/desktop/test/engine.test.ts
-      - run: npm run fetch-model -w @lockin/desktop
-      - run: npm run build-categories -w @lockin/desktop
-      - run: npm run dist:win -w @lockin/desktop
+      - run: npm run fetch-model -w @tabhush/desktop
+      - run: npm run build-categories -w @tabhush/desktop
+      - run: npm run dist:win -w @tabhush/desktop
       - uses: actions/upload-artifact@v4
         with:
           name: Tabhush-Windows

@@ -2,7 +2,7 @@
 // and a plain word on privacy. School pages are recognized on their own (Q-74), so there is no list
 // to keep. Locked during a session (LOCK-01). The UT1 list credit ships in the app's NOTICE file.
 
-import { BRAND } from "@lockin/core";
+import { BRAND } from "@tabhush/core";
 import type { Settings } from "../shared/types";
 import { call, getSnapshot, h, onStateChange, playEnter, setTitle, topbar } from "./common";
 

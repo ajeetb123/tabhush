@@ -10,7 +10,7 @@ import { execFile } from "node:child_process";
 import { appendFile, existsSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { BRAND, DESKTOP, EMBEDDING, MS, OWNER_RULES, EXITS, goalReached } from "@lockin/core";
+import { BRAND, DESKTOP, EMBEDDING, MS, OWNER_RULES, EXITS, goalReached } from "@tabhush/core";
 import type { UiMessage } from "../shared/types";
 import { offClockMs } from "../renderer/reportData";
 import { ActivityLog } from "./activity";

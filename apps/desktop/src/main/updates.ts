@@ -6,7 +6,7 @@
 // (INV-14): the update waits, and "Restart to update" is offered once no session is running.
 
 import updater from "electron-updater";
-import { DESKTOP, MS } from "@lockin/core";
+import { DESKTOP, MS } from "@tabhush/core";
 
 // Accessed only when updates are on: the library sets itself up on first use.
 const au = () => updater.autoUpdater;

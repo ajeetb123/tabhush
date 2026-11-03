@@ -3,7 +3,7 @@
 // The model and the WASM runtime are bundled in the app (INV-05); remote loading is off.
 
 import { env, pipeline, type FeatureExtractionPipeline } from "@huggingface/transformers";
-import { EMBEDDING } from "@lockin/core";
+import { EMBEDDING } from "@tabhush/core";
 import "./common"; // the window.tabhush type
 // The ONNX Runtime WASM binary, emitted into the package by Vite (no CDN, INV-05). The default
 // onnxruntime-web build embeds its JS glue, so only the .wasm path is set.

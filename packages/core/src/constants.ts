@@ -225,7 +225,7 @@ export const API = {
   TELEMETRY: "/v1/telemetry",
   CONTRIBUTE: "/v1/contribute",
   DELETE: "/v1/delete",
-  BASE_URL: "TODO_Q26" as Todo | string, // https://lockin-backend.<subdomain>.workers.dev (Q-26)
+  BASE_URL: "TODO_Q26" as Todo | string, // https://tabhush-backend.<subdomain>.workers.dev (Q-26)
 } as const;
 
 export const POW = {

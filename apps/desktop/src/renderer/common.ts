@@ -1,7 +1,7 @@
 // Shared helpers for the app's pages. Style rules (UI-06): one color per task, whitespace,
 // calm colors, dark mode, no badges or confetti.
 
-import { BRAND, MS } from "@lockin/core";
+import { BRAND, MS } from "@tabhush/core";
 import type { Session, Snapshot, UiMessage } from "../shared/types";
 
 export type { Snapshot } from "../shared/types";

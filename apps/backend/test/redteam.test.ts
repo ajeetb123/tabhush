@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { MS, RED_TEAM } from "@lockin/core";
+import { MS, RED_TEAM } from "@tabhush/core";
 import { openAiTransport, type LlmTransport } from "../src/llm";
 import { parseRedTeamSet, runRedTeam, type RedTeamItem } from "../src/redteam";
 

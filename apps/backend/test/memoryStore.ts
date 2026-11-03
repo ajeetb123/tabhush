@@ -1,4 +1,4 @@
-import type { TelemetryPayload } from "@lockin/core";
+import type { TelemetryPayload } from "@tabhush/core";
 import type { Store } from "../src/store";
 
 export class MemoryStore implements Store {

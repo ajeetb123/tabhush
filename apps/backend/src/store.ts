@@ -1,7 +1,7 @@
 // Backend storage (Q-04): D1 for tokens, caps and telemetry. The interface lets tests run on
 // an in-memory store. Nothing here ever stores a title, URL or request body (INV-18).
 
-import type { TelemetryPayload } from "@lockin/core";
+import type { TelemetryPayload } from "@tabhush/core";
 
 export interface Store {
   /** Saves a fresh, unused proof-of-work challenge. */

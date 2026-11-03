@@ -30,7 +30,7 @@ if (!namesZip || !existsSync(namesZip)) {
   process.exit(1);
 }
 
-const work = mkdtempSync(join(tmpdir(), "lockin-lexicon-"));
+const work = mkdtempSync(join(tmpdir(), "tabhush-lexicon-"));
 
 // ───────────── dictionary ─────────────
 let tarball = scowlSrc;

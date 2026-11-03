@@ -11,7 +11,7 @@ const CDN_DEFAULTS = ["https://cdn.jsdelivr.net/npm/onnxruntime-web@"];
 
 function stripRemoteDefaults(): Plugin {
   return {
-    name: "lockin-strip-remote-defaults",
+    name: "tabhush-strip-remote-defaults",
     renderChunk(code) {
       let out = code;
       for (const s of CDN_DEFAULTS) out = out.split(s).join("./unavailable-remote/");

@@ -3,7 +3,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CATEGORY_LIST, type Category } from "@lockin/core";
+import { CATEGORY_LIST, type Category } from "@tabhush/core";
 
 export class Categories {
   private table: Map<string, Category> | null = null;

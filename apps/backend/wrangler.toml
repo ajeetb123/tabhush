@@ -1,5 +1,5 @@
 # Cloudflare Worker (docs/08 BE-00). Worker name follows the working name (Q-01).
-name = "lockin-backend"
+name = "tabhush-backend"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
 
@@ -15,8 +15,8 @@ invocation_logs = false
 
 [[d1_databases]]
 binding = "DB"
-database_name = "lockin"
-# Set from `wrangler d1 create lockin` before the first deploy.
+database_name = "tabhush"
+# Set from `wrangler d1 create tabhush` before the first deploy.
 database_id = "REPLACE_WITH_D1_DATABASE_ID"
 migrations_dir = "migrations"
 

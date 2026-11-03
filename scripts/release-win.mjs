@@ -3,7 +3,7 @@
 // ajeetb123/tabhush-releases repo. Installed copies pick it up within a few hours.
 //
 // Steps: bump "version" in apps/desktop/package.json, commit and push, wait for the windows
-// workflow to pass, then: npm run release:win -w @lockin/desktop
+// workflow to pass, then: npm run release:win -w @tabhush/desktop
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";

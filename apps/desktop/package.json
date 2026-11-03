@@ -1,5 +1,5 @@
 {
-  "name": "@lockin/desktop",
+  "name": "@tabhush/desktop",
   "productName": "Tabhush",
   "version": "0.1.1",
   "private": true,
@@ -21,7 +21,7 @@
   "devDependencies": {
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
     "@huggingface/transformers": "4.3.2",
-    "@lockin/core": "*",
+    "@tabhush/core": "*",
     "electron": "44.9.3",
     "electron-builder": "26.17.0",
     "electron-updater": "^6.8.10",

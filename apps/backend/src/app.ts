@@ -12,7 +12,7 @@ import {
   parseTier3Request,
   POW,
   type ApiErrorCode,
-} from "@lockin/core";
+} from "@tabhush/core";
 import { LlmUnavailable, runInferLabel, runJudge, type LlmTransport } from "./llm";
 import type { Store } from "./store";
 

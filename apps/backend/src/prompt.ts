@@ -2,7 +2,7 @@
 // versioned here. Titles and sentences only ever appear inside the JSON data block, which the
 // system message declares untrusted. Must pass the QA-20 red-team suite before release.
 
-import { INFERENCE, LLM, type Tier3Request } from "@lockin/core";
+import { INFERENCE, LLM, type Tier3Request } from "@tabhush/core";
 
 export const PROMPT_VERSION = 1;
 

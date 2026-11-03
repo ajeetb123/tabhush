@@ -1,7 +1,7 @@
 // The all-day activity log for the comprehensive report (Q-70): which app, site and window was in
 // front, stretch by stretch, one file per day (4am to 4am, TIME-04). Stays on this device.
 
-import { DESKTOP, MS } from "@lockin/core";
+import { DESKTOP, MS } from "@tabhush/core";
 import type { ActivitySegment } from "../shared/types";
 import { dayStart } from "../renderer/reportData";
 import type { JsonStore } from "./store";

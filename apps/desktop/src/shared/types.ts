@@ -1,6 +1,6 @@
 // Types shared by the main process (engine, tracker) and the renderer pages.
 
-import type { SessionState } from "@lockin/core";
+import type { SessionState } from "@tabhush/core";
 
 /** One thing in front: a browser page, a browser window with a title only, or an app window. */
 export interface FrontItem {

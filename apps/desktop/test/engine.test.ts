@@ -2,7 +2,7 @@
 // task and proposes blocks across apps and browsers, Lock in closes and quits them, the tick tracks
 // and enforces, and the ending rules hold (owner's dev build vs everyone else).
 import { beforeEach, describe, expect, it } from "vitest";
-import { DESKTOP, MS } from "@lockin/core";
+import { DESKTOP, MS } from "@tabhush/core";
 import { ActivityLog } from "../src/main/activity";
 import { appKind, isSchoolPage, looksLikeGame } from "../src/main/apps";
 import { Categories } from "../src/main/categories";
@@ -170,7 +170,7 @@ describe("the tick: tracking and blocking", () => {
         clock.advance(MS.SECOND);
       }
     };
-    sys.frontNow = { app: VSCODE, title: "engine.ts — lockin" };
+    sys.frontNow = { app: VSCODE, title: "engine.ts — tabhush" };
     await ticks(12);
     sys.frontNow = { app: MESSAGES, title: "Mom" };
     await ticks(6);
@@ -178,7 +178,7 @@ describe("the tick: tracking and blocking", () => {
     const all = new ActivityLog(store).between(clock.t - MS.HOUR, clock.t + 1); // read back from disk
     const apps = appBreakdown(all, clock.t - MS.HOUR, clock.t + 1);
     expect(apps.map((a) => a.app)).toEqual(["Code", "Messages"]);
-    expect(apps[0]!.groups[0]!.titles[0]).toEqual({ title: "engine.ts — lockin", ms: 11 * MS.SECOND });
+    expect(apps[0]!.groups[0]!.titles[0]).toEqual({ title: "engine.ts — tabhush", ms: 11 * MS.SECOND });
     expect(apps[1]!.groups[0]!.titles).toEqual([]); // DSK-30: no titles from Messages
     expect(activityTotals(all, clock.t - MS.HOUR, clock.t + 1).activeMs).toBe(17 * MS.SECOND);
   });

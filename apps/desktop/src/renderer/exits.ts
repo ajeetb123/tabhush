@@ -4,7 +4,7 @@
 //   Everyone else, before the goal: Step away (pause; blocks stay on) or the Emergency stop
 //   (a one-line reason, retype a passage with no pasting, hold 3 s, a 60 s countdown, once a day).
 
-import { DESKTOP, OWNER_RULES } from "@lockin/core";
+import { DESKTOP, OWNER_RULES } from "@tabhush/core";
 import type { EndAccess } from "../shared/types";
 import { call, h } from "./common";
 

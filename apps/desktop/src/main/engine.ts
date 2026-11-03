@@ -40,7 +40,7 @@ import {
   domainsOf,
   type SessionEvent,
   type Task,
-} from "@lockin/core";
+} from "@tabhush/core";
 import type { EndAccess, EndKind, FocusEntry, FrontItem, PreviewItem, Session, Settings, Snapshot } from "../shared/types";
 import { asSessionLike, dayStart, focusSplit, offClockMs } from "../renderer/reportData";
 import type { ActivityLog } from "./activity";

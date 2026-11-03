@@ -3,7 +3,7 @@
 // + 2 percentage points. [DERIVED] A "flip" is a verdict different from the item's labeled
 // expected verdict; the 200-item set is written by the owner.
 
-import { RED_TEAM, type Tier3Request, type Verdict } from "@lockin/core";
+import { RED_TEAM, type Tier3Request, type Verdict } from "@tabhush/core";
 import { runJudge, type LlmTransport } from "./llm";
 
 export interface RedTeamItem {

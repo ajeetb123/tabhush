@@ -25,7 +25,7 @@ import {
   type Decision,
   type ItemKey,
   type Task,
-} from "@lockin/core";
+} from "@tabhush/core";
 import { appKind, isSchoolPage, looksLikeGame, type AppKind } from "./apps";
 import type { Categories } from "./categories";
 import type { AppInfo } from "./system";

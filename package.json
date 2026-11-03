@@ -1,5 +1,5 @@
 {
-  "name": "lockin",
+  "name": "tabhush",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -8,12 +8,12 @@
     "apps/backend"
   ],
   "scripts": {
-    "build": "npm run build -w @lockin/desktop",
+    "build": "npm run build -w @tabhush/desktop",
     "test": "vitest run",
     "typecheck": "tsc -p packages/core && tsc -p apps/desktop && tsc -p apps/backend",
     "check:ship": "node scripts/check-ship.mjs",
-    "start": "npm start -w @lockin/desktop",
-    "dist": "npm run dist -w @lockin/desktop",
+    "start": "npm start -w @tabhush/desktop",
+    "dist": "npm run dist -w @tabhush/desktop",
     "check:bundle": "node scripts/check-bundle.mjs"
   },
   "devDependencies": {

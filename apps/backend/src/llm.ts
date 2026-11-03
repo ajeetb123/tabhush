@@ -11,7 +11,7 @@ import {
   type Tier3JudgeResponse,
   type Tier3LabelResponse,
   type Tier3Request,
-} from "@lockin/core";
+} from "@tabhush/core";
 import { dataBlock, JUDGE_SCHEMA, LABEL_SCHEMA, SYSTEM_PROMPTS } from "./prompt";
 
 /** Returns the model's raw text output, or throws on transport failure. */

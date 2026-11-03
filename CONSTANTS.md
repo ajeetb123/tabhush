@@ -206,7 +206,7 @@ export const API = {                    // Q-03: /v1/ prefix, JSON errors {"erro
   TELEMETRY: "/v1/telemetry",
   CONTRIBUTE: "/v1/contribute",
   DELETE: "/v1/delete",
-  BASE_URL: "TODO_Q26",                 // https://lockin-backend.<subdomain>.workers.dev once the owner gives the subdomain
+  BASE_URL: "TODO_Q26",                 // https://tabhush-backend.<subdomain>.workers.dev once the owner gives the subdomain
 };
 
 export const POW = {                    // Q-06: SHA-256 hashcash; same cost for install tokens and contribution IDs

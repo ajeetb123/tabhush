@@ -6,7 +6,7 @@
 //   Strip range: 9am to 9pm, widened to cover any session outside it (Q-46, Q-65).
 //   Insight: the most-blocked site and when, plus when the longest session ran (Q-21, Q-65).
 
-import { ACTIVE_TIME, MS, REPORT } from "@lockin/core";
+import { ACTIVE_TIME, MS, REPORT } from "@tabhush/core";
 import type { ActivitySegment, EndKind, FocusEntry, Session } from "../shared/types";
 
 // Muted task colors: sage, clay, slate blue, ochre, plum, teal.

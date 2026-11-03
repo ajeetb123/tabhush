@@ -4,7 +4,7 @@
 
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
-import { DESKTOP } from "@lockin/core";
+import { DESKTOP } from "@tabhush/core";
 import type { AppInfo } from "./system";
 
 export type AppKind = "system" | "browser" | "proctoring" | "tool" | "music" | "meeting" | "distraction" | "other";

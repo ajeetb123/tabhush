@@ -1,7 +1,7 @@
 // The report (UI-02 Today, UI-04 Week and Sessions; built early per Q-65). Design rule: one big
 // number, one clear breakdown, one insight; every chart has a written takeaway.
 
-import { MS } from "@lockin/core";
+import { MS } from "@tabhush/core";
 import type { ActivitySegment, Session } from "../shared/types";
 import { animateNumber, avatar, call, formatDuration, getSnapshot, h, onStateChange, playEnter, setMood, setTitle, topbar } from "./common";
 import { activityBlocks, activityTotals, appBreakdown, asSessionLike, colorFor, dayReport, dayStart, formatHm, taskKey, weekReport, type SessionLike } from "./reportData";
