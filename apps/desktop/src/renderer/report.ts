@@ -3,7 +3,7 @@
 
 import { MS } from "@lockin/core";
 import type { ActivitySegment, Session } from "../shared/types";
-import { avatar, call, formatDuration, getSnapshot, h, onStateChange, setTitle, topbar } from "./common";
+import { animateNumber, avatar, call, formatDuration, getSnapshot, h, onStateChange, playEnter, setMood, setTitle, topbar } from "./common";
 import { activityTimeline, activityTotals, appBreakdown, asSessionLike, colorFor, dayReport, dayStart, formatHm, taskKey, weekReport, type SessionLike } from "./reportData";
 import { endLabel, sessionDetail } from "./sessionDetail";
 
@@ -86,9 +86,9 @@ async function activityView(now: number): Promise<Node[]> {
     h(
       "div",
       { className: "big3" },
-      h("div", {}, h("div", { className: "n hero-n", textContent: formatHm(totals.activeMs) }), h("div", { className: "l", textContent: "on the computer" })),
-      h("div", {}, h("div", { className: "n", textContent: formatHm(totals.inSessionMs) }), h("div", { className: "l", textContent: "of it in sessions" })),
-      h("div", {}, h("div", { className: "n", textContent: formatHm(totals.awayMs) }), h("div", { className: "l", textContent: "idle or away" })),
+      h("div", {}, h("div", { className: "n hero-n", textContent: formatHm(totals.activeMs), attrs: { "data-hm": String(totals.activeMs) } }), h("div", { className: "l", textContent: "on the computer" })),
+      h("div", {}, h("div", { className: "n", textContent: formatHm(totals.inSessionMs), attrs: { "data-hm": String(totals.inSessionMs) } }), h("div", { className: "l", textContent: "of it in sessions" })),
+      h("div", {}, h("div", { className: "n", textContent: formatHm(totals.awayMs), attrs: { "data-hm": String(totals.awayMs) } }), h("div", { className: "l", textContent: "idle or away" })),
     ),
     h("h2", { textContent: "Apps, sites and windows" }),
     ...appsCard(segments, from, to),
@@ -140,9 +140,9 @@ function todayView(sessions: SessionLike[], now: number): Node[] {
     h(
       "div",
       { className: "big3" },
-      h("div", {}, h("div", { className: "n hero-n", textContent: formatHm(r.focusedMs) }), h("div", { className: "l", textContent: "focused today" })),
-      h("div", {}, h("div", { className: "n", textContent: r.focusPct === null ? "–" : `${r.focusPct}%` }), h("div", { className: "l", textContent: "of session time on task" })),
-      h("div", {}, h("div", { className: "n", textContent: String(r.blocked) }), h("div", { className: "l", textContent: "items blocked" })),
+      h("div", {}, h("div", { className: "n hero-n", textContent: formatHm(r.focusedMs), attrs: { "data-hm": String(r.focusedMs) } }), h("div", { className: "l", textContent: "focused today" })),
+      h("div", {}, h("div", { className: "n", textContent: r.focusPct === null ? "–" : `${r.focusPct}%`, attrs: r.focusPct === null ? {} : { "data-pct": String(r.focusPct) } }), h("div", { className: "l", textContent: "of session time on task" })),
+      h("div", {}, h("div", { className: "n", textContent: String(r.blocked), attrs: { "data-n": String(r.blocked) } }), h("div", { className: "l", textContent: "items blocked" })),
     ),
     strip,
     h("div", { className: "strip-axis" }, h("span", { textContent: hourLabel(r.strip.startMs) }), h("span", { textContent: hourLabel(mid) }), h("span", { textContent: hourLabel(r.strip.endMs) })),
@@ -179,7 +179,7 @@ function weekView(sessions: SessionLike[], now: number): Node[] {
     bars.append(h("div", { className: "wk" }, col, h("div", { className: "lbl", textContent: d.label })));
   }
   return [
-    h("div", { className: "big3" }, h("div", {}, h("div", { className: "n hero-n", textContent: formatHm(w.totalMs) }), h("div", { className: "l", textContent: "focused in the last 7 days" }))),
+    h("div", { className: "big3" }, h("div", {}, h("div", { className: "n hero-n", textContent: formatHm(w.totalMs), attrs: { "data-hm": String(w.totalMs) } }), h("div", { className: "l", textContent: "focused in the last 7 days" }))),
     bars,
     h("div", { className: "insight" }, h("b", { textContent: "Insight" }), w.insight),
   ];
@@ -217,9 +217,12 @@ function sessionsView(sessions: SessionLike[], now: number): Node[] {
   });
 }
 
-async function render(): Promise<void> {
+let counted = false;
+
+async function render(entrance = false): Promise<void> {
   window.clearInterval(tick);
   const { session } = await getSnapshot();
+  setMood(session && session.committedAt !== null && session.state === "ACTIVE" ? "focus" : "calm");
   const saved = await pastSessions();
   const current = session && session.state !== "ENDED" && session.committedAt !== null ? [asSessionLike(session)] : [];
   const all = [...saved.filter((s) => s.id !== session?.id), ...current];
@@ -229,8 +232,9 @@ async function render(): Promise<void> {
   for (const [id, label] of [["today", "Today"], ["activity", "Activity"], ["week", "Week"], ["sessions", "Sessions"]] as const) {
     const b = h("button", { textContent: label, attrs: { role: "tab", "aria-selected": String(tab === id) } });
     b.addEventListener("click", () => {
+      if (tab === id) return;
       tab = id;
-      void render();
+      void render(true);
     });
     tabs.append(b);
   }
@@ -248,7 +252,16 @@ async function render(): Promise<void> {
     h("p", { className: "lead", textContent: "Everything here stays on this device." }),
     h("div", { className: "card report-card" }, h("div", { className: "head" }, tabs, live), h("div", { className: "body", attrs: { role: "tabpanel" } }, ...body)),
   );
+  // Numbers count up the first time each tab is shown (Q-73).
+  if (entrance || !counted) {
+    counted = true;
+    if (entrance) playEnter();
+    for (const el of main.querySelectorAll<HTMLElement>("[data-hm]")) animateNumber(el, Number(el.dataset.hm), formatHm);
+    for (const el of main.querySelectorAll<HTMLElement>("[data-pct]")) animateNumber(el, Number(el.dataset.pct), (n) => `${Math.round(n)}%`);
+    for (const el of main.querySelectorAll<HTMLElement>("[data-n]")) animateNumber(el, Number(el.dataset.n), (n) => String(Math.round(n)));
+  }
 }
 
 onStateChange(() => void render());
+playEnter();
 void render();

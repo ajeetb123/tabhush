@@ -4,7 +4,7 @@
 
 import { BRAND, BREAKS, breakMinutesAvailable, defaultGoal, EXITS, goalNote, goalReached, MS, OWNER_RULES, SESSION, typicalMinutes } from "@lockin/core";
 import type { PreviewItem, Session } from "../shared/types";
-import { avatar, blockedCount, call, formatDuration, getSnapshot, goalRing, h, onStateChange, setTitle, stat, topbar, type Snapshot } from "./common";
+import { avatar, blockedCount, call, focusOrb, formatDuration, getSnapshot, goalRing, h, onStateChange, playEnter, setMood, setTitle, stat, topbar, type Mood, type Snapshot } from "./common";
 import { exitActions, stopButton } from "./exits";
 import { asSessionLike, focusSplit, offClockMs } from "./reportData";
 import { endLabel, sessionDetail } from "./sessionDetail";
@@ -50,7 +50,8 @@ function idleView(snap: Snapshot): Node[] {
   });
   const now = snap.front ? `${snap.front.label}${snap.front.title ? ` · ${snap.front.title}` : ""}` : null;
   return [
-    hero({ text: "Ready" }, "Time to lock in", "It reads what you have open, names the task, and blocks the rest: apps and every browser."),
+    hero({ text: "Ready" }, "Time to lock in", "It reads what you have open, names the task, and quiets everything else."),
+    focusOrb(),
     start,
     ...[permissionsCard(snap)].filter((n): n is HTMLElement => n !== null),
     snap.settings.trackAllDay && now ? h("p", { className: "muted small", textContent: `Tracking for your report. In front now: ${now}` }) : null,
@@ -215,15 +216,18 @@ function runningView(s: Session, snap: Snapshot): Node[] {
   let shownReached: boolean | null = null;
   const front = h("p", { className: "muted small" });
 
+  ring.setLive(s.state === "ACTIVE");
   const update = () => {
     const now = Date.now();
     if (ending) {
-      ring.update(Math.max(0, s.endCountdown!.startedAt + countdownSec * MS.SECOND - now), null, "until it ends");
+      const left = Math.max(0, s.endCountdown!.startedAt + countdownSec * MS.SECOND - now);
+      ring.update(left, null, "until it ends", left / (countdownSec * MS.SECOND));
       return;
     }
     if (onBreak) {
       const b = s.breaks[s.breaks.length - 1]!;
-      ring.update(Math.max(0, b.startedAt + b.plannedMin * MS.MINUTE - now), null, "of break left");
+      const left = Math.max(0, b.startedAt + b.plannedMin * MS.MINUTE - now);
+      ring.update(left, null, "of break left", left / (b.plannedMin * MS.MINUTE));
       return;
     }
     const elapsed = now - (s.committedAt ?? s.startedAt) - offClockMs(s, now);
@@ -261,7 +265,7 @@ function runningView(s: Session, snap: Snapshot): Node[] {
         : hero({ text: "Locked in", tone: "live" }, "You’re locked in", s.taskLabel ?? undefined);
   return [
     top,
-    h("div", { className: "card" }, ring.el),
+    h("div", { className: "card ring-card" }, ring.el, s.state === "ACTIVE" ? h("p", { className: "breath-hint", textContent: "Breathe with the ring." }) : null),
     h("div", { className: "stats" }, stat(String(blockedCount(s)), "blocked so far"), stat(formatDuration(focusSplit(asSessionLike(s), Date.now()).on), "on task")),
     ...(s.state === "ACTIVE" ? [breakCard(s)] : []),
     actions,
@@ -307,10 +311,29 @@ function endedView(s: Session): Node[] {
   return out;
 }
 
+let lastView = "";
+
+const moodFor = (s: Session | null): Mood => {
+  if (!s) return "calm";
+  if (s.state === "ACTIVE") return "focus";
+  if (s.state === "ON_BREAK") return "break";
+  if (s.state === "END_COUNTDOWN") return "ending";
+  if (s.state === "IDLE_PAUSED") return "away";
+  if (s.state === "ENDED") return "done";
+  return "calm";
+};
+
 async function render(): Promise<void> {
   window.clearInterval(tick);
   const snap = await getSnapshot();
   const { session: s, history } = snap;
+  setMood(moodFor(s));
+  // The entrance plays when the view changes, not on every update.
+  const view = s?.state ?? "IDLE";
+  if (view !== lastView) {
+    lastView = view;
+    playEnter();
+  }
   let nodes: Node[];
   if (!s || s.state === "IDLE") {
     setFooter();

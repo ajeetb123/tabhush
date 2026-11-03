@@ -4,7 +4,7 @@
 
 import { BRAND, CATEGORY_LIST, DESKTOP, OWNER_RULES } from "@lockin/core";
 import type { Settings } from "../shared/types";
-import { call, domainsFrom, getSnapshot, h, onStateChange, setTitle, topbar } from "./common";
+import { call, domainsFrom, getSnapshot, h, onStateChange, playEnter, setTitle, topbar } from "./common";
 
 setTitle("Settings");
 const main = document.querySelector("main")!;
@@ -53,9 +53,9 @@ async function render(): Promise<void> {
   openAuto.addEventListener("click", () => void call({ type: "openPrivacyPane", pane: "automation" }));
 
   const toggle = (label: string, key: "trackAllDay" | "openAtLogin" | "countOtherWork", hint: string) => {
-    const box = h("input", { type: "checkbox", checked: settings[key], disabled: locked });
+    const box = h("input", { type: "checkbox", className: "switch", checked: settings[key], disabled: locked, attrs: { role: "switch", "aria-label": label } });
     box.addEventListener("change", () => void save({ type: "settings", patch: { [key]: box.checked } }));
-    return h("div", { className: "stack tight" }, h("label", { className: "row" }, box, h("span", { textContent: label })), h("p", { className: "muted small", textContent: hint }));
+    return h("label", { className: "setting" }, h("div", { className: "txt" }, h("b", { textContent: label }), h("p", { className: "muted small", textContent: hint })), box);
   };
 
   const finish = h("button", { className: "btn primary block", textContent: "Done, take me to Start" });
@@ -138,4 +138,5 @@ async function render(): Promise<void> {
 }
 
 onStateChange(() => void render());
+playEnter();
 void render();
