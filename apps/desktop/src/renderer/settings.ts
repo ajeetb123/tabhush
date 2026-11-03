@@ -9,12 +9,30 @@ import { call, getSnapshot, h, onStateChange, playEnter, setTitle, topbar } from
 setTitle("Settings");
 const main = document.querySelector("main")!;
 
+/** Q-75: the running version, and "Restart to update" once a new one is downloaded (never mid-session). */
+function versionRow(update: Awaited<ReturnType<typeof getSnapshot>>["update"], version: string | undefined, locked: boolean): HTMLElement {
+  const v = `Tabhush ${version ?? ""}`.trim();
+  const state = update?.state ?? "off";
+  if (state === "ready") {
+    const restart = h("button", { className: "btn primary", textContent: "Restart to update", disabled: locked });
+    restart.addEventListener("click", () => void call({ type: "installUpdate" }));
+    return h(
+      "div",
+      { className: "setting" },
+      h("div", { className: "txt" }, h("b", { textContent: `Version ${update!.version} is ready` }), h("p", { className: "muted small", textContent: locked ? "It installs after your session." : `You have ${v}. It takes a few seconds.` })),
+      restart,
+    );
+  }
+  const note = state === "off" ? "" : state === "downloading" ? "Downloading an update…" : state === "checking" ? "Checking for updates…" : "Up to date. Updates install themselves.";
+  return h("div", { className: "setting" }, h("div", { className: "txt" }, h("b", { textContent: v }), note ? h("p", { className: "muted small", textContent: note }) : null));
+}
+
 function section(title: string, ...children: (Node | null)[]): Node[] {
   return [h("h2", { textContent: title }), h("div", { className: "card stack" }, ...children.filter((c): c is Node => c !== null))];
 }
 
 async function render(): Promise<void> {
-  const { settings, session, permissions, platform } = await getSnapshot();
+  const { settings, session, permissions, platform, update, appVersion } = await getSnapshot();
   const isWin = platform === "win32";
   const locked = session !== null && session.state !== "IDLE" && session.state !== "ENDED";
   const err = h("p", { className: "error", attrs: { role: "alert" } });
@@ -72,6 +90,7 @@ async function render(): Promise<void> {
       h("p", { textContent: "Tabhush only notes which apps and sites you spend your time on, so it can show you your own report and keep distractions away during a session." }),
       h("p", { className: "muted small", textContent: "It all stays on this computer. Nothing is uploaded, sold or shared, and there are no ads or accounts. Uninstalling Tabhush removes it." }),
     ),
+    ...section("Version", versionRow(update, appVersion, locked)),
     err,
     saved,
   ];

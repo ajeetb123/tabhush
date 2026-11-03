@@ -41,5 +41,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Tabhush-Windows
-          path: apps/desktop/release/*.exe
+          # The installer plus the update feed (latest.yml) and the block map for small downloads (Q-75).
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.exe.blockmap
+            apps/desktop/release/latest.yml
           retention-days: 30

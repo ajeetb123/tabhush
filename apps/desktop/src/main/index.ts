@@ -19,6 +19,7 @@ import { Engine } from "./engine";
 import { Judge } from "./judge";
 import { JsonStore } from "./store";
 import { HelperSystem } from "./system";
+import { Updates } from "./updates";
 
 const here = dirname(fileURLToPath(import.meta.url)); // dist/
 const RENDERER = join(here, "renderer");
@@ -50,6 +51,7 @@ let engine: Engine;
 let system: HelperSystem;
 let allowQuit = false;
 let appNapBlock: number | null = null;
+let updates: Updates | null = null;
 
 const pageUrl = (page: string) => `app://tabhush/${page}.html`;
 
@@ -177,6 +179,9 @@ function rebuildMenu(): void {
     { type: "separator" },
     ...(s?.state === "ACTIVE" ? [{ label: "Step away", click: () => void engine.stepAway() }] : []),
     ...(s?.state === "IDLE_PAUSED" ? [{ label: "I’m back", click: () => void engine.resume() }] : []),
+    ...(updates?.status.state === "ready" && !running
+      ? [{ label: `Restart to update (${updates.status.version})`, click: () => void updates?.installNow() }]
+      : []),
     { label: "Settings", click: () => showWindow("settings") },
     { type: "separator" },
     locked
@@ -200,6 +205,7 @@ function quitNow(): void {
 
 function broadcast(): void {
   if (!engine) return; // the engine announces changes while it is still being created
+  updates?.offer(); // an update that waited for the session to end is offered now
   for (const w of BrowserWindow.getAllWindows()) if (w !== embedder && !w.isDestroyed()) w.webContents.send("changed");
   rebuildMenu();
   // DSK-01: no App Nap while a session runs, so tracking and the classifier keep their pace.
@@ -216,7 +222,9 @@ function broadcast(): void {
 async function route(m: UiMessage): Promise<unknown> {
   switch (m.type) {
     case "get":
-      return { ...(await engine.snapshot()), platform: process.platform, helperError: system.lastError };
+      return { ...(await engine.snapshot()), platform: process.platform, helperError: system.lastError, update: updates?.status, appVersion: app.getVersion() };
+    case "installUpdate":
+      return updates?.installNow() ?? false;
     case "start":
       return engine.start();
     case "setTasks":
@@ -343,6 +351,16 @@ app.whenReady().then(() => {
   });
 
   setInterval(() => void engine.tick().catch(() => undefined), DESKTOP.POLL_MS);
+
+  // Q-75: updates on Windows (packaged builds). Never mid-session (INV-14).
+  updates = new Updates({
+    enabled: IS_WIN && !DEV,
+    canInstallNow: () => !engine.session || engine.session.state === "IDLE" || engine.session.state === "ENDED",
+    onChange: () => broadcast(),
+    notify: (title, body) => new Notification({ title, body, silent: true }).show(),
+    log: (line) => appendFile(join(app.getPath("userData"), "tabhush.log"), `${new Date().toISOString()} ${line}\n`, () => undefined),
+  });
+  updates.start();
   void ensureEmbedder();
   broadcast();
 

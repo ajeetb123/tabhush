@@ -26,7 +26,10 @@ if (process.platform !== "darwin") {
 
 // 2. Main process (ESM) and preload (CommonJS, as sandboxed preloads require).
 const common = { bundle: true, platform: "node", target: "node22", external: ["electron"], sourcemap: false, logLevel: "warning" };
-await build({ ...common, entryPoints: [join(root, "src/main/index.ts")], outfile: join(root, "dist/main.js"), format: "esm" });
+// Bundled CommonJS packages (electron-updater and its fs-extra) call require() for Node built-ins;
+// an ES module has no require, so the bundle gets one.
+const requireShim = 'import { createRequire as __tabhushCreateRequire } from "node:module"; const require = __tabhushCreateRequire(import.meta.url);';
+await build({ ...common, entryPoints: [join(root, "src/main/index.ts")], outfile: join(root, "dist/main.js"), format: "esm", banner: { js: requireShim } });
 await build({ ...common, entryPoints: [join(root, "src/preload.ts")], outfile: join(root, "dist/preload.cjs"), format: "cjs" });
 console.log("main    dist/main.js, dist/preload.cjs");
 

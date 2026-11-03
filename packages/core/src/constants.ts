@@ -500,6 +500,11 @@ export const DESKTOP = {
     "Canvas", "Blackboard", "Moodle", "Brightspace", "D2L", "Gradescope", "PrairieLearn", "Piazza", "Ed Discussion",
     "zyBooks", "WebAssign", "Top Hat", "Panopto", "Kaltura", "Schoology", "Google Classroom", "MyLab",
   ],
+  // Q-75: automatic updates (Windows; macOS needs a signed app first).
+  UPDATE_FIRST_CHECK_SEC: 30,
+  UPDATE_CHECK_HOURS: 4,
+  UPDATE_OWNER: "ajeetb123", // public repo holding only installers and the update feed
+  UPDATE_REPO: "tabhush-releases",
   // DSK-10: proctoring starts → enforcement suspends.
   PROCTORING_APP_NAMES: ["LockDown Browser"],
   // Q-70 emergency stop task: retype this exactly (no paste) before the 60 s countdown.

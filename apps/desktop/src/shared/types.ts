@@ -132,6 +132,9 @@ export interface Snapshot {
   helperError?: string | null;
   /** Side tasks named this session (Q-72). */
   otherTasks?: string[];
+  /** Automatic updates (Q-75) and the running version. */
+  update?: { state: "off" | "idle" | "checking" | "downloading" | "ready" | "error"; version: string | null };
+  appVersion?: string;
 }
 
 export type UiMessage =
@@ -155,4 +158,5 @@ export type UiMessage =
   | { type: "requestAccessibility" }
   | { type: "openPrivacyPane"; pane: "accessibility" | "automation" }
   | { type: "reopen"; index: number }
-  | { type: "open"; page: "session" | "report" | "settings" };
+  | { type: "open"; page: "session" | "report" | "settings" }
+  | { type: "installUpdate" };
