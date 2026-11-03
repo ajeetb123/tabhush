@@ -106,7 +106,9 @@ foreach ($case in @(@{ on = $false; expect = $false }, @{ on = $true; expect = $
   [void]$g.StandardOutput.ReadLine()
   $g.StandardInput.Close()
   [void]$g.WaitForExit(10000)
-  Start-Sleep -Seconds 3
+  # Starting the reopened app can take a while on a busy machine: wait up to 20 s for its marker.
+  $deadline = (Get-Date).AddSeconds($(if ($case.expect) { 20 } else { 6 }))
+  while ((Get-Date) -lt $deadline -and -not (Test-Path $marker)) { Start-Sleep -Milliseconds 250 }
   Check "relaunch guard on=$($case.on)" ((Test-Path $marker) -eq $case.expect)
 }
 
