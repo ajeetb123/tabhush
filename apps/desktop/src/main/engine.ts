@@ -341,7 +341,10 @@ export class Engine {
       const s = this.session;
       if (s?.state !== "SWEEP_PREVIEW") return;
       // Q-78: up to MAX_TASKS_PER_SESSION tasks, deduplicated.
-      const labels = [...new Map(labelsIn.filter((l) => normalizeLabel(l)).map((l) => [normalizeLabel(l), l.trim()])).values()].slice(0, OWNER_RULES.MAX_TASKS_PER_SESSION);
+      // The first spelling of a task wins ("Calc" stays "Calc" when "CALC!" is added again).
+      const byName = new Map<string, string>();
+      for (const l of labelsIn) if (normalizeLabel(l) && !byName.has(normalizeLabel(l))) byName.set(normalizeLabel(l), l.trim());
+      const labels = [...byName.values()].slice(0, OWNER_RULES.MAX_TASKS_PER_SESSION);
       const chosen: Task[] = [];
       for (const l of labels) {
         const t = await this.resolveOrCreate(l);
@@ -359,6 +362,7 @@ export class Engine {
     s.preview = [];
     const task = await this.sessionTask(s);
     s.taskLabel = task?.label ?? null;
+    s.taskLabels = task ? task.members.map((m) => m.label) : [];
     if (!task) return;
     let i = 0;
     for (const tab of tabs) {

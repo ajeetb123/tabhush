@@ -71,6 +71,7 @@ export class HelperSystem implements System {
     private readonly binary: string,
     private readonly args: string[],
     private readonly env: { idleSeconds: () => number; notify: (title: string, body: string) => void; log?: (line: string) => void },
+    private readonly spawnEnv?: NodeJS.ProcessEnv,
   ) {}
 
   private ensure(): ChildProcessWithoutNullStreams | null {
@@ -78,7 +79,7 @@ export class HelperSystem implements System {
     // A helper that keeps failing is retried every 30 s, not on every poll.
     if (Date.now() < this.retryAfter) return null;
     const started = Date.now();
-    const proc = spawn(this.binary, this.args, { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+    const proc = spawn(this.binary, this.args, { stdio: ["pipe", "pipe", "pipe"], windowsHide: true, ...(this.spawnEnv ? { env: this.spawnEnv } : {}) });
     createInterface({ input: proc.stdout }).on("line", (line) => {
       try {
         const r = JSON.parse(line.replace(/^\uFEFF/, "")) as Reply;

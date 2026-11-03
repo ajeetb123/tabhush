@@ -65,7 +65,7 @@ function idleView(snap: Snapshot): Node[] {
  * with a click, and their small × forgets a task you don't want suggested again (a typo, a test).
  */
 function tasksCard(s: Session): HTMLElement {
-  const labels = s.taskLabel ? s.taskLabel.split(" + ") : [];
+  const labels = s.taskLabels ?? (s.taskLabel ? s.taskLabel.split(" + ") : []);
   const max = OWNER_RULES.MAX_TASKS_PER_SESSION;
   const setTasks = (next: string[]) => void call({ type: "setTasks", labels: next });
   const mine = labels.map((l) => {

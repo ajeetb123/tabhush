@@ -16,6 +16,7 @@ export interface SessionLike {
   id: string;
   taskIds: string[];
   taskLabel: string | null;
+  taskLabels?: string[];
   committedAt: number | null;
   endedAt: number | null;
   goalMin: number | null;
@@ -32,6 +33,7 @@ export function asSessionLike(s: Session): SessionLike {
     id: s.id,
     taskIds: s.taskIds ?? [],
     taskLabel: s.taskLabel,
+    ...(s.taskLabels?.length ? { taskLabels: s.taskLabels } : {}),
     committedAt: s.committedAt,
     endedAt: s.endedAt,
     goalMin: s.goalMin ?? null,
@@ -150,7 +152,8 @@ export function focusSplit(s: SessionLike, now: number, from = -Infinity, to = I
 
 /** The tasks a session was for, by name ("A + B" is two tasks, Q-78). */
 export function sessionTasks(s: SessionLike): string[] {
-  return (s.taskLabel ?? "Untitled").split(" + ").map((t) => t.trim()).filter(Boolean);
+  if (s.taskLabels?.length) return s.taskLabels;
+  return (s.taskLabel ?? "Untitled").split(" + ").map((t) => t.trim()).filter(Boolean); // older sessions
 }
 
 /** A task's default color, from its name (used where only one task is shown). */
@@ -245,7 +248,18 @@ export interface DayReport {
   insight: string;
 }
 
-export function dayReport(sessions: SessionLike[], now: number): DayReport {
+/** Colors for every task in the history, the most-worked task first, so a task looks the same on every tab. */
+export function historyPalette(sessions: readonly SessionLike[], now: number): Map<string, string> {
+  const totals = new Map<string, { label: string; ms: number }>();
+  for (const s of sessions) for (const p of productiveParts(s, now)) {
+    const t = totals.get(p.key) ?? { label: p.label, ms: 0 };
+    t.ms += p.ms;
+    totals.set(p.key, t);
+  }
+  return paletteFor([...totals.values()].sort((a, b) => b.ms - a.ms).map((t) => t.label));
+}
+
+export function dayReport(sessions: SessionLike[], now: number, palette?: Map<string, string>): DayReport {
   const from = dayStart(now);
   const to = from + MS.DAY;
   const today = sessions.filter((s) => s.committedAt !== null && s.committedAt < to && (s.endedAt ?? now) > from);
@@ -282,9 +296,9 @@ export function dayReport(sessions: SessionLike[], now: number): DayReport {
 
   // Every task in the day gets its own color, in the strip and the rows alike.
   const ordered = [...rows.values()].sort((a, b) => b.onMs - a.onMs);
-  const palette = paletteFor(ordered.map((r) => r.label));
-  for (const r of ordered) r.color = palette.get(r.label.toLowerCase()) ?? r.color;
-  for (const seg of segments) seg.color = palette.get(seg.label.toLowerCase()) ?? seg.color;
+  const colors = palette ?? paletteFor(ordered.map((r) => r.label));
+  for (const r of ordered) r.color = colors.get(r.label.toLowerCase()) ?? r.color;
+  for (const seg of segments) seg.color = colors.get(seg.label.toLowerCase()) ?? seg.color;
 
   return {
     focusedMs: on,
@@ -322,7 +336,7 @@ export interface WeekDay {
   totalMs: number;
 }
 
-export function weekReport(sessions: SessionLike[], now: number): { days: WeekDay[]; insight: string; totalMs: number } {
+export function weekReport(sessions: SessionLike[], now: number, palette?: Map<string, string>): { days: WeekDay[]; insight: string; totalMs: number } {
   const todayStart = dayStart(now);
   const days: WeekDay[] = [];
   const byPart = new Map<string, number>();
@@ -350,7 +364,7 @@ export function weekReport(sessions: SessionLike[], now: number): { days: WeekDa
   }
   const weekTotals = new Map<string, number>();
   for (const d of days) for (const p of d.parts) weekTotals.set(p.label, (weekTotals.get(p.label) ?? 0) + p.onMs);
-  const weekPalette = paletteFor([...weekTotals.entries()].sort((a, b) => b[1] - a[1]).map(([l]) => l));
+  const weekPalette = palette ?? paletteFor([...weekTotals.entries()].sort((a, b) => b[1] - a[1]).map(([l]) => l));
   for (const d of days) for (const p of d.parts) p.color = weekPalette.get(p.label.toLowerCase()) ?? p.color;
   const totalMs = days.reduce((a, d) => a + d.totalMs, 0);
   const best = [...byPart.entries()].sort((a, b) => b[1] - a[1])[0];

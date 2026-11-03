@@ -46,6 +46,12 @@ npm start
 `npm start` builds and opens the app in development mode. A development build can always end a session and quit (Q-69, Q-70); a packaged build can't while a session is locked.
 
 ```bash
+npm run e2e -w @tabhush/desktop
+```
+
+`npm run e2e` builds and runs the real app against a simulated set of apps and tabs (nothing on your computer is touched, its data goes to a temporary folder) and clicks through the main flows as the owner and as a regular user (Q-79). Its windows appear briefly without taking focus.
+
+```bash
 npm run dist
 ```
 

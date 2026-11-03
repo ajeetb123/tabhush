@@ -16,7 +16,8 @@
     "build-lexicons": "node ../../scripts/build-lexicons.mjs",
     "icons": "node ../../scripts/make-icons.mjs",
     "dist:win": "npm run build && electron-builder --win --publish never",
-    "release:win": "node ../../scripts/release-win.mjs"
+    "release:win": "node ../../scripts/release-win.mjs",
+    "e2e": "npm run build && node e2e/run.mjs"
   },
   "devDependencies": {
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",

@@ -65,6 +65,8 @@ export interface Session {
   startedAt: number;
   taskIds: string[];
   taskLabel: string | null;
+  /** The session's tasks by name, in order (Q-78). A name may itself contain " + ". */
+  taskLabels?: string[];
   /** Other recent tasks offered as chips on the start screen (Q-64). */
   suggestions: { taskId: string; label: string }[];
   goalMin: number | null;

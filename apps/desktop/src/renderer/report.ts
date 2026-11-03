@@ -4,7 +4,7 @@
 import { MS } from "@tabhush/core";
 import type { ActivitySegment, Session } from "../shared/types";
 import { animateNumber, avatar, call, formatDuration, getSnapshot, h, onStateChange, playEnter, setMood, setTitle, topbar } from "./common";
-import { activityBlocks, activityTotals, appBreakdown, asSessionLike, dayReport, dayStart, formatHm, sessionTasks, taskColor, weekReport, type SessionLike } from "./reportData";
+import { activityBlocks, activityTotals, appBreakdown, asSessionLike, dayReport, dayStart, formatHm, historyPalette, sessionTasks, taskColor, weekReport, type SessionLike } from "./reportData";
 import { endLabel, sessionDetail } from "./sessionDetail";
 
 setTitle("Your focus");
@@ -128,8 +128,8 @@ function hourLabel(t: number): string {
   return new Date(t).toLocaleTimeString(undefined, { hour: "numeric" }).replace(/\s/g, "").toLowerCase();
 }
 
-function todayView(sessions: SessionLike[], now: number): Node[] {
-  const r = dayReport(sessions, now);
+function todayView(sessions: SessionLike[], now: number, palette: Map<string, string>): Node[] {
+  const r = dayReport(sessions, now, palette);
   const span = r.strip.endMs - r.strip.startMs;
   const strip = h("div", { className: "strip", attrs: { role: "img", "aria-label": `Sessions today: ${r.strip.segments.map((s) => s.label).join(", ") || "none"}` } });
   for (const seg of r.strip.segments) {
@@ -170,8 +170,8 @@ function todayView(sessions: SessionLike[], now: number): Node[] {
   ];
 }
 
-function weekView(sessions: SessionLike[], now: number): Node[] {
-  const w = weekReport(sessions, now);
+function weekView(sessions: SessionLike[], now: number, palette: Map<string, string>): Node[] {
+  const w = weekReport(sessions, now, palette);
   const max = Math.max(...w.days.map((d) => d.totalMs), MS.HOUR);
   const bars = h("div", { className: "weekbars", attrs: { role: "img", "aria-label": `Focused time per day this week, ${formatHm(w.totalMs)} in total` } });
   for (const d of w.days) {
@@ -188,7 +188,7 @@ function weekView(sessions: SessionLike[], now: number): Node[] {
 
 const openIds = new Set<string>(); // expanded sessions survive a re-render
 
-function sessionsView(sessions: SessionLike[], now: number): Node[] {
+function sessionsView(sessions: SessionLike[], now: number, palette: Map<string, string>): Node[] {
   const list = [...sessions].filter((s) => s.committedAt !== null).sort((a, b) => b.committedAt! - a.committedAt!);
   if (!list.length) return [h("div", { className: "empty", textContent: "Your sessions will show up here." })];
   return list.map((s) => {
@@ -199,7 +199,7 @@ function sessionsView(sessions: SessionLike[], now: number): Node[] {
     const row = h(
       "summary",
       { className: "sess" },
-      h("span", { className: "dots" }, ...sessionTasks(s).map((t) => h("span", { className: "dot", title: t, attrs: { style: `background:${taskColor(t)}` } }))),
+      h("span", { className: "dots" }, ...sessionTasks(s).map((t) => h("span", { className: "dot", title: t, attrs: { style: `background:${palette.get(t.toLowerCase()) ?? taskColor(t)}` } }))),
       h("div", {}, h("div", { textContent: s.taskLabel ?? "Untitled" }), h("div", { className: "meta" }, `${when} · ${s.blockEvents.length} blocked `, status)),
       h("div", { className: "right" }, h("div", { textContent: formatHm(len) }), h("div", { className: "meta", textContent: s.goalMin ? `goal ${s.goalMin}m` : "" })),
     );
@@ -255,8 +255,10 @@ async function render(entrance = false): Promise<void> {
     update();
     tick = window.setInterval(update, MS.SECOND);
   }
+  // One color per task across every tab (Q-78).
+  const palette = historyPalette(all, now);
   const body =
-    tab === "today" ? todayView(all, now) : tab === "activity" ? await activityView(now, all) : tab === "week" ? weekView(all, now) : sessionsView(all, now);
+    tab === "today" ? todayView(all, now, palette) : tab === "activity" ? await activityView(now, all) : tab === "week" ? weekView(all, now, palette) : sessionsView(all, now, palette);
   main.replaceChildren(
     topbar(),
     h("h1", { textContent: "Your focus" }),

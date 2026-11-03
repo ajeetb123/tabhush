@@ -9,14 +9,22 @@ import { call, getSnapshot, h, onStateChange, playEnter, setTitle, topbar } from
 setTitle("Settings");
 const main = document.querySelector("main")!;
 
+/** What the last Clear history said; kept across the redraw that clearing causes. */
+let freshNote = "";
+
 /** Q-78: clears the history (a first try, tests, mistakes). Settings and permissions stay. */
 function startFresh(locked: boolean): HTMLElement {
   const clear = h("button", { className: "btn danger", textContent: "Clear history", disabled: locked });
-  const done = h("p", { className: "muted small", attrs: { role: "status" } });
+  const done = h("p", { className: "muted small", textContent: freshNote, attrs: { role: "status" } });
   clear.addEventListener("click", () => {
     if (!window.confirm("Clear your whole history? Sessions, the activity log and saved tasks are deleted. Settings stay. This can’t be undone.")) return;
-    void call<boolean>({ type: "clearHistory" }).then((ok) => (done.textContent = ok ? "History cleared." : "Finish your session first."));
+    void call<boolean>({ type: "clearHistory" }).then((ok) => {
+      freshNote = ok ? "History cleared." : "Finish your session first.";
+      done.textContent = freshNote;
+      document.querySelectorAll<HTMLElement>(".fresh-note").forEach((el) => (el.textContent = freshNote));
+    });
   });
+  done.classList.add("fresh-note");
   return h(
     "div",
     { className: "setting" },

@@ -7,7 +7,7 @@
 
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, net, Notification, powerMonitor, powerSaveBlocker, protocol, shell, Tray } from "electron";
 import { execFile } from "node:child_process";
-import { appendFile, existsSync } from "node:fs";
+import { appendFile, existsSync, readFileSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { BRAND, DESKTOP, EMBEDDING, MS, OWNER_RULES, EXITS, goalReached } from "@tabhush/core";
@@ -23,12 +23,29 @@ import { Updates } from "./updates";
 
 const here = dirname(fileURLToPath(import.meta.url)); // dist/
 const RENDERER = join(here, "renderer");
-const DEV = !app.isPackaged;
+// End-to-end test mode (e2e/run.mjs): only when these variables are set at launch, never in normal
+// use. A simulated OS helper and world, its own data folder, and notifications and reopened items
+// written to a log instead of shown. TABHUSH_AS_USER=1 makes a development run behave like an install.
+const TEST = process.env.TABHUSH_TEST_HELPER
+  ? { helper: process.env.TABHUSH_TEST_HELPER, world: process.env.TABHUSH_TEST_WORLD ?? "", log: process.env.TABHUSH_TEST_LOG ?? "" }
+  : null;
+if (TEST && process.env.TABHUSH_USER_DATA) app.setPath("userData", process.env.TABHUSH_USER_DATA);
+const testLog = (line: string) => TEST?.log && appendFile(TEST.log, `${JSON.stringify({ at: Date.now(), ...JSON.parse(line) })}\n`, () => undefined);
+const testIdle = (): number => {
+  try {
+    return Number((JSON.parse(readFileSync(TEST!.world, "utf8")) as { idle?: number }).idle ?? 0);
+  } catch {
+    return 0;
+  }
+};
+
+const DEV = !app.isPackaged && !(TEST && process.env.TABHUSH_AS_USER === "1");
 const IS_WIN = process.platform === "win32";
 const SELF_BUNDLE_ID = IS_WIN ? (DEV ? "electron.exe" : "tabhush.exe") : DEV ? "com.github.Electron" : "com.tabhush.app";
 
 /** The OS layer: the Swift helper on macOS, a PowerShell script on Windows (Q-71). */
-function helperCommand(): { binary: string; args: string[] } {
+function helperCommand(): { binary: string; args: string[]; env?: NodeJS.ProcessEnv } {
+  if (TEST) return { binary: process.execPath, args: [TEST.helper, TEST.world, TEST.log], env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } };
   if (IS_WIN) {
     const script = DEV ? join(here, "..", "native", "helper-win.ps1") : join(process.resourcesPath, "tabhush-helper.ps1");
     const args = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script];
@@ -74,14 +91,17 @@ function showWindow(page: "session" | "report" | "settings" = "session"): void {
         main?.hide();
       }
     });
-    main.once("ready-to-show", () => main?.show());
+    // In test mode windows appear without taking focus, so keys and clicks meant for other apps never land in them.
+    main.once("ready-to-show", () => (TEST ? main?.showInactive() : main?.show()));
     main.on("session-end", allowSessionEnd);
     void main.loadURL(pageUrl(page));
   } else {
     const current = main.webContents.getURL();
     if (!current.endsWith(`/${page}.html`)) void main.loadURL(pageUrl(page));
-    main.show();
+    if (TEST) main.showInactive();
+    else main.show();
   }
+  if (TEST) return;
   main.focus();
   app.focus({ steal: true });
 }
@@ -253,7 +273,7 @@ async function route(m: UiMessage): Promise<unknown> {
       return engine.addOtherTask(m.label);
     case "settings": {
       const next = engine.setSettings(m.patch);
-      if (!DEV) app.setLoginItemSettings({ openAtLogin: next.openAtLogin });
+      if (!DEV && !TEST) app.setLoginItemSettings({ openAtLogin: next.openAtLogin });
       return next;
     }
     case "sessions":
@@ -288,6 +308,7 @@ async function route(m: UiMessage): Promise<unknown> {
 
 /** Opens a closed tab in the default browser, or a quit app from where it's installed. */
 async function reopen(r: { url?: string; bundleId?: string; path?: string }): Promise<void> {
+  if (TEST) return void testLog(JSON.stringify({ reopen: r }));
   if (r.url) return void (await shell.openExternal(r.url).catch(() => undefined));
   if (r.path) return void (await shell.openPath(r.path));
   if (r.bundleId && !IS_WIN) execFile("/usr/bin/open", ["-b", r.bundleId], () => undefined);
@@ -315,11 +336,11 @@ app.whenReady().then(() => {
   if (IS_WIN) app.setAppUserModelId(SELF_BUNDLE_ID); // notifications need it on Windows
   const helper = helperCommand();
   system = new HelperSystem(helper.binary, helper.args, {
-    idleSeconds: () => powerMonitor.getSystemIdleTime(),
-    notify: (title, body) => new Notification({ title, body, silent: true }).show(),
+    idleSeconds: () => (TEST ? testIdle() : powerMonitor.getSystemIdleTime()),
+    notify: (title, body) => (TEST ? testLog(JSON.stringify({ notify: title })) : new Notification({ title, body, silent: true }).show()),
     // Helper problems go to tabhush.log in the app's data folder (for testers to send).
     log: (line) => appendFile(join(app.getPath("userData"), "tabhush.log"), `${new Date().toISOString()} ${line}\n`, () => undefined),
-  });
+  }, helper.env);
   const judge = new Judge({
     embed,
     categories,
@@ -341,7 +362,7 @@ app.whenReady().then(() => {
     setRelaunch: (on) => system.setRelaunchFlag(on),
   });
 
-  if (!DEV) app.setLoginItemSettings({ openAtLogin: engine.settings.openAtLogin });
+  if (!DEV && !TEST) app.setLoginItemSettings({ openAtLogin: engine.settings.openAtLogin });
 
   // macOS: a template glyph with the timer beside it. Windows: the color icon, timer in the tooltip.
   const icon = nativeImage.createFromPath(join(RENDERER, "icons", IS_WIN ? "icon-32.png" : "trayTemplate.png"));

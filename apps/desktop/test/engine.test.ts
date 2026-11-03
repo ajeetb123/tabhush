@@ -724,3 +724,28 @@ describe("mistakes (Q-78)", () => {
     expect(e.session!.suggestions).toEqual([]);
   });
 });
+
+describe("task names (Q-78 edge)", () => {
+  it("a task name with ' + ' in it stays one task", async () => {
+    const e = make();
+    await e.start();
+    await e.setTasks(["C + Python homework", "Calc"]);
+    expect(e.session!.taskLabels).toEqual(["C + Python homework", "Calc"]);
+    await e.confirm(25);
+    sys.frontNow = chromeTab("https://docs.google.com/document/d/5/edit", "C + Python homework notes");
+    for (let i = 0; i < 5; i++) {
+      await e.tick();
+      clock.advance(MS.SECOND);
+    }
+    const labels = productiveParts(asSessionLike(e.session!), clock.t).map((p) => p.label);
+    expect(labels).toContain("C + Python homework");
+    expect(labels).not.toContain("C");
+  });
+
+  it("duplicate and blank task names are dropped", async () => {
+    const e = make();
+    await e.start();
+    await e.setTasks(["Calc", "calc", "  ", "CALC!"]);
+    expect(e.session!.taskLabels).toEqual(["Calc"]);
+  });
+});
