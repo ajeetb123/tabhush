@@ -6,6 +6,7 @@ import {
   cacheKey,
   cosine,
   DESKTOP,
+  hostMatchesAny,
   isDistractingPage,
   isDistractingSearch,
   itemDomain,
@@ -20,13 +21,14 @@ import {
   relatedness,
   searchQuery,
   shippedCategory,
+  THRESHOLDS,
   tier1,
   VerdictCache,
   type Decision,
   type ItemKey,
   type Task,
 } from "@tabhush/core";
-import { appKind, isSchoolPage, looksLikeGame, type AppKind } from "./apps";
+import { appKind, isCareerTask, isJobSearch, isSchoolPage, looksLikeGame, namesTask, type AppKind } from "./apps";
 import type { Categories } from "./categories";
 import type { AppInfo } from "./system";
 
@@ -84,9 +86,11 @@ export class Judge {
     return this.topics;
   }
 
-  private taskS(task: SessionTask, v: number[]): number {
+  /** The best match among the session's tasks; a text naming a task is related whatever the model says (Q-82). */
+  private taskS(task: SessionTask, v: number[], text: string): number {
     const scored = task.members.filter((m) => m.labelVector).map((m) => relatedness(v, { label: m.labelVector!, prototypes: m.prototypes.map((p) => p.vector) }));
-    return scored.length ? Math.max(...scored) : 0;
+    const best = scored.length ? Math.max(...scored) : 0;
+    return task.members.some((m) => namesTask(text, m.label)) ? Math.max(best, THRESHOLDS.ALLOW_MIN_S) : best;
   }
 
   /** Q-64/Q-65: a search query or a page/window title that is about a distraction topic, not the task. */
@@ -95,7 +99,7 @@ export class Judge {
       const v = await this.vector(text);
       const t = await this.topicVectors();
       const best = (vs: number[][]) => Math.max(...vs.map((x) => cosine(v, x)));
-      const scores = { distraction: best(t.distraction), work: best(t.work), task: this.taskS(task, v) };
+      const scores = { distraction: best(t.distraction), work: best(t.work), task: this.taskS(task, v, text) };
       const hit = kind === "search" ? isDistractingSearch(scores) : isDistractingPage(scores);
       return hit ? { action: "park", source: kind === "search" ? "search_topic" : "page_topic", s: scores.task } : null;
     } catch {
@@ -105,6 +109,10 @@ export class Judge {
 
   /** A browser page with a known URL. */
   async page(task: SessionTask, url: string, title: string): Promise<Verdict> {
+    // Q-82: LinkedIn and the like stay open while a task is about internships, jobs or careers.
+    if (hostMatchesAny(parseUrl(url)?.host ?? "", DESKTOP.CAREER_SITES) && task.members.some((m) => isCareerTask(m.label))) {
+      return { action: "allow", source: "career" };
+    }
     const key: ItemKey = itemKeyFor(url) ?? { kind: "page", value: url };
     const t1 = tier1(url, {
       essentials: this.d.essentials(),
@@ -120,7 +128,8 @@ export class Judge {
     if (cached?.decision && t1.kind === "none") return { action: cached.decision, source: "cache" };
 
     const q = searchQuery(url);
-    if (q !== null && t1.kind !== "never_locked" && t1.kind !== "essential") {
+    // Q-82: a search about a job ("netflix internship application") is never a distraction search.
+    if (q !== null && t1.kind !== "never_locked" && t1.kind !== "essential" && !isJobSearch(q)) {
       const v = await this.byTopic(task, q, "search");
       if (v) {
         await this.cache.record(task.id, key, { decision: "park" });
@@ -141,7 +150,10 @@ export class Judge {
         tier1: t1,
         overridden: false, // Q-63: no overrides
         cache: this.cache,
-        relatedness: async () => this.taskS(task, await this.vector(itemText(title, itemDomain(url) ?? ""))),
+        relatedness: async () => {
+          const text = itemText(title, itemDomain(url) ?? "");
+          return this.taskS(task, await this.vector(text), text);
+        },
         memory: async () => null,
         tier3: null, // Q-61: no LLM
         onDeviceParkingPath: true,

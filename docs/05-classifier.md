@@ -45,6 +45,7 @@ The cheapest sure tier decides. Only unseen middle-confidence items reach the LL
 - Never prototypes: items merely allowed because no tier was sure (allow-and-flag); a YouTube home page left in the front window; anything not positively confirmed.
 - During the session, accepted items join. An **accepted override joins only after the 3-active-minute rule** (CLS-62).
 - Rationale: tasks are multimodal and relatedness is often about tools (Stack Overflow, Desmos, ChatGPT, search) more than wording. **Never average into one task vector.**
+- **Owner change 2026-11-03 (Q-82):** with several tasks in a session, an item's example goes to the task its time counted for, not the task with the closest name. Job applications (recognized by address and title) count for a task named as applying, and a title that names a task (every word but filler) counts for that task and is related to it whatever the model says.
 
 ### CLS-33 Relatedness score
 ```
@@ -85,6 +86,7 @@ A task that names a mixed site suspends that site's **domain-wide pre-block** on
 
 ### CLS-21 On-device-only parking path [beta2]
 Used whenever tier 3 is unavailable: on-device only mode, declined consent, under-age, or past the free daily cap.
+**Owner change 2026-11-03 (Q-82):** LinkedIn (UT1 social) is never parked while a session task is about internships, jobs or careers, and a search with a job word is never a distraction search.
 ```
 PARK iff  s < 0.25
      AND  category ∈ {entertainment, social, games, shopping}

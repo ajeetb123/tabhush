@@ -82,6 +82,8 @@ export interface Session {
   idleSince: number | null;
   /** Tabs and apps closed by a block, to reopen at the end (LOOP-07). */
   restoreList: { url?: string; bundleId?: string; path?: string; title: string; reason: "closed" | "quit" }[];
+  /** Start items the user unticked: they stay open all session (Q-63). Tab addresses and app IDs. */
+  kept?: string[];
   /** Music app volumes before the session lowered them (Q-63), restored at the end. */
   musicVolumes: Record<string, number>;
   suspensions: string[];

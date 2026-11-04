@@ -4,7 +4,7 @@
 
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
-import { DESKTOP } from "@tabhush/core";
+import { DESKTOP, OWNER_RULES, parseUrl } from "@tabhush/core";
 import type { AppInfo } from "./system";
 
 export type AppKind = "system" | "browser" | "proctoring" | "tool" | "music" | "meeting" | "distraction" | "other";
@@ -84,4 +84,53 @@ export function isSchoolPage(host: string, title: string): boolean {
   if (DESKTOP.SCHOOL_HOST_SUFFIXES.some((s) => h.endsWith(s)) || schoolHost.test(h)) return true;
   const site = title.split(/\s[|–—-]\s/).pop()?.trim() ?? "";
   return title.includes(" ") && DESKTOP.SCHOOL_TITLE_MARKERS.some((m) => site === m || site.startsWith(`${m} `) || site.endsWith(` ${m}`));
+}
+
+/** Lowercase words of a text, joined by single spaces and padded, for whole-word lookups. */
+const wordLine = (text: string): string => ` ${text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean).join(" ")} `;
+const hasWord = (text: string, list: readonly string[]): boolean => {
+  const line = wordLine(text);
+  return list.some((w) => line.includes(` ${w} `));
+};
+
+/**
+ * Is this page part of applying for a job (Q-82)? From its address (an applicant-tracking site
+ * such as Workday, Greenhouse or Lever, a host with a jobs word in it, a jobs path) or its title.
+ */
+export function isJobPage(url: string, title = ""): boolean {
+  const u = parseUrl(url);
+  if (!u) return isJobTitle(title);
+  if (DESKTOP.JOB_HOST_SUFFIXES.some((s) => u.host === s || u.host.endsWith(`.${s}`))) return true;
+  if (u.host.split(".").slice(0, -1).some((label) => DESKTOP.JOB_HOST_WORDS.some((w) => label.includes(w)))) return true;
+  const path = u.path.toLowerCase();
+  return DESKTOP.JOB_PATH_PREFIXES.some((p) => (p.endsWith("/") ? path.startsWith(p) : path === p || path.startsWith(`${p}/`))) || isJobTitle(title);
+}
+
+/** A window or page title about applying: "… - Dell Careers", "Job Application Questions", a résumé (Q-82). */
+export function isJobTitle(title: string): boolean {
+  const site = wordLine(title.split(/\s[|–—-]\s/).pop() ?? "");
+  return DESKTOP.JOB_SITE_NAME_ENDINGS.some((w) => site.endsWith(` ${w} `)) || hasWord(title, DESKTOP.JOB_TITLE_WORDS);
+}
+
+/** A task about applying ("applying for internships", "job search"); job pages count for it (Q-82). */
+export function isApplyingTask(label: string): boolean {
+  return hasWord(label, DESKTOP.APPLYING_TASK_WORDS);
+}
+
+/** A task about internships, jobs or careers; it keeps LinkedIn and job searches open (Q-82). */
+export function isCareerTask(label: string): boolean {
+  return hasWord(label, DESKTOP.CAREER_TASK_WORDS);
+}
+
+/** A search about a job ("netflix internship application"), never a distraction search (Q-82). */
+export function isJobSearch(query: string): boolean {
+  return hasWord(query, DESKTOP.JOB_SEARCH_WORDS) || DESKTOP.JOB_SEARCH_PREFIXES.some((p) => wordLine(query).includes(` ${p}`));
+}
+
+/** Does the text name the task, every word of it but filler ("LeetCode patterns" for "leetcode")? (Q-82) */
+export function namesTask(text: string, label: string): boolean {
+  const need = wordLine(label).trim().split(" ").filter((w) => w && !(OWNER_RULES.LABEL_FILLER_WORDS as readonly string[]).includes(w));
+  if (!need.length) return false;
+  const line = wordLine(text);
+  return need.every((w) => line.includes(` ${w} `));
 }

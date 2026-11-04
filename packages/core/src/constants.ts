@@ -322,6 +322,9 @@ export const OWNER_RULES = {
     "play free online games",
     "video game guides and esports",
   ],
+  // Q-82: a page whose title names the task (every word of it, leaving out these) is related,
+  // whatever the model says ("leetcode" is opaque to it).
+  LABEL_FILLER_WORDS: ["a", "an", "the", "for", "of", "to", "and", "on", "in", "my", "with", "at"],
   SEARCH_WORK_TOPICS: [
     "programming and software",
     "computer science",
@@ -505,6 +508,32 @@ export const DESKTOP = {
     "Canvas", "Blackboard", "Moodle", "Brightspace", "D2L", "Gradescope", "PrairieLearn", "Piazza", "Ed Discussion",
     "zyBooks", "WebAssign", "Top Hat", "Panopto", "Kaltura", "Schoology", "Google Classroom", "MyLab",
   ],
+  // Q-82: job applications are recognized by their address: an applicant-tracking site, a host
+  // with one of the words in it (apply.careers.microsoft.com, earlycareerradar.com), or a jobs path.
+  JOB_HOST_SUFFIXES: [
+    "myworkdayjobs.com", "greenhouse.io", "lever.co", "jibeapply.com", "icims.com", "smartrecruiters.com", "ashbyhq.com",
+    "workable.com", "taleo.net", "successfactors.com", "jobvite.com", "bamboohr.com", "eightfold.ai", "joinhandshake.com",
+    "simplify.jobs", "wellfound.com", "indeed.com", "glassdoor.com", "ziprecruiter.com",
+  ],
+  JOB_HOST_WORDS: ["career", "jobs", "apply", "recruit", "talent", "hiring"],
+  JOB_PATH_PREFIXES: ["/jobs", "/careers", "/job/", "/apply"],
+  // ...or by title: a site name ending in one of these ("Dell Careers"), or one of these phrases
+  // (a résumé open in Preview counts too).
+  JOB_SITE_NAME_ENDINGS: ["careers", "jobs"],
+  JOB_TITLE_WORDS: ["job application", "my applications", "submit application", "candidate home", "resume", "cover letter"],
+  // Q-82: a task named with one of these is about applying; job pages count for it.
+  APPLYING_TASK_WORDS: ["apply", "applying", "application", "applications", "job search", "job hunt", "job hunting", "recruiting"],
+  // Q-82: a task about internships, jobs or careers keeps CAREER_SITES open (LinkedIn is in UT1's
+  // social list), and job searches are never distraction searches.
+  CAREER_TASK_WORDS: [
+    "apply", "applying", "application", "applications", "intern", "internship", "internships", "job", "jobs", "career",
+    "careers", "resume", "interview", "interviews", "networking", "recruiting", "recruiter",
+  ],
+  CAREER_SITES: ["linkedin.com"],
+  // Q-82: "netflix internship application" is about a job, not Netflix. Words, then word starts
+  // (so typos like "applicaiton" still count).
+  JOB_SEARCH_WORDS: ["intern", "interns", "internship", "internships", "career", "careers", "job", "jobs", "hiring", "recruiting", "recruiter", "resume", "interview", "new grad"],
+  JOB_SEARCH_PREFIXES: ["appli"],
   // Q-75: automatic updates (Windows; macOS needs a signed app first).
   UPDATE_FIRST_CHECK_SEC: 30,
   UPDATE_CHECK_HOURS: 4,

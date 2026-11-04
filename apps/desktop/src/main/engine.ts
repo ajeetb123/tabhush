@@ -44,7 +44,7 @@ import {
 import type { EndAccess, EndKind, FocusEntry, FrontItem, PreviewItem, Session, Settings, Snapshot } from "../shared/types";
 import { asSessionLike, dayStart, focusSplit, offClockMs } from "../shared/reportData";
 import type { ActivityLog } from "./activity";
-import { appKind, browserKind, stripBrowserSuffix, titleExcluded } from "./apps";
+import { appKind, browserKind, isApplyingTask, isJobPage, isJobTitle, namesTask, stripBrowserSuffix, titleExcluded } from "./apps";
 import type { Categories } from "./categories";
 import type { Embed, Judge, SessionTask, Verdict } from "./judge";
 import type { JsonStore } from "./store";
@@ -111,6 +111,9 @@ function apply(s: Session, event: SessionEvent): void {
   if (next === null) throw new Error(`invalid transition ${s.state} --${event.type}-->`);
   s.state = next;
 }
+
+/** What an unticked Start item is remembered by: a tab's exact address or an app's ID (Q-63). */
+const keptKey = (kind: PreviewItem["kind"], id: string): string => `${kind}:${id}`;
 
 const combine = (members: Task[]): SessionTask =>
   members.length === 1
@@ -395,6 +398,8 @@ export class Engine {
       const s = this.session;
       if (s?.state !== "SWEEP_PREVIEW" || s.taskIds.length === 0) return;
       s.goalMin = clampGoal(goalMin);
+      // Q-63: what you untick here stays open for the whole session.
+      s.kept = s.preview.filter((p) => !p.park).map((p) => keptKey(p.kind, p.kind === "tab" ? (p.url ?? "") : p.bundleId));
       await this.sweep(s, s.preview.filter((p) => p.park));
       const task = await this.sessionTask(s);
       for (const m of task?.members ?? []) m.lastUsedAt = this.now();
@@ -585,10 +590,16 @@ export class Engine {
    * Q-72: allowed work that clearly belongs to another of your tasks (one you named this session,
    * or any task you've used before) is "other productive work" for that task, not this one.
    */
-  private async workState(s: Session, task: SessionTask, text: string): Promise<WorkState> {
+  private async workState(s: Session, task: SessionTask, text: string, jobPage = false): Promise<WorkState> {
     // With one task there's nothing to split; with several, the closest one gets the time (Q-78).
     const single: WorkState = { state: "on", ...(task.members.length === 1 ? { task: task.members[0]!.label } : {}) };
     if (!text.trim()) return single;
+    // Q-82: a job application counts for a task about applying, and a page naming a task counts
+    // for that task, whatever the model makes of the words (it pulls "myworkdayjobs" toward "work").
+    if (task.members.length > 1) {
+      const sure = (jobPage ? task.members.find((m) => isApplyingTask(m.label)) : undefined) ?? task.members.find((m) => namesTask(text, m.label));
+      if (sure) return { state: "on", task: sure.label };
+    }
     try {
       const v = await this.d.judge.vector(text);
       const rep = (t: Task) => ({ label: t.labelVector!, prototypes: t.prototypes.map((p) => p.vector) });
@@ -655,17 +666,22 @@ export class Engine {
     const fingerprint = `${app.bundleId}\n${front.url ?? ""}\n${item.title ?? front.title}`;
     let v = this.verdicts.get(fingerprint);
     if (!v) {
-      if (kind === "browser") {
+      if (s.kept?.includes(kind === "browser" ? keptKey("tab", front.url ?? "") : keptKey("app", app.bundleId))) {
+        v = { action: "allow", source: "kept" };
+      } else if (kind === "browser") {
         v = front.url ? await this.d.judge.page(task, front.url, front.tabTitle ?? item.title ?? "") : await this.d.judge.titleOnly(task, stripBrowserSuffix(front.title, app.name));
       } else {
         v = await this.d.judge.app(task, app, titleExcluded(app.bundleId) ? "" : front.title);
       }
       if (this.verdicts.size > 2000) this.verdicts.clear();
       if (v.action === "allow") {
-        // CLS-32: pages kept for the task teach it (prototypes), from strong similarity only; once per item.
-        if (kind === "browser" && front.url && v.source === "similarity" && (v.s ?? 0) >= THRESHOLDS.ALLOW_MIN_S) await this.seedPrototype(task, front.url, item.title ?? "");
         const text = kind === "browser" ? itemText(item.title ?? "", item.domain ?? "") : kind === "tool" || kind === "other" || kind === "meeting" ? itemText(item.title ?? "", app.name) : "";
-        v = { ...v, work: text ? await this.workState(s, task, text) : { state: "on" } };
+        const jobPage = kind === "browser" && front.url ? isJobPage(front.url, item.title ?? "") : isJobTitle(item.title ?? "");
+        const work: WorkState = text ? await this.workState(s, task, text, jobPage) : { state: "on" };
+        // CLS-32: pages kept for the task teach it (prototypes), from strong similarity only; once per
+        // item. The example goes to the task the time counts for, so a wrong guess can't feed itself (Q-82).
+        if (kind === "browser" && front.url && v.source === "similarity" && (v.s ?? 0) >= THRESHOLDS.ALLOW_MIN_S) await this.seedPrototype(task, front.url, item.title ?? "", "task" in work ? work.task : undefined);
+        v = { ...v, work };
       }
       this.verdicts.set(fingerprint, v);
     }
@@ -688,13 +704,14 @@ export class Engine {
     return { state: "off" };
   }
 
-  private async seedPrototype(task: SessionTask, url: string, title: string): Promise<void> {
+  private async seedPrototype(task: SessionTask, url: string, title: string, countedFor?: string): Promise<void> {
     try {
       const vec = await this.d.judge.vector(itemText(title, itemDomain(url) ?? ""));
-      // With several tasks, the prototype goes to the closest one.
-      const owner = task.members
-        .filter((m) => m.labelVector)
-        .sort((a, b) => cosine(vec, b.labelVector!) - cosine(vec, a.labelVector!))[0] ?? task.members[0]!;
+      // With several tasks, the prototype goes to the task the time counted for, else the closest one.
+      const owner =
+        task.members.find((m) => m.label === countedFor) ??
+        task.members.filter((m) => m.labelVector).sort((a, b) => cosine(vec, b.labelVector!) - cosine(vec, a.labelVector!))[0] ??
+        task.members[0]!;
       const stored = this.tasks.find((t) => t.id === owner.id);
       if (stored && addPrototype(stored, vec, { kind: "similarity", s: 0.45 }, this.now())) this.saveTasks();
     } catch {
@@ -759,9 +776,11 @@ export class Engine {
     let i = 0;
     for (const tab of await this.d.system.tabs()) {
       i++;
+      if (s.kept?.includes(keptKey("tab", tab.url))) continue;
       if ((await this.d.judge.page(task, tab.url, tab.title)).action === "park") items.push({ id: `tab:${i}`, kind: "tab", bundleId: tab.bundleId, url: tab.url, title: tab.title, label: itemDomain(tab.url) ?? tab.url, park: true });
     }
     for (const app of await this.d.system.apps()) {
+      if (s.kept?.includes(keptKey("app", app.bundleId))) continue;
       if (app.regular !== false && (await this.d.judge.app(task, app, "")).action === "park") items.push({ id: `app:${app.bundleId}`, kind: "app", bundleId: app.bundleId, pid: app.pid, ...(app.path ? { path: app.path } : {}), title: app.name, label: app.name, park: true });
     }
     await this.sweep(s, items);

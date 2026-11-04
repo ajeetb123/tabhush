@@ -3,9 +3,10 @@
 // and enforces, and the ending rules hold (owner's dev build vs everyone else).
 import { beforeEach, describe, expect, it } from "vitest";
 import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { DESKTOP, MS, OWNER_RULES } from "@tabhush/core";
 import { ActivityLog } from "../src/main/activity";
-import { appKind, isSchoolPage, looksLikeGame } from "../src/main/apps";
+import { appKind, isApplyingTask, isCareerTask, isJobPage, isJobSearch, isJobTitle, isSchoolPage, looksLikeGame, namesTask } from "../src/main/apps";
 import { Categories } from "../src/main/categories";
 import { Engine, passageMatches } from "../src/main/engine";
 import { Judge } from "../src/main/judge";
@@ -120,6 +121,30 @@ describe("Start and Lock in", () => {
     await e.toggle("app:com.valvesoftware.steam", false);
     await e.confirm(45);
     expect(sys.quits).toEqual([]);
+    // Q-63: unticked means kept for the session, not just skipped at Lock in.
+    sys.frontNow = { app: { ...STEAM, pid: 2 }, title: "Steam" };
+    await e.tick();
+    clock.advance(DESKTOP.BACKGROUND_SWEEP_SEC * MS.SECOND);
+    await e.tick();
+    expect(sys.quits).toEqual([]);
+  });
+
+  it("an unticked tab stays open all session, in front or behind; another page on that site doesn't", async () => {
+    const e = make();
+    await e.start();
+    const kept = e.session!.preview.find((p) => p.url === "https://www.netflix.com/watch/1")!;
+    await e.toggle(kept.id, false);
+    await e.confirm(45);
+    sys.closed = [];
+    sys.frontNow = chromeTab("https://www.netflix.com/watch/1", "Netflix");
+    await e.tick();
+    clock.advance(DESKTOP.BACKGROUND_SWEEP_SEC * MS.SECOND);
+    await e.tick();
+    expect(sys.closed).toEqual([]);
+    sys.frontNow = chromeTab("https://www.netflix.com/watch/2", "Netflix");
+    clock.advance(MS.SECOND);
+    await e.tick();
+    expect(sys.closed.flatMap((c) => c.urls)).toEqual(["https://www.netflix.com/watch/2"]);
   });
 });
 
@@ -385,6 +410,83 @@ describe("recognizing by looking (Q-74)", () => {
     expect(isSchoolPage("us.prairielearn.com", "Homework 3 | PrairieLearn")).toBe(true);
     expect(isSchoolPage("developer.mozilla.org", "HTML canvas tutorial - MDN")).toBe(false);
     expect(isSchoolPage("netflix.com", "Netflix")).toBe(false);
+  });
+
+  it("job applications are known by address; tasks and searches about jobs by their words (Q-82)", () => {
+    expect(isJobPage("https://ngc.wd1.myworkdayjobs.com/en-US/Northrop_Grumman_External_Site/job/123")).toBe(true);
+    expect(isJobPage("https://job-boards.greenhouse.io/acme/jobs/1")).toBe(true);
+    expect(isJobPage("https://apply.careers.microsoft.com/careers/job/1")).toBe(true);
+    expect(isJobPage("https://earlycareerradar.com/")).toBe(true);
+    expect(isJobPage("https://www.linkedin.com/jobs/view/123")).toBe(true);
+    expect(isJobPage("https://www.linkedin.com/feed/")).toBe(false);
+    expect(isJobPage("https://docs.google.com/document/d/1/edit")).toBe(false);
+    expect(isJobPage("https://www.apple.com/")).toBe(false);
+    expect(isJobPage("https://enterpriseplatform.dell.com/x", "Job Application Questions - CSG Software Engineering Undergraduate Intern - Dell Careers")).toBe(true);
+    expect(isJobPage("https://enterpriseplatform.dell.com/x", "Dell")).toBe(false);
+    expect(isJobTitle("Ajeet Bondugula Resume.pdf – 1 page")).toBe(true);
+    expect(isJobTitle("Lab 3 writeup.pdf – 2 pages")).toBe(false);
+    expect(isApplyingTask("applying for internships")).toBe(true);
+    expect(isApplyingTask("internship work")).toBe(false);
+    expect(isCareerTask("internship work")).toBe(true);
+    expect(isCareerTask("CS 2114")).toBe(false);
+    expect(isJobSearch("netflix applicaiton")).toBe(true);
+    expect(isJobSearch("netflix internship")).toBe(true);
+    expect(isJobSearch("netflix shows")).toBe(false);
+    expect(isJobSearch("apple tv")).toBe(false);
+    expect(namesTask("Data Structure and Algorithm Patterns for LeetCode Interviews – Tutorial - YouTube", "leetcode")).toBe(true);
+    expect(namesTask("CS 2114 | My Digital Hand", "CS 2114")).toBe(true);
+    expect(namesTask("Software Engineering Intern myworkdayjobs.com", "internship work")).toBe(false);
+  });
+
+  it("time on job sites counts for the task about applying, and learns it, not the one with 'work' in its name (Q-82)", async () => {
+    const e = make();
+    await e.start();
+    await e.setTasks(["applying for internships", "internship work"]);
+    await e.confirm(45);
+    const tick = async (front: ReturnType<typeof chromeTab>, seconds: number) => {
+      sys.frontNow = front;
+      for (let i = 0; i < seconds; i++) {
+        await e.tick();
+        clock.advance(MS.SECOND);
+      }
+    };
+    // Shares more words with "internship work", but it's a Workday application.
+    await tick(chromeTab("https://leidos.wd5.myworkdayjobs.com/External/job/1", "Internship work opportunities"), 60);
+    await tick(chromeTab("https://teams.cloud.microsoft/", "Chat | Model Gen Internship Work | Microsoft Teams"), 30);
+    const parts = Object.fromEntries(productiveParts(asSessionLike(e.session!), clock.t).map((p) => [p.label, Math.round(p.ms / MS.SECOND)]));
+    expect(parts["applying for internships"]).toBeGreaterThanOrEqual(59);
+    expect(parts["internship work"]).toBeGreaterThanOrEqual(29);
+    const tasks = store.read<{ label: string; prototypes: unknown[] }[]>("tasks", []);
+    expect(tasks.find((t) => t.label === "applying for internships")!.prototypes).toHaveLength(1);
+    expect(tasks.find((t) => t.label === "internship work")!.prototypes).toHaveLength(1); // the Teams chat
+  });
+
+  it("LinkedIn stays open while a task is about internships or jobs; a job search isn't a distraction search (Q-82)", async () => {
+    const dir = categoriesDir();
+    writeFileSync(join(dir, "social.txt"), "linkedin.com\n");
+    const judge = new Judge({ embed, categories: new Categories(dir), essentials: () => [], schoolSites: () => [], selfBundleId: "com.tabhush.app" });
+    const task = async (...labels: string[]) => {
+      const members = await Promise.all(labels.map(async (l) => ({ id: l, label: l, prototypes: [], createdAt: 0, lastUsedAt: 0, labelVector: (await embed([l]))[0]! })));
+      return { ...members[0]!, id: labels.join("+"), label: labels.join(" + "), members };
+    };
+    judge.startSession("s");
+    const feed = ["https://www.linkedin.com/feed/", "Feed | LinkedIn"] as const;
+    expect((await judge.page(await task("CS 2114"), ...feed)).action).toBe("park");
+    expect((await judge.page(await task("CS 2114", "applying for internships"), ...feed)).action).toBe("allow");
+    const search = (q: string) => [`https://www.google.com/search?q=${encodeURIComponent(q)}`, `${q} - Google Search`] as const;
+    expect((await judge.page(await task("CS 2114"), ...search("basketball scores"))).action).toBe("park");
+    expect((await judge.page(await task("CS 2114"), ...search("basketball internship applicaiton"))).action).toBe("allow");
+  });
+
+  it("a page that names the task is related even when the model can't tell (Q-82)", async () => {
+    const dir = categoriesDir();
+    writeFileSync(join(dir, "entertainment.txt"), "youtube.com\n");
+    const judge = new Judge({ embed, categories: new Categories(dir), essentials: () => [], schoolSites: () => [], selfBundleId: "com.tabhush.app" });
+    const leetcode = { id: "l", label: "leetcode", prototypes: [], createdAt: 0, lastUsedAt: 0, labelVector: (await embed(["leetcode"]))[0]! };
+    judge.startSession("s");
+    const video = (id: string, title: string) => judge.page({ ...leetcode, members: [leetcode] }, `https://www.youtube.com/watch?v=${id}`, `${title} - YouTube`);
+    expect((await video("a", "Funny cat compilation")).action).toBe("park");
+    expect((await video("b", "Data Structure and Algorithm Patterns for LeetCode Interviews")).action).toBe("allow");
   });
 
   it("Dota 2 is quit even though no list names it", async () => {

@@ -460,6 +460,29 @@ Windows (Q-71): the same lists also hold .exe names. Browsers chrome, msedge, br
   meetings Zoom, Teams, Webex; excluded Outlook, Slack, Discord, WhatsApp, 1Password, KeePassXC, Bitwarden
 EMERGENCY_PASSAGE: "I am choosing to stop this session before my goal. My work will still be here when
   I come back, and this stop will show in my report."     retyped exactly, no paste (Q-70)
+Job applications (Q-82; time counts for a task about applying, never blocks anything):
+  JOB_HOST_SUFFIXES: myworkdayjobs.com, greenhouse.io, lever.co, jibeapply.com, icims.com,
+    smartrecruiters.com, ashbyhq.com, workable.com, taleo.net, successfactors.com, jobvite.com,
+    bamboohr.com, eightfold.ai, joinhandshake.com, simplify.jobs, wellfound.com, indeed.com,
+    glassdoor.com, ziprecruiter.com
+  JOB_HOST_WORDS: career, jobs, apply, recruit, talent, hiring        (in any host label but the TLD)
+  JOB_PATH_PREFIXES: /jobs, /careers, /job/, /apply
+  JOB_SITE_NAME_ENDINGS: careers, jobs                               ("… - Dell Careers")
+  JOB_TITLE_WORDS: job application, my applications, submit application, candidate home, resume, cover letter
+  APPLYING_TASK_WORDS: apply, applying, application(s), job search, job hunt(ing), recruiting
+Career tasks (Q-82): a task with one of CAREER_TASK_WORDS (apply, applying, application(s), intern,
+  internship(s), job(s), career(s), resume, interview(s), networking, recruiting, recruiter) keeps
+  CAREER_SITES open: linkedin.com
+Job searches (Q-82, never distraction searches): JOB_SEARCH_WORDS intern(s), internship(s), career(s),
+  job(s), hiring, recruiting, recruiter, resume, interview, new grad; or a word starting "appli"
+```
+
+Owner rules for task names (Q-82, `OWNER_RULES`):
+
+```
+LABEL_FILLER_WORDS: a, an, the, for, of, to, and, on, in, my, with, at
+  A page or window whose title has every other word of a task's name is related to that task
+  (at least ALLOW_MIN_S), and its time counts for that task.
 ```
 
 ## Lists that are partially defined
