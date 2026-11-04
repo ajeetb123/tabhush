@@ -64,7 +64,7 @@ export interface EngineDeps {
   embed: Embed;
   activity: ActivityLog;
   categories: Categories;
-  /** The owner's development build (not packaged): End works any time (Q-69). */
+  /** The owner's rules, End and Quit any time (Q-69): the development build, or an installed copy on the owner's computer (Q-83). */
   dev: boolean;
   selfBundleId: string;
   openWindow: (page: "session" | "report" | "settings") => void;

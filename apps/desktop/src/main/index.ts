@@ -17,6 +17,7 @@ import { ActivityLog } from "./activity";
 import { Categories } from "./categories";
 import { Engine } from "./engine";
 import { Judge } from "./judge";
+import { isOwnersComputer, markOwnersComputer } from "./owner";
 import { JsonStore } from "./store";
 import { HelperSystem } from "./system";
 import { Updates } from "./updates";
@@ -40,6 +41,10 @@ const testIdle = (): number => {
 };
 
 const DEV = !app.isPackaged && !(TEST && process.env.TABHUSH_AS_USER === "1");
+// Q-83: the owner's rules (end and quit any time) in the development build and in an installed copy
+// on the owner's own computer, which the development build marks. Never in the end-to-end test.
+if (DEV && !TEST) markOwnersComputer(app.getPath("userData"));
+const OWNER = DEV || (!TEST && isOwnersComputer(app.getPath("userData")));
 const IS_WIN = process.platform === "win32";
 const SELF_BUNDLE_ID = IS_WIN ? (DEV ? "electron.exe" : "tabhush.exe") : DEV ? "com.github.Electron" : "com.tabhush.app";
 
@@ -368,7 +373,7 @@ app.whenReady().then(() => {
     embed,
     activity,
     categories,
-    dev: DEV,
+    dev: OWNER,
     selfBundleId: SELF_BUNDLE_ID,
     openWindow: showWindow,
     onChange: broadcast,
