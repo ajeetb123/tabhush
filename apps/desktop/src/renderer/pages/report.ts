@@ -239,8 +239,10 @@ async function render(tabSwitch = false): Promise<void> {
   const { session } = await getSnapshot();
   setMood(session && session.committedAt !== null && session.state === "ACTIVE" ? "focus" : "calm");
   const saved = await pastSessions();
+  // A running session stands in for its saved copy; an ended one you haven't dismissed is already
+  // saved, and stays in the report (Q-84: it used to vanish until Done).
   const current = session && session.state !== "ENDED" && session.committedAt !== null ? [asSessionLike(session)] : [];
-  const all = [...saved.filter((s) => s.id !== session?.id), ...current];
+  const all = [...saved.filter((s) => !current.some((c) => c.id === s.id)), ...current];
   const now = Date.now();
 
   const tabs = h("div", { className: "tabs", attrs: { role: "tablist" } });

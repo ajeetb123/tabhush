@@ -291,6 +291,12 @@ await pass("owner (development copy)", { asUser: false }, async ({ ui, world, sl
   await ui.type('input[aria-label="Reason for ending"]', "done");
   await ui.click("End now");
   await ui.waitFor("summary 3", `document.body.innerText.includes("Session over")`, 8000);
+  // Q-84: a session you just ended is in the report before you press Done.
+  await ui.eval(`(location.hash = "report", true)`);
+  await ui.waitFor("report after ending", `location.hash === "#report" && document.body.innerText.includes("BY TASK")`, 8000);
+  check("the session just ended already shows in Today", (await ui.text()).includes("CS 2114"));
+  await ui.eval(`(location.hash = "session", true)`);
+  await ui.waitFor("back to the summary", `document.body.innerText.includes("Session over")`, 8000);
   await ui.click("Done");
   await ui.waitFor("idle after Done", `[...document.querySelectorAll("button")].some((b) => b.textContent === "Start")`);
   await ui.eval(`(window.__noReload = true, true)`);
