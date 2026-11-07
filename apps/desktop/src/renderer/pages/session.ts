@@ -299,6 +299,8 @@ function runningView(s: Session, snap: Snapshot): Node[] {
     mistake,
     h("div", { className: "card ring-card" }, ring.el, s.state === "ACTIVE" ? h("p", { className: "breath-hint", textContent: "Breathe with the ring." }) : null),
     h("div", { className: "stats" }, stat(String(blockedCount(s)), "blocked so far"), onTask),
+    // Q-84: no input means nobody is working; the time since the last input isn't counted.
+    snap.away && s.state === "ACTIVE" ? h("p", { className: "note away-note", textContent: "No input for a while, so this time isn’t counting. It picks up again when you do." }) : null,
     ...(s.state === "ACTIVE" ? [breakCard(s)] : []),
     actions,
     ...(s.state === "ACTIVE" ? [sideWorkCard(s, snap)] : []),

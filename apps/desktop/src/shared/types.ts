@@ -135,6 +135,8 @@ export interface Snapshot {
   endAccess: EndAccess;
   permissions: Permissions;
   front: FrontItem | null;
+  /** No input for a while: time isn't counting until it resumes (Q-84). */
+  away?: boolean;
   /** Added by the main process: "darwin" or "win32", and the OS helper's last error (for testers). */
   platform?: string;
   helperError?: string | null;

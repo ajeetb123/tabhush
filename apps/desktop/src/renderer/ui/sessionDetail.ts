@@ -3,7 +3,7 @@
 
 import { MS } from "@tabhush/core";
 import { avatar, h, stat } from "./common";
-import { focusSplit, formatHm, offClockMs, productiveParts, sessionTimeline, siteBreakdown, type SessionLike } from "../../shared/reportData";
+import { focusSplit, formatHm, offClockMs, productiveParts, sessionTimeline, siteBreakdown, UNASSIGNED, type SessionLike } from "../../shared/reportData";
 
 const PAGES_SHOWN = 6;
 const TIMELINE_MIN_MS = 30 * MS.SECOND; // shorter stretches are noise in the timeline
@@ -49,7 +49,7 @@ export function sessionDetail(s: SessionLike, now = Date.now()): HTMLElement {
     wrap.append(h("h2", { textContent: "By task" }));
     const list = h("ul", { className: "items" });
     for (const p of own.sort((a, b) => b.ms - a.ms)) {
-      list.append(h("li", { className: "spread" }, h("div", { className: "site" }, h("span", { className: "dot", attrs: { style: `background:${p.color}` } }), h("span", { textContent: p.label })), h("b", { textContent: formatHm(p.ms) })));
+      list.append(h("li", { className: p.key === UNASSIGNED.key ? "spread unsure" : "spread" }, h("div", { className: "site" }, h("span", { className: "dot", attrs: { style: `background:${p.color}` } }), h("span", { textContent: p.label })), h("b", { textContent: formatHm(p.ms) })));
     }
     wrap.append(h("div", { className: "card" }, list));
   }

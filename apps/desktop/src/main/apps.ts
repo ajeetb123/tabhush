@@ -127,6 +127,18 @@ export function isJobSearch(query: string): boolean {
   return hasWord(query, DESKTOP.JOB_SEARCH_WORDS) || DESKTOP.JOB_SEARCH_PREFIXES.some((p) => wordLine(query).includes(` ${p}`));
 }
 
+/**
+ * Does the title say anything about the work (Q-84)? The app's own name ("Claude" in Claude, "Google
+ * Chrome"), a blank, or a generic word ("New Tab", "Files") says nothing: with several tasks, no evidence.
+ */
+export function isInformativeTitle(title: string, place: string): boolean {
+  const t = title.trim().toLowerCase().replace(/[\s·|–—-]+$/, "");
+  if (!t) return false;
+  const p = place.trim().toLowerCase();
+  if (t === p || t === p.replace(/\.[a-z]+$/, "") || (p && t.replace(/\s+/g, "") === p.replace(/\s+/g, ""))) return false;
+  return !(OWNER_RULES.UNINFORMATIVE_TITLES as readonly string[]).includes(t);
+}
+
 /** Does the text name the task, every word of it but filler ("LeetCode patterns" for "leetcode")? (Q-82) */
 export function namesTask(text: string, label: string): boolean {
   const need = wordLine(label).trim().split(" ").filter((w) => w && !(OWNER_RULES.LABEL_FILLER_WORDS as readonly string[]).includes(w));

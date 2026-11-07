@@ -21,7 +21,7 @@ export const SESSION = {
 
 // ───────────────────────── Active time and logging (docs/09) ─────────────────────────
 export const ACTIVE_TIME = {
-  NO_INPUT_STOP_MIN: 3, // [START]
+  NO_INPUT_STOP_MIN: 2, // [START] owner 2026-11-07 (Q-84): stricter than the scope's 3
   VIDEO_GRACE_MIN: 20, // [START]
   PDF_GRACE_MIN: 5, // [START]
   DAY_BOUNDARY_HOUR_LOCAL: 4,
@@ -321,6 +321,13 @@ export const OWNER_RULES = {
     // Liquipedia and Twitch blocked; no work page, game theory or game-dev page blocked)
     "play free online games",
     "video game guides and esports",
+  ],
+  // Q-84: a window or page title that says nothing about the work. With several tasks in a session,
+  // such a window is no evidence for any of them: its time keeps counting for the task you were on.
+  // (The app's own name as the title, e.g. "Claude", is checked in code, not listed here.)
+  UNINFORMATIVE_TITLES: [
+    "new tab", "newtab", "untitled", "home", "files", "inbox", "dashboard", "loading", "loading…", "sign in", "log in", "login",
+    "welcome", "settings", "search", "downloads", "desktop", "documents", "trash", "window", "blank",
   ],
   // Q-82: a page whose title names the task (every word of it, leaving out these) is related,
   // whatever the model says ("leetcode" is opaque to it).

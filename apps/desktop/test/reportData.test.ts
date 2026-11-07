@@ -1,6 +1,6 @@
 // Report math (UI-02, UI-04; Q-65).
 import { describe, expect, it } from "vitest";
-import { dayReport, dayStart, focusSplit, formatHm, offClockMs, sessionTimeline, siteBreakdown, weekReport, type SessionLike } from "../src/shared/reportData";
+import { dayReport, dayStart, focusSplit, formatHm, historyPalette, offClockMs, productiveParts, sessionTimeline, siteBreakdown, UNASSIGNED, weekReport, type SessionLike } from "../src/shared/reportData";
 
 const H = 3_600_000;
 const M = 60_000;
@@ -138,5 +138,33 @@ describe("several tasks in one session (Q-78)", () => {
       ["Internship work", 50],
       ["Lab report", 30],
     ]);
+  });
+});
+
+describe("entries the log couldn't place (Q-84)", () => {
+  const multi = (log: SessionLike["focusLog"]): SessionLike => ({ ...sess("m", "A + B", at(10), at(10, 40)), taskIds: ["a", "b"], taskLabels: ["A", "B"], focusLog: log });
+
+  it("takes the nearest tagged entry, before it or, at the start, after it", () => {
+    const s = multi([
+      { at: at(10), state: "on", title: "Claude" },
+      { at: at(10, 10), state: "on", task: "B" },
+      { at: at(10, 20), state: "on", title: "Claude" },
+      { at: at(10, 30), state: "on", task: "A" },
+      { at: at(10, 40), state: "away" },
+    ]);
+    expect(Object.fromEntries(productiveParts(s, at(11)).map((p) => [p.label, p.ms / M]))).toEqual({ B: 30, A: 10 });
+  });
+
+  it("with no evidence at all it says so, in its own grey, and never takes a task's color", () => {
+    const s = multi([{ at: at(10), state: "on", title: "Claude" }, { at: at(10, 40), state: "away" }]);
+    expect(productiveParts(s, at(11))).toEqual([{ ...UNASSIGNED, ms: 40 * M, side: false }]);
+    const r = dayReport([s], at(11));
+    expect(r.rows).toEqual([expect.objectContaining({ key: UNASSIGNED.key, color: UNASSIGNED.color, onMs: 40 * M })]);
+    expect(r.strip.segments[0]).toMatchObject({ color: UNASSIGNED.color, label: UNASSIGNED.label });
+    expect(historyPalette([s], at(11)).has(UNASSIGNED.label.toLowerCase())).toBe(false);
+  });
+
+  it("one task needs no evidence (older sessions)", () => {
+    expect(productiveParts(sess("one", "A", at(10), at(10, 40)), at(11)).map((p) => p.label)).toEqual(["A"]);
   });
 });

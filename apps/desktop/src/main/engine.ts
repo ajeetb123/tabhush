@@ -31,6 +31,7 @@ import {
   parseUrl,
   recentTasks,
   relatedness,
+  searchQuery,
   THRESHOLDS,
   sameAsCandidates,
   SESSION,
@@ -44,7 +45,7 @@ import {
 import type { EndAccess, EndKind, FocusEntry, FrontItem, PreviewItem, Session, Settings, Snapshot } from "../shared/types";
 import { asSessionLike, dayStart, focusSplit, offClockMs } from "../shared/reportData";
 import type { ActivityLog } from "./activity";
-import { appKind, browserKind, isApplyingTask, isJobPage, isJobTitle, namesTask, stripBrowserSuffix, titleExcluded } from "./apps";
+import { appKind, browserKind, isApplyingTask, isInformativeTitle, isJobPage, isJobTitle, namesTask, stripBrowserSuffix, titleExcluded } from "./apps";
 import type { Categories } from "./categories";
 import type { Embed, Judge, SessionTask, Verdict } from "./judge";
 import type { JsonStore } from "./store";
@@ -204,6 +205,7 @@ export class Engine {
       endAccess: this.endAccess(),
       permissions: { accessibility: await this.d.system.accessibilityTrusted(false) },
       front: this.lastFront,
+      away: this.wasAway,
       otherTasks: this.session ? this.otherTaskLabels(this.session) : [],
     };
   }
@@ -470,7 +472,8 @@ export class Engine {
     const max = DESKTOP.APP_TITLE_MAX_CHARS;
     if (kind && front.url) {
       const p = parseUrl(front.url);
-      const domain = itemDomain(front.url) ?? p?.host ?? app.name;
+      // A local file or an internal page (file://, chrome://) has no host: it's the browser itself.
+      const domain = itemDomain(front.url) || p?.host || app.name;
       const hideTitle = !p || isDomainOnly(p, this.d.categories.banking());
       const title = (front.tabTitle ?? stripBrowserSuffix(front.title, app.name)).slice(0, max);
       return { label: domain, app: app.name, bundleId: app.bundleId, url: front.url, domain, ...(hideTitle || !title ? {} : { title }) };
@@ -493,13 +496,17 @@ export class Engine {
       const frontChanged = prevLabel !== `${item?.label}|${item?.title}`;
 
       // No input for a while counts as away; a meeting or a video in front gets the longer grace (TIME-03).
-      const watching = !!item && (DESKTOP.MEETING_APPS.includes(item.bundleId as never) || /youtube\.com\/watch/.test(item.url ?? "") || (!!item.url && hostMatchesAny(parseUrl(item.url)?.host ?? "", domainsOf(WEB_MEETINGS))));
+      // Q-84: a video or call earns it only while it is actually playing. On macOS the helper sees the
+      // app keeping the display awake; without that signal (Windows) the address decides.
+      const looksLikeVideo = !!item && (/youtube\.com\/watch/.test(item.url ?? "") || (!!item.url && hostMatchesAny(parseUrl(item.url)?.host ?? "", domainsOf(WEB_MEETINGS))));
+      const watching = !!item && (DESKTOP.MEETING_APPS.includes(item.bundleId as never) || (front.playing ?? looksLikeVideo));
       const idleSec = this.d.system.idleSeconds();
       const graceMin = watching ? ACTIVE_TIME.VIDEO_GRACE_MIN : ACTIVE_TIME.NO_INPUT_STOP_MIN;
       const away = this.locked || idleSec >= graceMin * 60;
       // Q-74: sitting there doing nothing is never work. When no-input is noticed, the minutes since
       // the last input come back out of the log as away time.
       if (away && !this.wasAway) this.d.activity.markAwaySince(this.locked ? now : now - idleSec * MS.SECOND, now);
+      const awayChanged = away !== this.wasAway;
       this.wasAway = away;
 
       let work: WorkState | undefined;
@@ -529,7 +536,7 @@ export class Engine {
           this.lastSweep = now;
           await this.relock(s);
         }
-        const visible = before !== s.state || s.blockEvents.length !== blocksAtStart || s.suspendedFor !== suspendedBefore;
+        const visible = before !== s.state || s.blockEvents.length !== blocksAtStart || s.suspendedFor !== suspendedBefore || awayChanged;
         if (visible) this.save();
         else if (frontChanged || now - this.lastSave >= 10 * MS.SECOND) this.save(false);
       }
@@ -590,10 +597,13 @@ export class Engine {
    * Q-72: allowed work that clearly belongs to another of your tasks (one you named this session,
    * or any task you've used before) is "other productive work" for that task, not this one.
    */
-  private async workState(s: Session, task: SessionTask, text: string, jobPage = false): Promise<WorkState> {
+  private async workState(s: Session, task: SessionTask, text: string, jobPage = false, informative = true): Promise<WorkState> {
     // With one task there's nothing to split; with several, the closest one gets the time (Q-78).
     const single: WorkState = { state: "on", ...(task.members.length === 1 ? { task: task.members[0]!.label } : {}) };
     if (!text.trim()) return single;
+    // Q-84: a window that says nothing about the work (the app's own name, "New Tab", "Files") is no
+    // evidence for any task; the time keeps counting for the task you were on (the tick carries it).
+    if (!informative) return single;
     // Q-82: a job application counts for a task about applying, and a page naming a task counts
     // for that task, whatever the model makes of the words (it pulls "myworkdayjobs" toward "work").
     if (task.members.length > 1) {
@@ -605,9 +615,11 @@ export class Engine {
       const rep = (t: Task) => ({ label: t.labelVector!, prototypes: t.prototypes.map((p) => p.vector) });
       const members = task.members.filter((m) => m.labelVector).map((m) => ({ m, s: relatedness(v, rep(m)) })).sort((a, b) => b.s - a.s);
       const mine = members[0]?.s ?? 0;
-      const own: WorkState = { state: "on", task: (members[0]?.m ?? task.members[0]!).label };
+      // Q-84: with several tasks, a page the model can't place (under MIDDLE_MIN_S for every one of
+      // them) is no evidence either, rather than a guess for whichever task has the most examples.
+      const placed: WorkState = task.members.length === 1 ? single : mine < THRESHOLDS.MIDDLE_MIN_S ? { state: "on" } : { state: "on", task: members[0]!.m.label };
       const others = this.settings.countOtherWork ? this.tasks.filter((t) => !s.taskIds.includes(t.id) && t.labelVector) : [];
-      if (!others.length) return task.members.length === 1 ? single : own;
+      if (!others.length) return placed;
       // Tasks named this session win a tie with older ones.
       const scored = others
         .map((t) => ({ t, s: relatedness(v, rep(t)) + (s.otherTaskIds.includes(t.id) ? 1e-6 : 0) }))
@@ -616,7 +628,7 @@ export class Engine {
       if (mine < THRESHOLDS.ALLOW_MIN_S && best.s >= THRESHOLDS.ALLOW_MIN_S && best.s - mine >= OWNER_RULES.OTHER_WORK_MARGIN) {
         return { state: "other", task: best.t.label };
       }
-      return task.members.length === 1 ? single : own;
+      return placed;
     } catch {
       return single; // tier 2 unavailable: counted as the session's task, as before
     }
@@ -675,12 +687,18 @@ export class Engine {
       }
       if (this.verdicts.size > 2000) this.verdicts.clear();
       if (v.action === "allow") {
-        const text = kind === "browser" ? itemText(item.title ?? "", item.domain ?? "") : kind === "tool" || kind === "other" || kind === "meeting" ? itemText(item.title ?? "", app.name) : "";
+        const place = kind === "browser" ? (item.domain ?? "") : app.name;
+        const text = kind === "browser" || kind === "tool" || kind === "other" || kind === "meeting" ? itemText(item.title ?? "", place) : "";
+        const informative = isInformativeTitle(item.title ?? "", place);
         const jobPage = kind === "browser" && front.url ? isJobPage(front.url, item.title ?? "") : isJobTitle(item.title ?? "");
-        const work: WorkState = text ? await this.workState(s, task, text, jobPage) : { state: "on" };
+        const work: WorkState = text ? await this.workState(s, task, text, jobPage, informative) : { state: "on" };
         // CLS-32: pages kept for the task teach it (prototypes), from strong similarity only; once per
-        // item. The example goes to the task the time counts for, so a wrong guess can't feed itself (Q-82).
-        if (kind === "browser" && front.url && v.source === "similarity" && (v.s ?? 0) >= THRESHOLDS.ALLOW_MIN_S) await this.seedPrototype(task, front.url, item.title ?? "", "task" in work ? work.task : undefined);
+        // item. The example goes to the task the time counts for, so a wrong guess can't feed itself
+        // (Q-82); a search results page or a window that says nothing teaches nothing (Q-84).
+        const counted = "task" in work ? work.task : undefined;
+        if (kind === "browser" && front.url && v.source === "similarity" && (v.s ?? 0) >= THRESHOLDS.ALLOW_MIN_S && counted && informative && searchQuery(front.url) === null) {
+          await this.seedPrototype(task, front.url, item.title ?? "", counted);
+        }
         v = { ...v, work };
       }
       this.verdicts.set(fingerprint, v);
@@ -722,7 +740,8 @@ export class Engine {
   private logFocus(s: Session, state: FocusEntry["state"], where: { domain?: string; title?: string; task?: string } = {}, at = this.now()): void {
     if (state !== "away" && s.state !== "ACTIVE") return;
     const last = s.focusLog[s.focusLog.length - 1];
-    if (last && last.state === state && (state === "away" || (last.domain === where.domain && last.title === where.title && last.task === where.task))) return;
+    const same = (a?: string, b?: string) => (a ?? "") === (b ?? "");
+    if (last && last.state === state && (state === "away" || (same(last.domain, where.domain) && same(last.title, where.title) && same(last.task, where.task)))) return;
     const t = Math.max(at, last?.at ?? at);
     s.focusLog.push(
       state === "away"

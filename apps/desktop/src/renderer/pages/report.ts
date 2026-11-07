@@ -4,7 +4,7 @@
 import { MS } from "@tabhush/core";
 import type { ActivitySegment, Session } from "../../shared/types";
 import { animateNumber, avatar, call, formatDuration, getSnapshot, h, playSwitch, setMood, setTitle, topbar } from "../ui/common";
-import { activityBlocks, activityTotals, appBreakdown, asSessionLike, dayReport, dayStart, formatHm, historyPalette, sessionTasks, taskColor, weekReport, type SessionLike } from "../../shared/reportData";
+import { activityBlocks, activityTotals, appBreakdown, asSessionLike, dayReport, dayStart, formatHm, historyPalette, sessionTasks, taskColor, weekReport, type SessionLike, UNASSIGNED } from "../../shared/reportData";
 import { endLabel, sessionDetail } from "../ui/sessionDetail";
 
 const main = document.querySelector("main")!;
@@ -138,16 +138,19 @@ function todayView(sessions: SessionLike[], now: number, palette: Map<string, st
   const mid = r.strip.startMs + span / 2;
   const rows = h("ul", { className: "taskrows" });
   for (const row of r.rows) {
+    const unsure = row.key === UNASSIGNED.key; // Q-84: said plainly, not guessed
     rows.append(
       h(
         "li",
-        {},
+        { className: unsure ? "unsure" : "" },
         h("span", { className: "dot", attrs: { style: `background:${row.color}` } }),
         h("span", { textContent: row.label }),
         h("span", { className: "t", textContent: formatHm(row.onMs) }),
         h("span", {
           className: "c",
-          textContent: [row.sessions ? `${row.sessions} session${row.sessions === 1 ? "" : "s"}` : "", row.sideMs ? `${formatHm(row.sideMs)} as side work` : ""].filter(Boolean).join(" · "),
+          textContent: unsure
+            ? "no page or window said which"
+            : [row.sessions ? `${row.sessions} session${row.sessions === 1 ? "" : "s"}` : "", row.sideMs ? `${formatHm(row.sideMs)} as side work` : ""].filter(Boolean).join(" · "),
         }),
       ),
     );

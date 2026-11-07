@@ -53,6 +53,7 @@ Current task and timer, Switch task, Break, End, AI checks left today, Limited m
 One color per task · lots of whitespace · system font · dark mode · **no badges or confetti** (badges, pets and leaderboards are Out).
 **Owner change 2026-11-02 (Q-73):** "Calm Aurora": the calm palette stays, but soft low-saturation ambient light that follows the session's state, frosted-glass surfaces, animated SVG (the focus orb at Start, the live goal ring, the logo's beating dot) and choreographed motion are now part of the look. No badges, emoji or confetti; everything stops under the OS "reduce motion" setting.
 **Owner change 2026-11-03 (Q-81):** switching between Session, Report and Settings is instant and in place, with no reload; entrance motion plays once per visit, and a view never redraws while nothing it shows has changed.
+**Owner change 2026-11-07 (Q-84):** By task shows a grey "Couldn't tell which task" row (dashed dot) for session time no page or window could place; the strip draws it grey too. It is said, not guessed.
 **Owner change 2026-11-01 (Q-66):** a calm, non-vibrant look: warm neutral background, one muted pine-green accent, ink buttons, muted task colors, no gradients or emoji. Font: **Plus Jakarta Sans** (OFL-1.1), bundled with the extension (no web fonts), system fonts as fallback.
 
 ## UI-07 Limited mode indicator
@@ -71,6 +72,7 @@ Toolbar badge shows "Limited mode" while failing open (`04` LOCK-08).
 Focused time only counts while the user is there. After **3 minutes with no input** on a normal page, time stops counting until input returns. Idle source: browser idle API (v1), system idle timer (desktop). Neither needs a permission.
 
 ### TIME-03 Video and PDF
+**Owner change 2026-11-07 (Q-84):** the no-input stop is 2 minutes, backdated to the last input. A video or call earns the 20-minute grace only while it is actually playing: on macOS the helper sees the app keeping the display awake (a paused video, or a page just sitting there, doesn't); Windows still goes by the address. The session view says "No input for a while, so this time isn't counting" while it applies.
 - Video playing in an allowed **front** tab counts for up to **20 minutes** after last input, then a one-tap **"Still here?"** keeps it counting.
 - PDF in front counts for up to **5 minutes** after last input.
 - Neither ever counts as evidence for a training label.

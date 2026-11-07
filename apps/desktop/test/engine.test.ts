@@ -11,7 +11,7 @@ import { Categories } from "../src/main/categories";
 import { Engine, passageMatches } from "../src/main/engine";
 import { Judge } from "../src/main/judge";
 import { JsonStore } from "../src/main/store";
-import { activityTotals, appBreakdown, asSessionLike, productiveParts } from "../src/shared/reportData";
+import { activityTotals, appBreakdown, asSessionLike, dayReport, focusSplit, productiveParts, UNASSIGNED } from "../src/shared/reportData";
 import { app, categoriesDir, chromeTab, CHROME, Clock, fakeEmbed, FakeSystem, FIREFOX, tempDir } from "./fakes";
 
 const embed = async (t: string[]) => fakeEmbed(t);
@@ -19,6 +19,7 @@ const STEAM = app("Steam", "com.valvesoftware.steam");
 const SPOTIFY = app("Spotify", "com.spotify.client", "public.app-category.music");
 const VSCODE = app("Code", "com.microsoft.VSCode", "public.app-category.developer-tools");
 const MESSAGES = app("Messages", "com.apple.MobileSMS", "public.app-category.social-networking");
+const CLAUDE = app("Claude", "com.anthropic.claudefordesktop");
 
 let sys: FakeSystem;
 let clock: Clock;
@@ -745,6 +746,123 @@ describe("edge cases", () => {
     await e.stepAway();
     expect(await e.emergencyStop("ER visit", DESKTOP.EMERGENCY_PASSAGE)).toBe(true);
     expect(e.session!.pauses[0]!.endedAt).not.toBeNull();
+  });
+});
+
+describe("which task gets the time (Q-84)", () => {
+  const run = async (e: Engine, front: typeof sys.frontNow, seconds: number) => {
+    sys.frontNow = front;
+    for (let i = 0; i < seconds; i++) {
+      await e.tick();
+      clock.advance(MS.SECOND);
+    }
+  };
+  const seconds = (e: Engine) => Object.fromEntries(productiveParts(asSessionLike(e.session!), clock.t).map((p) => [p.label, Math.round(p.ms / MS.SECOND)]));
+
+  it("a window that says nothing (Claude, a new tab) counts for the task you were on, before it and after it", async () => {
+    const e = make();
+    await e.start();
+    await e.setTasks(["applying for internships", "stats midterm"]);
+    await e.confirm(45);
+    await run(e, { app: CLAUDE, title: "Claude" }, 60); // before any evidence
+    await run(e, chromeTab("https://www.google.com/search?q=stats+midterm+practice", "stats midterm practice - Google Search"), 20);
+    await run(e, { app: CLAUDE, title: "Claude" }, 60);
+    await run(e, chromeTab("chrome://newtab/", "New Tab"), 10);
+    const parts = seconds(e);
+    expect(parts["stats midterm"]).toBeGreaterThanOrEqual(149);
+    expect(parts["applying for internships"]).toBeUndefined();
+    expect(parts[UNASSIGNED.label]).toBeUndefined();
+  });
+
+  it("a session with no evidence at all says so, instead of crediting the first task", async () => {
+    const e = make();
+    await e.start();
+    await e.setTasks(["applying for internships", "stats midterm"]);
+    await e.confirm(45);
+    await run(e, { app: CLAUDE, title: "Claude" }, 120);
+    const parts = seconds(e);
+    expect(Object.keys(parts)).toEqual([UNASSIGNED.label]);
+    expect(parts[UNASSIGNED.label]).toBeGreaterThanOrEqual(119);
+    expect(dayReport([asSessionLike(e.session!)], clock.t).rows[0]).toMatchObject({ key: UNASSIGNED.key, color: UNASSIGNED.color });
+  });
+
+  it("with several tasks, a page the model can't place isn't guessed; it stays with the task you were on", async () => {
+    const e = make();
+    await e.start();
+    await e.setTasks(["Chem lab report", "Resume tailoring"]);
+    await e.confirm(45);
+    await run(e, chromeTab("https://docs.google.com/document/d/3/edit", "Resume tailoring for internship"), 60);
+    await run(e, chromeTab("https://docs.google.com/document/d/4/edit", "Meeting notes"), 60); // nothing like either task
+    const parts = seconds(e);
+    expect(parts["Resume tailoring"]).toBeGreaterThanOrEqual(119);
+    expect(parts["Chem lab report"]).toBeUndefined();
+  });
+
+  it("search pages and windows that say nothing teach a task nothing", async () => {
+    const e = make();
+    await e.start();
+    await e.setTasks(["CS 2114 project"]);
+    await e.confirm(45);
+    const examples = () => store.read<{ label: string; prototypes: unknown[] }[]>("tasks", []).find((t) => t.label === "CS 2114 project")!.prototypes.length;
+    await run(e, chromeTab("https://www.google.com/search?q=cs+2114+project", "cs 2114 project - Google Search"), 5);
+    expect(examples()).toBe(0);
+    await run(e, chromeTab("https://docs.google.com/document/d/5/edit", "CS 2114 project writeup"), 5);
+    expect(examples()).toBe(1);
+  });
+
+  it("a local file open in the browser is logged as the browser, once, not every second", async () => {
+    const e = make();
+    await lockIn(e);
+    await run(e, chromeTab("file:///Users/a/Sampling%20Distributions.pdf", "Sampling Distributions.pdf"), 5);
+    const entries = e.session!.focusLog.filter((x) => x.title === "Sampling Distributions.pdf");
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.domain).toBe("Google Chrome");
+  });
+});
+
+describe("not doing anything (Q-84)", () => {
+  it("no input for 2 minutes stops the clock back to the last input; it resumes with the next input", async () => {
+    const e = make();
+    await lockIn(e);
+    sys.frontNow = { app: CLAUDE, title: "Claude" };
+    for (let i = 0; i < 300; i++) {
+      sys.idle = i >= 60 ? i - 60 : 0; // input stops after a minute
+      await e.tick();
+      clock.advance(MS.SECOND);
+    }
+    expect((await e.snapshot()).away).toBe(true);
+    sys.idle = 0;
+    for (let i = 0; i < 60; i++) {
+      await e.tick();
+      clock.advance(MS.SECOND);
+    }
+    expect((await e.snapshot()).away).toBe(false);
+    const split = focusSplit(asSessionLike(e.session!), clock.t);
+    expect(Math.abs(split.on / MS.SECOND - 120)).toBeLessThanOrEqual(2);
+    expect(Math.abs(split.away / MS.SECOND - 240)).toBeLessThanOrEqual(2);
+  });
+
+  it("a video gets the longer grace only while it is actually playing", async () => {
+    const e = make();
+    await lockIn(e);
+    const video = chromeTab("https://www.youtube.com/watch?v=lecture12", "Lecture 12: Sampling distributions");
+    sys.frontNow = { ...video, playing: true };
+    for (let i = 0; i < 600; i++) {
+      sys.idle = i;
+      await e.tick();
+      clock.advance(MS.SECOND);
+    }
+    expect((await e.snapshot()).away).toBe(false);
+    sys.frontNow = { ...video, playing: false }; // paused: a page sitting there
+    await e.tick();
+    expect((await e.snapshot()).away).toBe(true);
+    // A helper without the signal (Windows): the address decides, as before.
+    sys.idle = 0;
+    await e.tick();
+    sys.frontNow = video;
+    sys.idle = 600;
+    await e.tick();
+    expect((await e.snapshot()).away).toBe(false);
   });
 });
 

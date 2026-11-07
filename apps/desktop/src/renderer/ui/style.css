@@ -556,3 +556,8 @@ body.settled .weekbars .val,
 body.settled .strip span,
 body.settled .report-card .body,
 body.settled .footer { animation: none; }
+
+/* Q-84: time the log couldn't place on a task is shown as such, muted, not guessed. */
+li.unsure { opacity: .72; }
+li.unsure .dot { background: transparent !important; border: 2px dashed currentColor; box-sizing: border-box; }
+.note.away-note { opacity: .85; }

@@ -7,6 +7,7 @@
 
 import ApplicationServices
 import Cocoa
+import IOKit.pwr_mgt
 
 // Browsers whose tabs can be read and closed with Apple Events.
 let chromeFamily: Set<String> = [
@@ -74,6 +75,21 @@ func focusedWindowTitle(_ pid: pid_t) -> String {
   return (title as? String) ?? ""
 }
 
+/// Is the app keeping the display awake? A playing video or a call asserts that; a paused one, or a
+/// page just sitting there, doesn't (Q-84). From the system's power assertions, no permission needed.
+/// Browsers and Electron apps assert from their main process; Safari's web content processes don't match.
+func keepsDisplayAwake(_ pid: pid_t) -> Bool {
+  var raw: Unmanaged<CFDictionary>?
+  guard IOPMCopyAssertionsByProcess(&raw) == kIOReturnSuccess, let dict = raw?.takeRetainedValue() as? [AnyHashable: Any] else { return false }
+  let displayTypes: Set<String> = ["PreventUserIdleDisplaySleep", "NoDisplaySleepAssertion"]
+  for (key, value) in dict {
+    let owner: Int32? = (key as? NSNumber)?.int32Value ?? Int32((key as? String) ?? "")
+    guard owner == pid, let list = value as? [[String: Any]] else { continue }
+    for a in list where displayTypes.contains((a["AssertType"] as? String) ?? (a["AssertionType"] as? String) ?? "") { return true }
+  }
+  return false
+}
+
 /// URL and title of the active tab of a running browser's front window, or nil.
 func activeTab(_ bundleId: String) -> (url: String, title: String)? {
   guard isRunning(bundleId) != nil else { return nil }
@@ -98,7 +114,7 @@ func handle(_ msg: [String: Any]) -> [String: Any] {
 
   case "front":
     guard let app = NSWorkspace.shared.frontmostApplication else { return ["app": NSNull()] }
-    var r: [String: Any] = ["app": appInfo(app), "title": focusedWindowTitle(app.processIdentifier)]
+    var r: [String: Any] = ["app": appInfo(app), "title": focusedWindowTitle(app.processIdentifier), "playing": keepsDisplayAwake(app.processIdentifier)]
     if let bid = app.bundleIdentifier, let tab = activeTab(bid) {
       r["url"] = tab.url
       r["tabTitle"] = tab.title

@@ -46,6 +46,7 @@ The cheapest sure tier decides. Only unseen middle-confidence items reach the LL
 - During the session, accepted items join. An **accepted override joins only after the 3-active-minute rule** (CLS-62).
 - Rationale: tasks are multimodal and relatedness is often about tools (Stack Overflow, Desmos, ChatGPT, search) more than wording. **Never average into one task vector.**
 - **Owner change 2026-11-03 (Q-82):** with several tasks in a session, an item's example goes to the task its time counted for, not the task with the closest name. Job applications (recognized by address and title) count for a task named as applying, and a title that names a task (every word but filler) counts for that task and is related to it whatever the model says.
+- **Owner change 2026-11-07 (Q-84):** a window that says nothing (the app's own name, blank, `UNINFORMATIVE_TITLES`) or an item under MIDDLE_MIN_S for every session task is no evidence for any of them: its time keeps the task you were on, and it seeds nothing. Search results pages seed nothing either.
 
 ### CLS-33 Relatedness score
 ```

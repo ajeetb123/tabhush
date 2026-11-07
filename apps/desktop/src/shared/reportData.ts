@@ -159,6 +159,31 @@ export function sessionTasks(s: SessionLike): string[] {
 /** A task's default color, from its name (used where only one task is shown). */
 export const taskColor = (label: string): string => colorFor(label.toLowerCase());
 
+/** Time the log couldn't place on a task (a window that says nothing, Q-84): the report says so rather than guess. */
+export const UNASSIGNED = { key: "?", label: "Couldn’t tell which task", color: "#b5b2aa" } as const;
+
+/**
+ * Each entry's task for the report (Q-84): its own tag when it names a session task; else the nearest
+ * tagged entry before it, else the nearest after it (a bare "Claude" window between two stats pages
+ * was stats); else none. A session with one task needs no evidence.
+ */
+function resolvedTasks(log: readonly { state: string; task?: string }[], tasks: readonly string[]): (string | undefined)[] {
+  if (tasks.length === 1) return log.map((e) => (e.state === "on" ? tasks[0] : undefined));
+  const own = log.map((e) => (e.state === "on" && e.task && tasks.some((t) => t.toLowerCase() === e.task!.toLowerCase()) ? e.task : undefined));
+  const out = [...own];
+  let prev: string | undefined;
+  for (let i = 0; i < log.length; i++) {
+    if (own[i]) prev = own[i];
+    else if (log[i]!.state === "on") out[i] = prev;
+  }
+  let next: string | undefined;
+  for (let i = log.length - 1; i >= 0; i--) {
+    if (own[i]) next = own[i];
+    else if (log[i]!.state === "on" && !out[i]) out[i] = next;
+  }
+  return out;
+}
+
 // Most distinct first, so the top three tasks read as blue, clay and green (Q-78, the Today mockup).
 const DISTINCT_ORDER = ["#7487ad", "#c48a64", "#6f9a8b", "#bfa35a", "#9a7aa6", "#5f97a3"] as const;
 
@@ -181,15 +206,16 @@ export function productiveParts(s: SessionLike, now: number, from = -Infinity, t
   if (s.committedAt !== null) {
     const end = s.endedAt ?? now;
     const log = s.focusLog.length ? s.focusLog : [{ at: s.committedAt, state: "on" as const }];
+    const resolved = resolvedTasks(log, tasks);
     log.forEach((e, i) => {
       if (e.state !== "on" && e.state !== "other") return;
       const a = Math.max(e.at, from, s.committedAt!);
       const b = Math.min(log[i + 1]?.at ?? end, to, end);
       if (b <= a) return;
-      const label = e.state === "on" ? (e.task && tasks.some((t) => t.toLowerCase() === e.task!.toLowerCase()) ? e.task : tasks[0]!) : e.task;
-      if (!label) return;
-      const key = label.toLowerCase();
-      const p = parts.get(key) ?? { key, label, color: taskColor(label), ms: 0, side: e.state === "other" };
+      const label = e.state === "on" ? resolved[i] : e.task;
+      if (!label && e.state === "other") return;
+      const key = label ? label.toLowerCase() : UNASSIGNED.key;
+      const p = parts.get(key) ?? (label ? { key, label, color: taskColor(label), ms: 0, side: e.state === "other" } : { ...UNASSIGNED, ms: 0, side: false });
       p.ms += b - a;
       parts.set(key, p);
     });
@@ -208,16 +234,18 @@ export function taskStretches(s: SessionLike, now: number, from = -Infinity, to 
   const end = s.endedAt ?? now;
   const log = s.focusLog.length ? s.focusLog : [{ at: s.committedAt, state: "on" as const }];
   const out: { from: number; to: number; color: string; label: string }[] = [];
+  const resolved = resolvedTasks(log, tasks);
   log.forEach((e, i) => {
     if (e.state !== "on" && e.state !== "other") return;
     const a = Math.max(e.at, from, s.committedAt!);
     const b = Math.min(log[i + 1]?.at ?? end, to, end);
     if (b <= a) return;
-    const label = e.state === "on" ? (e.task && tasks.some((t) => t.toLowerCase() === e.task!.toLowerCase()) ? e.task : tasks[0]!) : e.task;
-    if (!label) return;
+    const label = e.state === "on" ? resolved[i] : e.task;
+    if (!label && e.state === "other") return;
+    const shown = label ?? UNASSIGNED.label;
     const last = out[out.length - 1];
-    if (last && last.label.toLowerCase() === label.toLowerCase() && a - last.to <= STRIP_MERGE_GAP_MS) last.to = b;
-    else out.push({ from: a, to: b, color: taskColor(label), label });
+    if (last && last.label.toLowerCase() === shown.toLowerCase() && a - last.to <= STRIP_MERGE_GAP_MS) last.to = b;
+    else out.push({ from: a, to: b, color: label ? taskColor(label) : UNASSIGNED.color, label: shown });
   });
   return out.filter((x) => x.to - x.from >= STRIP_MIN_MS);
 }
@@ -256,6 +284,7 @@ export function historyPalette(sessions: readonly SessionLike[], now: number): M
     t.ms += p.ms;
     totals.set(p.key, t);
   }
+  totals.delete(UNASSIGNED.key); // keeps its own grey
   return paletteFor([...totals.values()].sort((a, b) => b.ms - a.ms).map((t) => t.label));
 }
 
@@ -296,7 +325,7 @@ export function dayReport(sessions: SessionLike[], now: number, palette?: Map<st
 
   // Every task in the day gets its own color, in the strip and the rows alike.
   const ordered = [...rows.values()].sort((a, b) => b.onMs - a.onMs);
-  const colors = palette ?? paletteFor(ordered.map((r) => r.label));
+  const colors = palette ?? paletteFor(ordered.filter((r) => r.key !== UNASSIGNED.key).map((r) => r.label));
   for (const r of ordered) r.color = colors.get(r.label.toLowerCase()) ?? r.color;
   for (const seg of segments) seg.color = colors.get(seg.label.toLowerCase()) ?? seg.color;
 
@@ -364,7 +393,7 @@ export function weekReport(sessions: SessionLike[], now: number, palette?: Map<s
   }
   const weekTotals = new Map<string, number>();
   for (const d of days) for (const p of d.parts) weekTotals.set(p.label, (weekTotals.get(p.label) ?? 0) + p.onMs);
-  const weekPalette = palette ?? paletteFor([...weekTotals.entries()].sort((a, b) => b[1] - a[1]).map(([l]) => l));
+  const weekPalette = palette ?? paletteFor([...weekTotals.entries()].filter(([l]) => l !== UNASSIGNED.label).sort((a, b) => b[1] - a[1]).map(([l]) => l));
   for (const d of days) for (const p of d.parts) p.color = weekPalette.get(p.label.toLowerCase()) ?? p.color;
   const totalMs = days.reduce((a, d) => a + d.totalMs, 0);
   const best = [...byPart.entries()].sort((a, b) => b[1] - a[1])[0];

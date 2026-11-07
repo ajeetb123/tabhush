@@ -23,6 +23,8 @@ export interface FrontInfo {
   /** Active tab of a scriptable browser's front window (Apple Events). */
   url?: string;
   tabTitle?: string;
+  /** The front app is keeping the display awake: a video or a call is playing (macOS helper, Q-84). */
+  playing?: boolean;
 }
 
 export interface BrowserTab {
@@ -147,7 +149,13 @@ export class HelperSystem implements System {
   async front(): Promise<FrontInfo> {
     const r = await this.call("front");
     if (!r?.ok) return { app: null, title: "" };
-    return { app: (r.app as AppInfo | null) ?? null, title: String(r.title ?? ""), url: r.url as string | undefined, tabTitle: r.tabTitle as string | undefined };
+    return {
+      app: (r.app as AppInfo | null) ?? null,
+      title: String(r.title ?? ""),
+      url: r.url as string | undefined,
+      tabTitle: r.tabTitle as string | undefined,
+      ...(typeof r.playing === "boolean" ? { playing: r.playing } : {}),
+    };
   }
 
   async apps(): Promise<AppInfo[]> {

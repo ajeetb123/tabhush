@@ -17,8 +17,8 @@ export const SESSION = {
 
 // ───────────────────────── Active time and logging (docs/09) ─────────────────────────
 export const ACTIVE_TIME = {
-  NO_INPUT_STOP_MIN: 3,         // [START] normal page: time stops counting after 3 min without input
-  VIDEO_GRACE_MIN: 20,          // [START] video in an allowed FRONT tab counts up to 20 min after last input, then "Still here?"
+  NO_INPUT_STOP_MIN: 2,         // [START] normal page: time stops counting after 2 min without input, back to the last input (owner 2026-11-07, Q-84; was 3)
+  VIDEO_GRACE_MIN: 20,          // [START] a video or call in front counts up to 20 min after last input; on macOS only while it is actually playing (Q-84)
   PDF_GRACE_MIN: 5,             // [START] PDF in front counts up to 5 min after last input
   DAY_BOUNDARY_HOUR_LOCAL: 4,   // a "day" runs 4am to 4am local time
 };
@@ -477,12 +477,18 @@ Job searches (Q-82, never distraction searches): JOB_SEARCH_WORDS intern(s), int
   job(s), hiring, recruiting, recruiter, resume, interview, new grad; or a word starting "appli"
 ```
 
-Owner rules for task names (Q-82, `OWNER_RULES`):
+Owner rules for task names (Q-82, Q-84, `OWNER_RULES`):
 
 ```
 LABEL_FILLER_WORDS: a, an, the, for, of, to, and, on, in, my, with, at
   A page or window whose title has every other word of a task's name is related to that task
   (at least ALLOW_MIN_S), and its time counts for that task.
+UNINFORMATIVE_TITLES: new tab, newtab, untitled, home, files, inbox, dashboard, loading, sign in, log in,
+  login, welcome, settings, search, downloads, desktop, documents, trash, window, blank
+  A title in this list, a blank one, or the app's own name ("Claude" in Claude) says nothing about the
+  work. With several tasks it is no evidence: the time counts for the task you were on (nearest tagged
+  entry before, else after); a session with none shows "Couldn't tell which task". So is a page under
+  MIDDLE_MIN_S for every task. Neither becomes a learned example, nor does a search results page.
 ```
 
 ## Lists that are partially defined

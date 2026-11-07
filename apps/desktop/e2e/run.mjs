@@ -365,7 +365,7 @@ await pass("regular user (installed copy)", { asUser: true }, async ({ ui, world
   world.set({ idle: 200 });
   await sleep(2500);
   let s = (await ui.snap()).session;
-  check("no input for 3 minutes counts as away", s.focusLog[s.focusLog.length - 1]?.state === "away");
+  check("no input for 2 minutes counts as away", s.focusLog[s.focusLog.length - 1]?.state === "away");
   world.set({ idle: 0 });
   await sleep(2000);
 
