@@ -6,7 +6,7 @@ Hit Start from wherever you are. Tabhush figures out what you're working on, qui
 
 | You want to… | Read |
 |---|---|
-| Work on the code (any agent or person) | `AGENTS.md` first, then `CLAUDE.md` and `DEVELOPMENT.md` |
+| Work on the code (any agent or person) | `AGENTS.md` first, then `DEVELOPMENT.md` |
 | Know what's built and what's left | `STATUS.md` |
 | Look up a number, list or threshold | `CONSTANTS.md` (mirrored in `packages/core/src/constants.ts`) |
 | Know why something works the way it does | `docs/16-open-questions.md` (every owner decision, Q-01 … Q-76) |
